@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Listar Professores - Controle de Dublagem{% endblock %}
+{% block page_title %}Lista de Professores{% endblock %}
+
+{% block extra_css %}
+    .professores-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+    }
+    
+    .professores-table th,
+    .professores-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .professores-table th {
+        background: #667eea;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .professores-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.85em;
+        font-weight: bold;
+        margin-right: 5px;
+    }
+    
+    .badge-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .badge-info {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+    
+    .empty-state p {
+        font-size: 1.2em;
+        margin-top: 10px;
+    }
+    
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .professores-table {
+            font-size: 0.85em;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .professores-table thead {
+            display: none;
+        }
+        
+        .professores-table tbody,
+        .professores-table tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+        }
+        
+        .professores-table td {
+            display: block;
+            text-align: left;
+            padding: 8px;
+            border: none;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .professores-table td:last-child {
+            border-bottom: none;
+        }
+        
+        .professores-table td::before {
+            content: attr(data-label) ": ";
+            font-weight: bold;
+            color: #667eea;
+            display: inline-block;
+            min-width: 100px;
+        }
+        
+        .badge {
+            display: inline-block;
+            margin: 2px;
+            font-size: 0.75em;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .professores-table {
+            font-size: 0.75em;
+        }
+        
+        .professores-table td {
+            padding: 6px;
+        }
+        
+        .professores-table td::before {
+            min-width: 80px;
+            font-size: 0.9em;
+        }
+    }
+{% endblock %}
+
+{% block content %}
+{% if professores %}
+    <table class="professores-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Tipo</th>
+                <th>Data de Cadastro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for professor in professores %}
+            <tr>
+                <td data-label="ID">{{ professor.id }}</td>
+                <td data-label="Nome"><strong>{{ professor.nome }}</strong></td>
+                <td data-label="Telefone">{{ professor.telefone or '-' }}</td>
+                <td data-label="Modalidades">
+                    {% if professor.dublagem_presencial %}
+                        <span class="badge badge-success">Dublagem Presencial</span>
+                    {% endif %}
+                    {% if professor.dublagem_online %}
+                        <span class="badge badge-success">Dublagem Online</span>
+                    {% endif %}
+                    {% if professor.teatro_presencial %}
+                        <span class="badge badge-info">Teatro Presencial</span>
+                    {% endif %}
+                    {% if professor.teatro_online %}
+                        <span class="badge badge-info">Teatro Online</span>
+                    {% endif %}
+                    {% if professor.musical %}
+                        <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
+                    {% endif %}
+                    {% if professor.locucao %}
+                        <span class="badge" style="background: #dc3545; color: white;">Locução</span>
+                    {% endif %}
+                    {% if professor.curso_apresentador %}
+                        <span class="badge" style="background: #6c757d; color: white;">Curso de Apresentador</span>
+                    {% endif %}
+                    {% if not professor.dublagem_presencial and not professor.dublagem_online and not professor.teatro_presencial and not professor.teatro_online and not professor.musical and not professor.locucao and not professor.curso_apresentador %}
+                        <span>-</span>
+                    {% endif %}
+                </td>
+                <td data-label="Data Cadastro">{{ professor.data_cadastro.strftime('%d/%m/%Y %H:%M') if professor.data_cadastro else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <h2>Nenhum professor cadastrado ainda</h2>
+        <p>Comece cadastrando professores na página de cadastro.</p>
+    </div>
+{% endif %}
+{% endblock %}
+

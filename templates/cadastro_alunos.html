@@ -1,0 +1,660 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro de Alunos - Controle de Dublagem{% endblock %}
+{% block page_title %}Cadastro de Alunos{% endblock %}
+
+{% block extra_css %}
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label.required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="tel"],
+    .form-group input[type="date"],
+    .form-group input[type="number"],
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+        font-family: inherit;
+    }
+    
+    .form-group input[type="text"]:focus,
+    .form-group input[type="tel"]:focus,
+    .form-group input[type="date"]:focus,
+    .form-group input[type="number"]:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .form-group > .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 10px;
+    }
+    
+    .cursos-professores-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 10px;
+    }
+    
+    .curso-professor-item {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .professor-select-curso {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 0.9em;
+    }
+    
+    .professor-select-curso:disabled {
+        background: #e9ecef;
+        cursor: not-allowed;
+    }
+    
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        margin: 0;
+    }
+    
+    .checkbox-item label {
+        margin: 0;
+        font-weight: normal;
+        cursor: pointer;
+    }
+    
+    .idade-display {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 5px 15px;
+        background: #667eea;
+        color: white;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    
+    .buttons {
+        margin-top: 30px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .btn {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: bold;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    
+    .professor-select-container {
+        position: relative;
+    }
+    
+    .professor-select-container select:disabled {
+        background: #e9ecef;
+        cursor: not-allowed;
+    }
+    
+    .info-text {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .form-container {
+            max-width: 100%;
+        }
+        
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+        
+        .checkbox-group {
+            grid-template-columns: 1fr;
+        }
+        
+        .cursos-professores-container {
+            gap: 10px;
+        }
+        
+        .curso-professor-item {
+            padding: 12px;
+        }
+        
+        .buttons {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+        
+        .idade-display {
+            display: block;
+            margin-left: 0;
+            margin-top: 5px;
+            text-align: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-group input[type="text"],
+        .form-group input[type="tel"],
+        .form-group input[type="date"],
+        .form-group input[type="number"],
+        .form-group select {
+            font-size: 16px; /* Evita zoom no iOS */
+            padding: 12px;
+        }
+        
+        .professor-select-curso {
+            font-size: 16px;
+            padding: 10px;
+        }
+        
+        .checkbox-item {
+            padding: 8px;
+        }
+        
+        .curso-professor-item {
+            padding: 10px;
+        }
+    }
+    
+    /* Melhorias para touch */
+    @media (hover: none) and (pointer: coarse) {
+        .btn,
+        .add-professor-btn,
+        .remove-professor-btn {
+            min-height: 44px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+        }
+    }
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="POST" action="{{ url_for('main.cadastro_alunos') }}" id="alunoForm">
+        <div class="form-group">
+            <label for="nome" class="required">Nome do Aluno</label>
+            <input type="text" 
+                   id="nome" 
+                   name="nome" 
+                   required 
+                   placeholder="Digite o nome completo do aluno">
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="telefone" class="required">Telefone</label>
+                <input type="tel" 
+                       id="telefone" 
+                       name="telefone" 
+                       required
+                       pattern="[0-9]{11}"
+                       maxlength="11"
+                       placeholder="11987654321"
+                       oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                       title="Digite apenas números: DDD + 9 dígitos (ex: 11987654321)">
+            </div>
+            
+            <div class="form-group">
+                <label for="nome_responsavel" id="label_nome_responsavel">Nome do Responsável</label>
+                <input type="text" 
+                       id="nome_responsavel" 
+                       name="nome_responsavel" 
+                       placeholder="Digite o nome do responsável">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="telefone_responsavel" id="label_telefone_responsavel">Telefone do Responsável</label>
+                <input type="tel" 
+                       id="telefone_responsavel" 
+                       name="telefone_responsavel" 
+                       pattern="[0-9]{11}"
+                       maxlength="11"
+                       placeholder="11987654321"
+                       oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                       title="Digite apenas números: DDD + 9 dígitos (ex: 11987654321)">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="data_nascimento">Data de Nascimento</label>
+                <input type="date" 
+                       id="data_nascimento" 
+                       name="data_nascimento" 
+                       onchange="calcularIdade()">
+                <span id="idadeDisplay" class="idade-display" style="display: none;"></span>
+            </div>
+            
+            <div class="form-group">
+                <label for="idade">Idade</label>
+                <input type="number" 
+                       id="idade" 
+                       name="idade" 
+                       readonly 
+                       placeholder="Será calculada automaticamente"
+                       style="background: #e9ecef;">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Endereço</label>
+            <div class="form-row">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="rua">Rua</label>
+                    <input type="text" 
+                           id="rua" 
+                           name="rua" 
+                           placeholder="Nome da rua">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="numero">Número</label>
+                    <input type="text" 
+                           id="numero" 
+                           name="numero" 
+                           placeholder="Número">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="bairro">Bairro</label>
+                    <input type="text" 
+                           id="bairro" 
+                           name="bairro" 
+                           placeholder="Bairro">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="cidade">Cidade</label>
+                    <input type="text" 
+                           id="cidade" 
+                           name="cidade" 
+                           placeholder="Cidade">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="pais">País</label>
+                <input type="text" 
+                       id="pais" 
+                       name="pais" 
+                       placeholder="País"
+                       value="Brasil">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="required">Cursos e Professores</label>
+            <div class="cursos-professores-container">
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="dublagem_online" 
+                               name="dublagem_online"
+                               onchange="toggleProfessorSelect('dublagem_online', true)">
+                        <label for="dublagem_online">Dublagem Online</label>
+                    </div>
+                    <select id="professor_dublagem_online" 
+                            name="professor_dublagem_online" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="dublagem_presencial" 
+                               name="dublagem_presencial"
+                               onchange="toggleProfessorSelect('dublagem_presencial', true)">
+                        <label for="dublagem_presencial">Dublagem Presencial</label>
+                    </div>
+                    <select id="professor_dublagem_presencial" 
+                            name="professor_dublagem_presencial" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="teatro_online" 
+                               name="teatro_online"
+                               onchange="toggleProfessorSelect('teatro_online', false)">
+                        <label for="teatro_online">Teatro Online</label>
+                    </div>
+                    <select id="professor_teatro_online" 
+                            name="professor_teatro_online" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="teatro_presencial" 
+                               name="teatro_presencial"
+                               onchange="toggleProfessorSelect('teatro_presencial', false)">
+                        <label for="teatro_presencial">Teatro Presencial</label>
+                    </div>
+                    <select id="professor_teatro_presencial" 
+                            name="professor_teatro_presencial" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="locucao" 
+                               name="locucao"
+                               onchange="toggleProfessorSelect('locucao', true)">
+                        <label for="locucao">Locução</label>
+                    </div>
+                    <select id="professor_locucao" 
+                            name="professor_locucao" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="teatro_tv_cinema" 
+                               name="teatro_tv_cinema"
+                               onchange="toggleProfessorSelect('teatro_tv_cinema', false)">
+                        <label for="teatro_tv_cinema">Teatro TV e Cinema</label>
+                    </div>
+                    <select id="professor_teatro_tv_cinema" 
+                            name="professor_teatro_tv_cinema" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+                
+                <div class="curso-professor-item">
+                    <div class="checkbox-item">
+                        <input type="checkbox" 
+                               id="musical" 
+                               name="musical"
+                               onchange="toggleProfessorSelect('musical', false)">
+                        <label for="musical">Musical</label>
+                    </div>
+                    <select id="professor_musical" 
+                            name="professor_musical" 
+                            class="professor-select-curso"
+                            style="display: none; margin-top: 10px;"
+                            disabled>
+                        <option value="">Selecione o professor</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button type="submit" class="btn btn-primary">Cadastrar Aluno</button>
+            <button type="reset" class="btn btn-secondary" onclick="resetarFormulario()">Limpar</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function calcularIdade() {
+        const dataNascimento = document.getElementById('data_nascimento').value;
+        const idadeInput = document.getElementById('idade');
+        const idadeDisplay = document.getElementById('idadeDisplay');
+        const nomeResponsavel = document.getElementById('nome_responsavel');
+        const telefoneResponsavel = document.getElementById('telefone_responsavel');
+        const labelNomeResponsavel = document.getElementById('label_nome_responsavel');
+        const labelTelefoneResponsavel = document.getElementById('label_telefone_responsavel');
+        
+        if (dataNascimento) {
+            const hoje = new Date();
+            const nascimento = new Date(dataNascimento);
+            let idade = hoje.getFullYear() - nascimento.getFullYear();
+            const mes = hoje.getMonth() - nascimento.getMonth();
+            
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+                idade--;
+            }
+            
+            idadeInput.value = idade;
+            idadeDisplay.textContent = idade + ' anos';
+            idadeDisplay.style.display = 'inline-block';
+            
+            // Validar responsável para menores de 16 anos
+            if (idade < 16) {
+                nomeResponsavel.required = true;
+                telefoneResponsavel.required = true;
+                labelNomeResponsavel.classList.add('required');
+                labelTelefoneResponsavel.classList.add('required');
+            } else {
+                nomeResponsavel.required = false;
+                telefoneResponsavel.required = false;
+                labelNomeResponsavel.classList.remove('required');
+                labelTelefoneResponsavel.classList.remove('required');
+            }
+        } else {
+            idadeInput.value = '';
+            idadeDisplay.style.display = 'none';
+            nomeResponsavel.required = false;
+            telefoneResponsavel.required = false;
+            labelNomeResponsavel.classList.remove('required');
+            labelTelefoneResponsavel.classList.remove('required');
+        }
+    }
+    
+    function toggleProfessorSelect(tipoCurso, isDublagem) {
+        const checkbox = document.getElementById(tipoCurso);
+        const selectId = `professor_${tipoCurso}`;
+        const professorSelect = document.getElementById(selectId);
+        
+        if (checkbox.checked) {
+            // Mostrar e habilitar o select
+            professorSelect.style.display = 'block';
+            professorSelect.disabled = false;
+            
+            // Carregar professores apropriados
+            carregarProfessoresParaCurso(tipoCurso, isDublagem, professorSelect);
+        } else {
+            // Esconder e desabilitar o select
+            professorSelect.style.display = 'none';
+            professorSelect.disabled = true;
+            professorSelect.innerHTML = '<option value="">Selecione o professor</option>';
+        }
+    }
+    
+    function carregarProfessoresParaCurso(tipoCurso, isDublagem, selectElement) {
+        // Usar o tipo de curso diretamente na API
+        const url = `/api/professores?tipo_curso=${tipoCurso}`;
+        buscarProfessores(url, selectElement);
+    }
+    
+    function buscarProfessores(url, selectElement) {
+        fetch(url)
+            .then(response => response.json())
+            .then(professores => {
+                selectElement.innerHTML = '<option value="">Selecione o professor</option>';
+                
+                if (professores.length === 0) {
+                    selectElement.innerHTML = '<option value="">Nenhum professor disponível</option>';
+                    selectElement.disabled = true;
+                } else {
+                    professores.forEach(professor => {
+                        const option = document.createElement('option');
+                        option.value = professor.id;
+                        option.textContent = professor.nome;
+                        selectElement.appendChild(option);
+                    });
+                    selectElement.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao buscar professores:', error);
+                selectElement.innerHTML = '<option value="">Erro ao carregar professores</option>';
+                selectElement.disabled = true;
+            });
+    }
+    
+    function resetarFormulario() {
+        document.getElementById('alunoForm').reset();
+        document.getElementById('idadeDisplay').style.display = 'none';
+        
+        // Resetar todos os selects de professores
+        const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+        tiposCursos.forEach(tipo => {
+            const select = document.getElementById(`professor_${tipo}`);
+            if (select) {
+                select.style.display = 'none';
+                select.disabled = true;
+                select.innerHTML = '<option value="">Selecione o professor</option>';
+            }
+        });
+    }
+    
+    // Validação antes de enviar formulário
+    document.getElementById('alunoForm').addEventListener('submit', function(e) {
+        // Validar telefone do aluno
+        const telefone = document.getElementById('telefone').value.replace(/\D/g, '');
+        if (telefone.length !== 11) {
+            e.preventDefault();
+            alert('Telefone do aluno inválido. Deve conter DDD + 9 dígitos (11 números).');
+            return false;
+        }
+        
+        // Validar responsável se menor de 16 anos
+        const idade = parseInt(document.getElementById('idade').value) || 0;
+        if (idade < 16 && idade > 0) {
+            const nomeResponsavel = document.getElementById('nome_responsavel').value.trim();
+            const telefoneResponsavel = document.getElementById('telefone_responsavel').value.replace(/\D/g, '');
+            
+            if (!nomeResponsavel) {
+                e.preventDefault();
+                alert('Nome do responsável é obrigatório para menores de 16 anos.');
+                return false;
+            }
+            
+            if (telefoneResponsavel.length !== 11) {
+                e.preventDefault();
+                alert('Telefone do responsável inválido. Deve conter DDD + 9 dígitos (11 números).');
+                return false;
+            }
+        }
+    });
+    
+    // Inicializar estado dos selects de professores
+    window.onload = function() {
+        const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+        tiposCursos.forEach(tipo => {
+            const select = document.getElementById(`professor_${tipo}`);
+            if (select) {
+                select.disabled = true;
+            }
+        });
+    };
+</script>
+{% endblock %}
+

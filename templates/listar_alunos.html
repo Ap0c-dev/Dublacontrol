@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Listar Alunos - Controle de Dublagem{% endblock %}
+{% block page_title %}Lista de Alunos{% endblock %}
+
+{% block extra_css %}
+    .alunos-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+        font-size: 0.9em;
+    }
+    
+    .alunos-table th,
+    .alunos-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .alunos-table th {
+        background: #667eea;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .alunos-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.75em;
+        font-weight: bold;
+        margin-right: 3px;
+        margin-bottom: 3px;
+    }
+    
+    .badge-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .badge-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .badge-info {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .badge-warning {
+        background: #ffc107;
+        color: #333;
+    }
+    
+    .badge-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .badge-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+    
+    .empty-state p {
+        font-size: 1.2em;
+        margin-top: 10px;
+    }
+    
+    .cursos-cell {
+        max-width: 400px;
+        min-width: 300px;
+    }
+    
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .alunos-table {
+            font-size: 0.8em;
+            display: block;
+            overflow-x: auto;
+        }
+        
+        .alunos-table thead {
+            display: none;
+        }
+        
+        .alunos-table tbody,
+        .alunos-table tr {
+            display: block;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        
+        .alunos-table td {
+            display: block;
+            text-align: left;
+            padding: 8px;
+            border: none;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .alunos-table td:last-child {
+            border-bottom: none;
+        }
+        
+        .alunos-table td::before {
+            content: attr(data-label);
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+            color: #667eea;
+        }
+        
+        .cursos-cell {
+            max-width: 100%;
+            min-width: 100%;
+        }
+        
+        .badge {
+            display: inline-block;
+            margin: 2px;
+            font-size: 0.7em;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .alunos-table {
+            font-size: 0.75em;
+        }
+        
+        .alunos-table td::before {
+            width: 100px;
+            font-size: 0.9em;
+        }
+        
+        .badge {
+            font-size: 0.65em;
+            padding: 2px 6px;
+        }
+    }
+{% endblock %}
+
+{% block content %}
+{% if alunos %}
+    <table class="alunos-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Responsável</th>
+                <th>Telefone Responsável</th>
+                <th>Idade</th>
+                <th>Cursos e Professores</th>
+                <th>Data Cadastro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for aluno in alunos %}
+            <tr>
+                <td data-label="ID">{{ aluno.id }}</td>
+                <td data-label="Nome"><strong>{{ aluno.nome }}</strong></td>
+                <td data-label="Telefone">{{ aluno.telefone or '-' }}</td>
+                <td data-label="Responsável">{{ aluno.nome_responsavel or '-' }}</td>
+                <td data-label="Tel. Responsável">{{ aluno.telefone_responsavel or '-' }}</td>
+                <td data-label="Idade">{{ aluno.idade or '-' }}</td>
+                <td data-label="Cursos e Professores" class="cursos-cell">
+                    {% if aluno.matriculas %}
+                        {% for matricula in aluno.matriculas %}
+                            <div style="margin-bottom: 8px;">
+                                {% if matricula.tipo_curso == 'dublagem_online' %}
+                                    <span class="badge badge-primary">Dublagem Online</span>
+                                {% elif matricula.tipo_curso == 'dublagem_presencial' %}
+                                    <span class="badge badge-success">Dublagem Presencial</span>
+                                {% elif matricula.tipo_curso == 'teatro_online' %}
+                                    <span class="badge badge-info">Teatro Online</span>
+                                {% elif matricula.tipo_curso == 'teatro_presencial' %}
+                                    <span class="badge badge-warning">Teatro Presencial</span>
+                                {% elif matricula.tipo_curso == 'locucao' %}
+                                    <span class="badge badge-danger">Locução</span>
+                                {% elif matricula.tipo_curso == 'teatro_tv_cinema' %}
+                                    <span class="badge badge-secondary">Teatro TV/Cinema</span>
+                                {% elif matricula.tipo_curso == 'musical' %}
+                                    <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
+                                {% endif %}
+                                <strong style="margin-left: 5px;">{{ matricula.professor.nome if matricula.professor else 'Sem professor' }}</strong>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <span>-</span>
+                    {% endif %}
+                </td>
+                <td data-label="Data Cadastro">{{ aluno.data_cadastro.strftime('%d/%m/%Y %H:%M') if aluno.data_cadastro else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <h2>Nenhum aluno cadastrado ainda</h2>
+        <p>Comece cadastrando alunos na página de cadastro.</p>
+    </div>
+{% endif %}
+{% endblock %}
+
