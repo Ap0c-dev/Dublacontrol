@@ -72,3 +72,15 @@ O sistema utiliza SQLite por padrão. O arquivo `controle_dublagem.db` será cri
 
 Para usar outro banco de dados, altere a variável `SQLALCHEMY_DATABASE_URI` no arquivo `config.py`.
 
+## Deploy no Render
+
+Para fazer deploy no Render:
+
+1. Conecte seu repositório GitHub ao Render
+2. Configure as seguintes variáveis de ambiente no Render:
+   - `SECRET_KEY`: Uma chave secreta aleatória para segurança
+   - `DATABASE_URL`: (Opcional) URL do banco de dados PostgreSQL se usar banco externo
+3. O Render detectará automaticamente o `Procfile` e iniciará a aplicação com Gunicorn
+
+**Nota**: Se não configurar `DATABASE_URL`, o sistema usará SQLite. Para produção, recomenda-se usar PostgreSQL.
+
