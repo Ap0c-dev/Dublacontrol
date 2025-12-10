@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 Execute a aplicação:
 ```bash
-python app.py
+python wsgi.py
 ```
 
 **Nota**: Certifique-se de que o ambiente virtual está ativado antes de executar a aplicação.
@@ -61,7 +61,7 @@ controle-dublagem/
 │   ├── base.html            # Template base
 │   ├── cadastro_professores.html  # Formulário de cadastro
 │   └── listar_professores.html    # Lista de professores
-├── app.py                   # Arquivo principal
+├── wsgi.py                  # Arquivo principal (WSGI)
 ├── config.py                # Configurações
 └── requirements.txt         # Dependências Python
 ```
