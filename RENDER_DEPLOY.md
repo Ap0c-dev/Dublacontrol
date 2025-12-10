@@ -56,17 +56,42 @@ No painel do Render, vá em "Environment" e adicione:
 
 ## Troubleshooting
 
+### Tela "WELCOME TO RENDER" ou aplicação não carrega
+
+**Possíveis causas e soluções:**
+
+1. **Serviço em modo sleep (plano gratuito)**
+   - O Render coloca serviços gratuitos em sleep após 15 minutos de inatividade
+   - A primeira requisição pode demorar até 1 minuto para "acordar" o serviço
+   - Aguarde alguns segundos e recarregue a página
+
+2. **Erro na inicialização**
+   - Verifique os logs no painel do Render (aba "Logs")
+   - Procure por erros de importação ou banco de dados
+   - Verifique se todas as dependências estão no `requirements.txt`
+
+3. **Banco de dados não configurado**
+   - Se usar PostgreSQL, certifique-se de que o banco está criado e ativo
+   - Verifique se a variável `DATABASE_URL` está configurada
+   - Para SQLite, os dados serão perdidos ao reiniciar (não recomendado para produção)
+
+4. **Problemas com caminhos**
+   - A aplicação detecta automaticamente os caminhos dos templates
+   - Se houver erro, verifique os logs
+
 ### Erro: "No module named 'gunicorn'"
 - Verifique se o `requirements.txt` contém `gunicorn==21.2.0`
 
 ### Erro: "Database connection failed"
 - Verifique se a variável `DATABASE_URL` está configurada corretamente
 - Se usar PostgreSQL, certifique-se de que o banco está ativo
+- Verifique se o formato da URL está correto (postgresql:// não postgres://)
 
 ### Erro: "Application failed to respond"
 - Verifique os logs no Render
 - Certifique-se de que o `Procfile` está correto
 - Verifique se a porta está sendo lida da variável `PORT` (Render define automaticamente)
+- Teste a rota `/health` para verificar se a aplicação está respondendo
 
 ## Notas Importantes
 
