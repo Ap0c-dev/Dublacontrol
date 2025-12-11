@@ -29,9 +29,13 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
-            print("Tabelas criadas/verificadas com sucesso")
+            env = app.config.get('ENVIRONMENT', 'dev')
+            db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            print(f"✓ Ambiente: {env.upper()}")
+            print(f"✓ Banco de dados: {db_path}")
+            print("✓ Tabelas criadas/verificadas com sucesso")
         except Exception as e:
-            print(f"Erro ao criar tabelas: {e}")
+            print(f"✗ Erro ao criar tabelas: {e}")
             import traceback
             traceback.print_exc()
     

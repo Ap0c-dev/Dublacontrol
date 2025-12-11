@@ -3,8 +3,18 @@ from app.models.professor import db, Professor
 from app.models.aluno import Aluno
 from app.models.matricula import Matricula
 from datetime import datetime, date
+import re
 
 bp = Blueprint('main', __name__)
+
+def validar_telefone(telefone):
+    """Valida o formato do telefone (DDD + 9 dígitos = 11 dígitos numéricos)"""
+    if not telefone:
+        return False, "Telefone é obrigatório."
+    telefone_numerico = re.sub(r'\D', '', telefone)
+    if not re.fullmatch(r'^\d{11}$', telefone_numerico):
+        return False, "Telefone deve conter 11 dígitos numéricos (DDD + 9 dígitos)."
+    return True, ""
 
 @bp.route('/')
 def index():
@@ -60,6 +70,16 @@ def cadastro_professores():
                             teatro_online or musical or locucao or curso_apresentador)
             if not tem_modalidade:
                 erros.append(f'Professor {i+1} ({nome}): Selecione pelo menos uma modalidade.')
+                continue
+            
+            # Verificar se o professor já existe (mesmo nome e telefone)
+            professor_existente = Professor.query.filter_by(
+                nome=nome,
+                telefone=telefone
+            ).first()
+            
+            if professor_existente:
+                erros.append(f'Professor {i+1} ({nome}): Já existe um professor cadastrado com este nome e telefone.')
                 continue
             
             # Criar e salvar professor
@@ -147,132 +167,176 @@ def api_professores():
 @bp.route('/cadastro-alunos', methods=['GET', 'POST'])
 def cadastro_alunos():
     if request.method == 'POST':
-        nome = request.form.get('nome', '').strip()
-        telefone = request.form.get('telefone', '').strip()
-        nome_responsavel = request.form.get('nome_responsavel', '').strip()
-        telefone_responsavel = request.form.get('telefone_responsavel', '').strip()
-        data_nascimento_str = request.form.get('data_nascimento', '').strip()
+        # Coletar todos os índices de alunos do formulário
+        indices = set()
+        for key in request.form.keys():
+            if key.startswith('nome_'):
+                try:
+                    idx = int(key.split('_')[1])
+                    indices.add(idx)
+                except (ValueError, IndexError):
+                    continue
         
-        # Endereço - campos separados
-        rua = request.form.get('rua', '').strip()
-        numero = request.form.get('numero', '').strip()
-        bairro = request.form.get('bairro', '').strip()
-        cidade = request.form.get('cidade', '').strip()
-        pais = request.form.get('pais', '').strip()
+        if not indices:
+            flash('Nenhum aluno foi adicionado ao formulário.', 'error')
+            return render_template('cadastro_alunos.html')
         
-        # Cursos e professores associados
-        cursos_professores = {}
+        erros = []
+        alunos_cadastrados = 0
         tipos_cursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical']
         
-        dublagem_online = request.form.get('dublagem_online') == 'on'
-        dublagem_presencial = request.form.get('dublagem_presencial') == 'on'
-        teatro_online = request.form.get('teatro_online') == 'on'
-        teatro_presencial = request.form.get('teatro_presencial') == 'on'
-        locucao = request.form.get('locucao') == 'on'
-        teatro_tv_cinema = request.form.get('teatro_tv_cinema') == 'on'
-        musical = request.form.get('musical') == 'on'
-        
-        # Coletar professores para cada curso selecionado
-        for tipo_curso in tipos_cursos:
-            professor_id_str = request.form.get(f'professor_{tipo_curso}', '').strip()
-            if professor_id_str:
-                try:
-                    professor_id = int(professor_id_str)
-                    cursos_professores[tipo_curso] = professor_id
-                except ValueError:
-                    pass
-        
-        # Validação: nome obrigatório
-        if not nome:
-            flash('Nome do aluno é obrigatório.', 'error')
-            return render_template('cadastro_alunos.html')
-        
-        # Validação: telefone obrigatório e formato
-        if not telefone:
-            flash('Telefone do aluno é obrigatório.', 'error')
-            return render_template('cadastro_alunos.html')
-        
-        # Validar formato do telefone (apenas números, DDD + 9 dígitos = 11 dígitos)
-        telefone_limpo = ''.join(filter(str.isdigit, telefone))
-        if len(telefone_limpo) != 11:
-            flash('Telefone inválido. Deve conter DDD + 9 dígitos (ex: 11987654321).', 'error')
-            return render_template('cadastro_alunos.html')
-        
-        telefone = telefone_limpo
-        
-        # Processar data de nascimento
-        data_nascimento = None
-        idade = None
-        if data_nascimento_str:
-            try:
-                data_nascimento = datetime.strptime(data_nascimento_str, '%Y-%m-%d').date()
-                # Calcular idade
-                today = date.today()
-                idade = today.year - data_nascimento.year - ((today.month, today.day) < (data_nascimento.month, data_nascimento.day))
-                if idade < 0:
-                    idade = 0
-            except ValueError:
-                flash('Data de nascimento inválida.', 'error')
-                return render_template('cadastro_alunos.html')
-        
-        # Validação: responsável obrigatório para menores de 16 anos
-        if idade is not None and idade < 16:
-            if not nome_responsavel:
-                flash('Nome do responsável é obrigatório para menores de 16 anos.', 'error')
-                return render_template('cadastro_alunos.html')
-            
-            if not telefone_responsavel:
-                flash('Telefone do responsável é obrigatório para menores de 16 anos.', 'error')
-                return render_template('cadastro_alunos.html')
-            
-            # Validar formato do telefone do responsável
-            telefone_responsavel_limpo = ''.join(filter(str.isdigit, telefone_responsavel))
-            if len(telefone_responsavel_limpo) != 11:
-                flash('Telefone do responsável inválido. Deve conter DDD + 9 dígitos.', 'error')
-                return render_template('cadastro_alunos.html')
-            
-            telefone_responsavel = telefone_responsavel_limpo
-        
-        # Criar e salvar aluno
         try:
-            aluno = Aluno(
-                nome=nome,
-                telefone=telefone,
-                nome_responsavel=nome_responsavel if nome_responsavel else None,
-                telefone_responsavel=telefone_responsavel if telefone_responsavel else None,
-                data_nascimento=data_nascimento,
-                idade=idade,
-                rua=rua if rua else None,
-                numero=numero if numero else None,
-                bairro=bairro if bairro else None,
-                cidade=cidade if cidade else None,
-                pais=pais if pais else None,
-                dublagem_online=dublagem_online,
-                dublagem_presencial=dublagem_presencial,
-                teatro_online=teatro_online,
-                teatro_presencial=teatro_presencial,
-                locucao=locucao,
-                teatro_tv_cinema=teatro_tv_cinema,
-                musical=musical
-            )
-            db.session.add(aluno)
-            db.session.flush()  # Para obter o ID do aluno
-            
-            # Criar matrículas para cada curso com professor selecionado
-            for tipo_curso, professor_id in cursos_professores.items():
-                matricula = Matricula(
-                    aluno_id=aluno.id,
-                    professor_id=professor_id,
-                    tipo_curso=tipo_curso
+            for i in sorted(indices):
+                nome = request.form.get(f'nome_{i}', '').strip()
+                telefone = request.form.get(f'telefone_{i}', '').strip()
+                nome_responsavel = request.form.get(f'nome_responsavel_{i}', '').strip()
+                telefone_responsavel = request.form.get(f'telefone_responsavel_{i}', '').strip()
+                data_nascimento_str = request.form.get(f'data_nascimento_{i}', '').strip()
+                
+                # Endereço
+                rua = request.form.get(f'rua_{i}', '').strip()
+                numero = request.form.get(f'numero_{i}', '').strip()
+                bairro = request.form.get(f'bairro_{i}', '').strip()
+                cidade = request.form.get(f'cidade_{i}', '').strip()
+                pais = request.form.get(f'pais_{i}', '').strip() or 'Brasil'
+                
+                # Validação: nome obrigatório
+                if not nome:
+                    erros.append(f'Aluno {i+1}: Nome é obrigatório.')
+                    continue
+                
+                # Validação: telefone obrigatório e formato
+                valido, msg = validar_telefone(telefone)
+                if not valido:
+                    erros.append(f'Aluno {i+1} ({nome}): {msg}')
+                    continue
+                
+                telefone = ''.join(filter(str.isdigit, telefone))
+                
+                # Processar data de nascimento
+                data_nascimento = None
+                idade = None
+                if data_nascimento_str:
+                    try:
+                        data_nascimento = datetime.strptime(data_nascimento_str, '%Y-%m-%d').date()
+                        today = date.today()
+                        idade = today.year - data_nascimento.year - ((today.month, today.day) < (data_nascimento.month, data_nascimento.day))
+                        if idade < 0:
+                            idade = 0
+                        
+                        # Validar idade entre 5 e 100 anos
+                        if idade < 5:
+                            erros.append(f'Aluno {i+1} ({nome}): A idade deve ser no mínimo 5 anos.')
+                            continue
+                        if idade > 100:
+                            erros.append(f'Aluno {i+1} ({nome}): A idade deve ser no máximo 100 anos.')
+                            continue
+                    except ValueError:
+                        erros.append(f'Aluno {i+1} ({nome}): Data de nascimento inválida.')
+                        continue
+                
+                # Validação: responsável obrigatório para menores de 16 anos
+                if idade is not None and idade < 16:
+                    if not nome_responsavel:
+                        erros.append(f'Aluno {i+1} ({nome}): Nome do responsável é obrigatório para menores de 16 anos.')
+                        continue
+                    
+                    valido_resp, msg_resp = validar_telefone(telefone_responsavel)
+                    if not valido_resp:
+                        erros.append(f'Aluno {i+1} ({nome}): {msg_resp}')
+                        continue
+                    
+                    telefone_responsavel = ''.join(filter(str.isdigit, telefone_responsavel))
+                
+                # Verificar se o aluno já existe (mesmo nome e telefone)
+                aluno_existente = Aluno.query.filter_by(
+                    nome=nome,
+                    telefone=telefone
+                ).first()
+                
+                if aluno_existente:
+                    erros.append(f'Aluno {i+1} ({nome}): Já existe um aluno cadastrado com este nome e telefone.')
+                    continue
+                
+                # Cursos, professores e mensalidades
+                cursos_professores = {}
+                for tipo_curso in tipos_cursos:
+                    if request.form.get(f'{tipo_curso}_{i}') == 'on':
+                        professor_id_str = request.form.get(f'professor_{tipo_curso}_{i}', '').strip()
+                        mensalidade_str = request.form.get(f'mensalidade_{tipo_curso}_{i}', '').strip()
+                        
+                        if professor_id_str:
+                            try:
+                                professor_id = int(professor_id_str)
+                                # Processar mensalidade (pode ser vazio)
+                                valor_mensalidade = None
+                                if mensalidade_str:
+                                    try:
+                                        valor_mensalidade = float(mensalidade_str.replace(',', '.'))
+                                        if valor_mensalidade < 0:
+                                            valor_mensalidade = None
+                                    except ValueError:
+                                        valor_mensalidade = None
+                                
+                                cursos_professores[tipo_curso] = {
+                                    'professor_id': professor_id,
+                                    'valor_mensalidade': valor_mensalidade
+                                }
+                            except ValueError:
+                                pass
+                
+                # Criar aluno
+                aluno = Aluno(
+                    nome=nome,
+                    telefone=telefone,
+                    nome_responsavel=nome_responsavel if nome_responsavel else None,
+                    telefone_responsavel=telefone_responsavel if telefone_responsavel else None,
+                    data_nascimento=data_nascimento,
+                    idade=idade,
+                    rua=rua if rua else None,
+                    numero=numero if numero else None,
+                    bairro=bairro if bairro else None,
+                    cidade=cidade if cidade else None,
+                    pais=pais if pais else None,
+                    dublagem_online=request.form.get(f'dublagem_online_{i}') == 'on',
+                    dublagem_presencial=request.form.get(f'dublagem_presencial_{i}') == 'on',
+                    teatro_online=request.form.get(f'teatro_online_{i}') == 'on',
+                    teatro_presencial=request.form.get(f'teatro_presencial_{i}') == 'on',
+                    locucao=request.form.get(f'locucao_{i}') == 'on',
+                    teatro_tv_cinema=request.form.get(f'teatro_tv_cinema_{i}') == 'on',
+                    musical=request.form.get(f'musical_{i}') == 'on'
                 )
-                db.session.add(matricula)
+                db.session.add(aluno)
+                db.session.flush()
+                
+                # Criar matrículas
+                for tipo_curso, dados in cursos_professores.items():
+                    matricula = Matricula(
+                        aluno_id=aluno.id,
+                        professor_id=dados['professor_id'],
+                        tipo_curso=tipo_curso,
+                        valor_mensalidade=dados['valor_mensalidade']
+                    )
+                    db.session.add(matricula)
+                
+                alunos_cadastrados += 1
+            
+            if erros:
+                db.session.rollback()
+                for erro in erros:
+                    flash(erro, 'error')
+                return render_template('cadastro_alunos.html')
             
             db.session.commit()
-            flash('Aluno cadastrado com sucesso!', 'success')
+            if alunos_cadastrados == 1:
+                flash('Aluno cadastrado com sucesso!', 'success')
+            else:
+                flash(f'{alunos_cadastrados} alunos cadastrados com sucesso!', 'success')
             return redirect(url_for('main.cadastro_alunos'))
+            
         except Exception as e:
             db.session.rollback()
-            flash(f'Erro ao cadastrar aluno: {str(e)}', 'error')
+            flash(f'Erro ao cadastrar alunos: {str(e)}', 'error')
             return render_template('cadastro_alunos.html')
     
     return render_template('cadastro_alunos.html')

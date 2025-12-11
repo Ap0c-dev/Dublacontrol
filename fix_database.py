@@ -13,7 +13,13 @@ def corrigir_banco():
     app = create_app()
     
     with app.app_context():
-        print("Iniciando correção do banco de dados...")
+        env = app.config.get('ENVIRONMENT', 'dev')
+        db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        print("=" * 60)
+        print(f"AMBIENTE: {env.upper()}")
+        print(f"BANCO DE DADOS: {db_path}")
+        print("=" * 60)
+        print("\nIniciando correção do banco de dados...")
         
         try:
             inspector = inspect(db.engine)
@@ -199,6 +205,7 @@ def corrigir_banco():
                         aluno_id INTEGER NOT NULL,
                         professor_id INTEGER NOT NULL,
                         tipo_curso VARCHAR(50) NOT NULL,
+                        valor_mensalidade REAL,
                         data_matricula DATETIME DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (aluno_id) REFERENCES alunos(id),
                         FOREIGN KEY (professor_id) REFERENCES professores(id)
@@ -209,7 +216,21 @@ def corrigir_banco():
             else:
                 columns = [col['name'] for col in inspector.get_columns('matriculas')]
                 print(f"Colunas atuais: {', '.join(columns)}")
-                print("✓ Tabela 'matriculas' já existe.")
+                
+                # Verificar se a coluna valor_mensalidade existe
+                if 'valor_mensalidade' not in columns:
+                    print("Adicionando coluna 'valor_mensalidade'...")
+                    try:
+                        db.session.execute(text('ALTER TABLE matriculas ADD COLUMN valor_mensalidade REAL'))
+                        db.session.commit()
+                        print("✓ Coluna 'valor_mensalidade' adicionada.")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"✗ Erro ao adicionar coluna 'valor_mensalidade': {e}")
+                else:
+                    print("✓ Coluna 'valor_mensalidade' já existe.")
+                
+                print("✓ Tabela 'matriculas' verificada.")
             
             print("\n✓ Correção do banco de dados concluída com sucesso!")
             

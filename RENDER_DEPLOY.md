@@ -19,7 +19,8 @@
    - **Root Directory**: (deixe vazio)
    - **Runtime**: `Python 3`
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
+   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile - wsgi:app`
+     - **IMPORTANTE**: Use `wsgi:app` (não `app:app`)
 
 ### 2. Configurar Variáveis de Ambiente
 
@@ -50,7 +51,7 @@ No painel do Render, vá em "Environment" e adicione:
 
 ## Arquivos Importantes
 
-- **Procfile**: Define como iniciar a aplicação (`web: gunicorn app:app`)
+- **Procfile**: Define como iniciar a aplicação (`web: gunicorn wsgi:app`)
 - **requirements.txt**: Lista todas as dependências
 - **config.py**: Configurações que detectam automaticamente o ambiente Render
 
@@ -92,6 +93,18 @@ No painel do Render, vá em "Environment" e adicione:
 - Certifique-se de que o `Procfile` está correto
 - Verifique se a porta está sendo lida da variável `PORT` (Render define automaticamente)
 - Teste a rota `/health` para verificar se a aplicação está respondendo
+
+### Erro: "Failed to find attribute 'app' in 'app'"
+**Este erro ocorre quando o Render está tentando executar `gunicorn app:app` em vez de `wsgi:app`.**
+
+**Solução:**
+1. No painel do Render, vá até as configurações do seu Web Service
+2. Procure pelo campo **"Start Command"** ou **"Command"**
+3. **Altere o comando para**: `gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile - wsgi:app`
+   - Ou versão mais simples: `gunicorn wsgi:app`
+   - **CRUCIAL**: Use `wsgi:app` (não `app:app`)
+4. Salve as alterações e faça um novo deploy (ou clique em "Manual Deploy")
+5. Verifique se o arquivo `wsgi.py` existe na raiz do projeto
 
 ## Notas Importantes
 

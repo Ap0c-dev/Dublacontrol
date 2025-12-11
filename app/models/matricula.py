@@ -11,6 +11,9 @@ class Matricula(db.Model):
     # Tipo de curso
     tipo_curso = db.Column(db.String(50), nullable=False)  # dublagem_online, dublagem_presencial, teatro_online, teatro_presencial, locucao, teatro_tv_cinema, musical
     
+    # Valor da mensalidade para esta modalidade
+    valor_mensalidade = db.Column(db.Float, nullable=True)  # Permite valores decimais (ex: 150.50)
+    
     data_matricula = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     # Relacionamentos
@@ -26,6 +29,7 @@ class Matricula(db.Model):
             'aluno_id': self.aluno_id,
             'professor_id': self.professor_id,
             'tipo_curso': self.tipo_curso,
+            'valor_mensalidade': float(self.valor_mensalidade) if self.valor_mensalidade else None,
             'professor_nome': self.professor.nome if self.professor else None,
             'data_matricula': self.data_matricula.isoformat() if self.data_matricula else None
         }
