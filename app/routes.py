@@ -23,96 +23,118 @@ def index():
 @bp.route('/cadastro-professores', methods=['GET', 'POST'])
 def cadastro_professores():
     if request.method == 'POST':
-        professores_data = request.form.getlist('professores[]')
-        
-        if not professores_data:
-            flash('Nenhum professor foi enviado.', 'error')
-            return render_template('cadastro_professores.html')
-        
-        professores_cadastrados = 0
-        erros = []
-        
-        # Processar cada professor do formulário
-        for i, professor_data in enumerate(professores_data):
-            # Obter dados do professor
-            nome = request.form.get(f'nome_{i}', '').strip()
-            telefone = request.form.get(f'telefone_{i}', '').strip()
+        try:
+            professores_data = request.form.getlist('professores[]')
             
-            # Validação: telefone obrigatório e formato
-            if not telefone:
-                erros.append(f'Professor {i+1}: Telefone é obrigatório.')
-                continue
+            if not professores_data:
+                flash('Nenhum professor foi enviado.', 'error')
+                return render_template('cadastro_professores.html')
             
-            # Validar formato do telefone (apenas números, DDD + 9 dígitos = 11 dígitos)
-            telefone_limpo = ''.join(filter(str.isdigit, telefone))
-            if len(telefone_limpo) != 11:
-                erros.append(f'Professor {i+1}: Telefone inválido. Deve conter DDD + 9 dígitos (11 números).')
-                continue
+            professores_cadastrados = 0
+            erros = []
             
-            telefone = telefone_limpo
-            
-            # Modalidades
-            dublagem_presencial = request.form.get(f'dublagem_presencial_{i}') == 'on'
-            dublagem_online = request.form.get(f'dublagem_online_{i}') == 'on'
-            teatro_presencial = request.form.get(f'teatro_presencial_{i}') == 'on'
-            teatro_online = request.form.get(f'teatro_online_{i}') == 'on'
-            musical = request.form.get(f'musical_{i}') == 'on'
-            locucao = request.form.get(f'locucao_{i}') == 'on'
-            curso_apresentador = request.form.get(f'curso_apresentador_{i}') == 'on'
-            
-            # Validação: nome obrigatório
-            if not nome:
-                erros.append(f'Professor {i+1}: Nome é obrigatório.')
-                continue
-            
-            # Validação: pelo menos uma modalidade obrigatória
-            tem_modalidade = (dublagem_presencial or dublagem_online or teatro_presencial or 
-                            teatro_online or musical or locucao or curso_apresentador)
-            if not tem_modalidade:
-                erros.append(f'Professor {i+1} ({nome}): Selecione pelo menos uma modalidade.')
-                continue
-            
-            # Verificar se o professor já existe (mesmo nome e telefone)
-            professor_existente = Professor.query.filter_by(
-                nome=nome,
-                telefone=telefone
-            ).first()
-            
-            if professor_existente:
-                erros.append(f'Professor {i+1} ({nome}): Já existe um professor cadastrado com este nome e telefone.')
-                continue
-            
-            # Criar e salvar professor
-            try:
-                professor = Professor(
+            # Processar cada professor do formulário
+            for i, professor_data in enumerate(professores_data):
+                # Obter dados do professor
+                nome = request.form.get(f'nome_{i}', '').strip()
+                telefone = request.form.get(f'telefone_{i}', '').strip()
+                
+                # Validação: telefone obrigatório e formato
+                if not telefone:
+                    erros.append(f'Professor {i+1}: Telefone é obrigatório.')
+                    continue
+                
+                # Validar formato do telefone (apenas números, DDD + 9 dígitos = 11 dígitos)
+                telefone_limpo = ''.join(filter(str.isdigit, telefone))
+                if len(telefone_limpo) != 11:
+                    erros.append(f'Professor {i+1}: Telefone inválido. Deve conter DDD + 9 dígitos (11 números).')
+                    continue
+                
+                telefone = telefone_limpo
+                
+                # Modalidades
+                dublagem_presencial = request.form.get(f'dublagem_presencial_{i}') == 'on'
+                dublagem_online = request.form.get(f'dublagem_online_{i}') == 'on'
+                teatro_presencial = request.form.get(f'teatro_presencial_{i}') == 'on'
+                teatro_online = request.form.get(f'teatro_online_{i}') == 'on'
+                musical = request.form.get(f'musical_{i}') == 'on'
+                locucao = request.form.get(f'locucao_{i}') == 'on'
+                curso_apresentador = request.form.get(f'curso_apresentador_{i}') == 'on'
+                
+                # Validação: nome obrigatório
+                if not nome:
+                    erros.append(f'Professor {i+1}: Nome é obrigatório.')
+                    continue
+                
+                # Validação: pelo menos uma modalidade obrigatória
+                tem_modalidade = (dublagem_presencial or dublagem_online or teatro_presencial or 
+                                teatro_online or musical or locucao or curso_apresentador)
+                if not tem_modalidade:
+                    erros.append(f'Professor {i+1} ({nome}): Selecione pelo menos uma modalidade.')
+                    continue
+                
+                # Verificar se o professor já existe (mesmo nome e telefone)
+                professor_existente = Professor.query.filter_by(
                     nome=nome,
-                    telefone=telefone,
-                    dublagem_presencial=dublagem_presencial,
-                    dublagem_online=dublagem_online,
-                    teatro_presencial=teatro_presencial,
-                    teatro_online=teatro_online,
-                    musical=musical,
-                    locucao=locucao,
-                    curso_apresentador=curso_apresentador
-                )
-                db.session.add(professor)
-                professores_cadastrados += 1
-            except Exception as e:
-                erros.append(f'Professor {i+1} ({nome}): Erro ao cadastrar - {str(e)}')
-        
-        if erros:
-            for erro in erros:
-                flash(erro, 'error')
-        
-        if professores_cadastrados > 0:
-            try:
-                db.session.commit()
-                flash(f'{professores_cadastrados} professor(es) cadastrado(s) com sucesso!', 'success')
-            except Exception as e:
+                    telefone=telefone
+                ).first()
+                
+                if professor_existente:
+                    erros.append(f'Professor {i+1} ({nome}): Já existe um professor cadastrado com este nome e telefone.')
+                    continue
+                
+                # Criar e salvar professor
+                try:
+                    professor = Professor(
+                        nome=nome,
+                        telefone=telefone,
+                        dublagem_presencial=dublagem_presencial,
+                        dublagem_online=dublagem_online,
+                        teatro_presencial=teatro_presencial,
+                        teatro_online=teatro_online,
+                        musical=musical,
+                        locucao=locucao,
+                        curso_apresentador=curso_apresentador
+                    )
+                    db.session.add(professor)
+                    professores_cadastrados += 1
+                except Exception as e:
+                    import traceback
+                    error_details = traceback.format_exc()
+                    print(f"Erro ao criar professor {i+1} ({nome}): {error_details}")
+                    erros.append(f'Professor {i+1} ({nome}): Erro ao cadastrar - {str(e)}')
+                    db.session.rollback()
+            
+            if erros:
+                # Se houver erros, fazer rollback antes de retornar
                 db.session.rollback()
-                flash(f'Erro ao salvar no banco de dados: {str(e)}', 'error')
+                for erro in erros:
+                    flash(erro, 'error')
+                return render_template('cadastro_professores.html')
+            
+            if professores_cadastrados > 0:
+                try:
+                    db.session.commit()
+                    flash(f'{professores_cadastrados} professor(es) cadastrado(s) com sucesso!', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    import traceback
+                    error_details = traceback.format_exc()
+                    print(f"Erro ao salvar professores: {error_details}")
+                    flash(f'Erro ao salvar no banco de dados: {str(e)}', 'error')
+            else:
+                # Se nenhum professor foi cadastrado e não há erros, pode ser um problema
+                flash('Nenhum professor foi processado. Verifique os dados e tente novamente.', 'error')
+            
+            return redirect(url_for('main.cadastro_professores'))
         
-        return redirect(url_for('main.cadastro_professores'))
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Erro geral no cadastro de professores: {error_details}")
+            flash(f'Erro interno ao processar cadastro: {str(e)}', 'error')
+            return render_template('cadastro_professores.html')
     
     return render_template('cadastro_professores.html')
 
@@ -126,33 +148,51 @@ def api_professores():
     """API para buscar professores baseado nas modalidades selecionadas"""
     tipo_curso = request.args.get('tipo_curso', '').strip()
     
+    if not tipo_curso:
+        return jsonify([])
+    
     query = Professor.query
     
     # Filtrar professores baseado no tipo de curso
+    # SQLite armazena booleanos como INTEGER (0 ou 1), então comparamos com 1
     from sqlalchemy import or_
     
     if tipo_curso == 'dublagem_online':
-        query = query.filter(Professor.dublagem_online == True)
+        query = query.filter(Professor.dublagem_online == 1)
     elif tipo_curso == 'dublagem_presencial':
-        query = query.filter(Professor.dublagem_presencial == True)
+        query = query.filter(Professor.dublagem_presencial == 1)
     elif tipo_curso == 'teatro_online':
-        query = query.filter(Professor.teatro_online == True)
+        query = query.filter(Professor.teatro_online == 1)
     elif tipo_curso == 'teatro_presencial':
-        query = query.filter(Professor.teatro_presencial == True)
+        query = query.filter(Professor.teatro_presencial == 1)
     elif tipo_curso == 'locucao':
-        query = query.filter(Professor.locucao == True)
+        query = query.filter(Professor.locucao == 1)
     elif tipo_curso == 'musical':
-        query = query.filter(Professor.musical == True)
+        query = query.filter(Professor.musical == 1)
     elif tipo_curso == 'teatro_tv_cinema':
         # Teatro TV/Cinema pode ser com professor de teatro presencial ou online
-        query = query.filter(or_(Professor.teatro_presencial == True, Professor.teatro_online == True))
+        query = query.filter(or_(Professor.teatro_presencial == 1, Professor.teatro_online == 1))
     else:
         # Se nenhum tipo foi especificado, retornar vazio
         return jsonify([])
     
     professores = query.order_by(Professor.nome).all()
     
-    return jsonify([{
+    # Debug: verificar quantos professores foram encontrados
+    total_professores = Professor.query.count()
+    print(f"DEBUG API: tipo_curso={tipo_curso}, total_professores_no_banco={total_professores}, encontrados={len(professores)}")
+    
+    # Se não encontrou nenhum, listar todos os professores para debug
+    if len(professores) == 0 and total_professores > 0:
+        todos_profs = Professor.query.limit(3).all()
+        print(f"  DEBUG: Listando primeiros professores do banco:")
+        for p in todos_profs:
+            print(f"    - {p.nome}: dublagem_online={p.dublagem_online} (type: {type(p.dublagem_online)}), dublagem_presencial={p.dublagem_presencial}")
+            # Testar query manual
+            if tipo_curso == 'dublagem_online':
+                print(f"      Teste: dublagem_online == 1: {p.dublagem_online == 1}, dublagem_online == True: {p.dublagem_online == True}")
+    
+    resultado = [{
         'id': p.id,
         'nome': p.nome,
         'dublagem_presencial': p.dublagem_presencial,
@@ -162,7 +202,10 @@ def api_professores():
         'musical': p.musical,
         'locucao': p.locucao,
         'curso_apresentador': p.curso_apresentador
-    } for p in professores])
+    } for p in professores]
+    
+    print(f"DEBUG API: Retornando {len(resultado)} professores")
+    return jsonify(resultado)
 
 @bp.route('/cadastro-alunos', methods=['GET', 'POST'])
 def cadastro_alunos():
@@ -226,10 +269,10 @@ def cadastro_alunos():
                         
                         # Validar idade entre 5 e 100 anos
                         if idade < 5:
-                            erros.append(f'Aluno {i+1} ({nome}): A idade deve ser no mínimo 5 anos.')
+                            erros.append(f'Aluno {i+1} ({nome}): Idade Inválida')
                             continue
                         if idade > 100:
-                            erros.append(f'Aluno {i+1} ({nome}): A idade deve ser no máximo 100 anos.')
+                            erros.append(f'Aluno {i+1} ({nome}): Idade Inválida')
                             continue
                     except ValueError:
                         erros.append(f'Aluno {i+1} ({nome}): Data de nascimento inválida.')

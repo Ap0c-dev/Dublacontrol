@@ -384,9 +384,9 @@
                            name="data_nascimento_${alunoCount}" 
                            min="${dataMin}"
                            max="${dataMax}"
-                           onchange="calcularIdade(${alunoCount})"
-                           oninput="validarDataNascimento(${alunoCount})"
-                           title="A idade deve estar entre 5 e 100 anos">
+                           onchange="calcularIdade(${alunoCount}); validarDataNascimento(${alunoCount})"
+                           onblur="validarDataNascimento(${alunoCount}); this.reportValidity()"
+                           title="A idade será calculada automaticamente ou pode ser inserida manualmente">
                     <span id="idadeDisplay_${alunoCount}" class="idade-display" style="display: none;"></span>
                     <span id="idadeErro_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
                 </div>
@@ -396,9 +396,12 @@
                     <input type="number" 
                            id="idade_${alunoCount}" 
                            name="idade_${alunoCount}" 
-                           readonly 
-                           placeholder="Será calculada automaticamente"
-                           style="background: #e9ecef;">
+                           min="5"
+                           max="100"
+                           placeholder="Digite a idade ou será calculada automaticamente"
+                           oninput="validarIdadeManual(${alunoCount})"
+                           onblur="validarIdadeManual(${alunoCount})">
+                    <span id="idadeErroManual_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
                 </div>
             </div>
             
@@ -724,7 +727,8 @@
         // Validar formato da data e ano
         const partes = dataNascimento.split('-');
         if (partes.length !== 3) {
-            dataNascimentoInput.setCustomValidity('Data inválida.');
+            dataNascimentoInput.setCustomValidity('Idade Inválida');
+            calcularIdade(index);
             return;
         }
         
@@ -736,9 +740,8 @@
         
         // Validar se o ano está no intervalo permitido
         if (ano < anoMin || ano > anoMax) {
-            dataNascimentoInput.setCustomValidity(`O ano deve estar entre ${anoMin} e ${anoMax} (idade entre 5 e 100 anos).`);
-            dataNascimentoInput.reportValidity();
-            calcularIdade(index); // Recalcular para mostrar erro
+            dataNascimentoInput.setCustomValidity('Idade Inválida');
+            calcularIdade(index);
             return;
         }
         
@@ -748,14 +751,73 @@
         const dataSelecionada = new Date(dataNascimento);
         
         if (dataSelecionada < dataMin || dataSelecionada > dataMax) {
-            dataNascimentoInput.setCustomValidity('A data deve estar dentro do intervalo permitido (idade entre 5 e 100 anos).');
-            dataNascimentoInput.reportValidity();
+            dataNascimentoInput.setCustomValidity('Idade Inválida');
             calcularIdade(index);
             return;
         }
         
         dataNascimentoInput.setCustomValidity('');
         calcularIdade(index);
+    }
+    
+    function validarIdadeManual(index) {
+        const idadeInput = document.getElementById(`idade_${index}`);
+        const idadeErroManual = document.getElementById(`idadeErroManual_${index}`);
+        const nomeResponsavel = document.getElementById(`nome_responsavel_${index}`);
+        const telefoneResponsavel = document.getElementById(`telefone_responsavel_${index}`);
+        const labelNomeResponsavel = document.getElementById(`label_nome_responsavel_${index}`);
+        const labelTelefoneResponsavel = document.getElementById(`label_telefone_responsavel_${index}`);
+        
+        if (!idadeInput) return;
+        
+        const idade = parseInt(idadeInput.value);
+        
+        // Limpar erro anterior
+        if (idadeErroManual) {
+            idadeErroManual.style.display = 'none';
+            idadeErroManual.textContent = '';
+        }
+        
+        if (idadeInput.value && !isNaN(idade)) {
+            // Validar idade entre 5 e 100 anos
+            if (idade < 5 || idade > 100) {
+                if (idadeErroManual) {
+                    idadeErroManual.textContent = 'Idade Inválida';
+                    idadeErroManual.style.display = 'block';
+                }
+                idadeInput.setCustomValidity('Idade Inválida');
+                
+                // Limpar campos de responsável
+                if (nomeResponsavel) nomeResponsavel.required = false;
+                if (telefoneResponsavel) telefoneResponsavel.required = false;
+                if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
+                if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
+                return;
+            }
+            
+            // Idade válida
+            idadeInput.setCustomValidity('');
+            
+            // Validar responsável para menores de 16 anos
+            if (idade < 16) {
+                if (nomeResponsavel) nomeResponsavel.required = true;
+                if (telefoneResponsavel) telefoneResponsavel.required = true;
+                if (labelNomeResponsavel) labelNomeResponsavel.classList.add('required');
+                if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.add('required');
+            } else {
+                if (nomeResponsavel) nomeResponsavel.required = false;
+                if (telefoneResponsavel) telefoneResponsavel.required = false;
+                if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
+                if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
+            }
+        } else if (idadeInput.value === '') {
+            // Campo vazio - limpar validações
+            idadeInput.setCustomValidity('');
+            if (nomeResponsavel) nomeResponsavel.required = false;
+            if (telefoneResponsavel) telefoneResponsavel.required = false;
+            if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
+            if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
+        }
     }
     
     function calcularIdade(index) {
@@ -775,13 +837,17 @@
             idadeErro.textContent = '';
         }
         
+        // Se o usuário já digitou a idade manualmente, não sobrescrever
+        const idadeManual = idadeInput ? parseInt(idadeInput.value) : NaN;
+        const temIdadeManual = !isNaN(idadeManual) && idadeInput && idadeInput.value !== '';
+        
         if (dataNascimento && dataNascimentoInput && !dataNascimentoInput.validity.customError) {
             const hoje = new Date();
             const nascimento = new Date(dataNascimento);
             
             // Verificar se a data é válida
             if (isNaN(nascimento.getTime())) {
-                if (idadeInput) idadeInput.value = '';
+                if (!temIdadeManual && idadeInput) idadeInput.value = '';
                 if (idadeDisplay) idadeDisplay.style.display = 'none';
                 return;
             }
@@ -795,41 +861,47 @@
             
             // Validar idade entre 5 e 100 anos
             if (idade < 5 || idade > 100) {
-                if (idadeInput) idadeInput.value = '';
+                if (!temIdadeManual && idadeInput) idadeInput.value = '';
                 if (idadeDisplay) idadeDisplay.style.display = 'none';
                 if (idadeErro) {
-                    idadeErro.textContent = idade < 5 ? 'A idade deve ser no mínimo 5 anos.' : 'A idade deve ser no máximo 100 anos.';
+                    idadeErro.textContent = 'Idade Inválida';
                     idadeErro.style.display = 'block';
                 }
                 if (dataNascimentoInput) {
-                    dataNascimentoInput.setCustomValidity(idade < 5 ? 'A idade deve ser no mínimo 5 anos.' : 'A idade deve ser no máximo 100 anos.');
-                    dataNascimentoInput.reportValidity();
+                    dataNascimentoInput.setCustomValidity('Idade Inválida');
                 }
                 
-                // Limpar campos de responsável
-                if (nomeResponsavel) {
-                    nomeResponsavel.required = false;
-                    nomeResponsavel.value = '';
+                // Limpar campos de responsável apenas se não houver idade manual válida
+                if (!temIdadeManual || idadeManual < 5 || idadeManual > 100) {
+                    if (nomeResponsavel) {
+                        nomeResponsavel.required = false;
+                        nomeResponsavel.value = '';
+                    }
+                    if (telefoneResponsavel) {
+                        telefoneResponsavel.required = false;
+                        telefoneResponsavel.value = '';
+                    }
+                    if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
+                    if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
                 }
-                if (telefoneResponsavel) {
-                    telefoneResponsavel.required = false;
-                    telefoneResponsavel.value = '';
-                }
-                if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
-                if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
                 return;
             }
             
-            // Idade válida
+            // Idade válida - só atualizar se não houver idade manual
             if (dataNascimentoInput) dataNascimentoInput.setCustomValidity('');
-            if (idadeInput) idadeInput.value = idade;
+            if (!temIdadeManual && idadeInput) {
+                idadeInput.value = idade;
+            }
             if (idadeDisplay) {
                 idadeDisplay.textContent = idade + ' anos';
                 idadeDisplay.style.display = 'inline-block';
             }
             
+            // Usar idade calculada ou manual para validar responsável
+            const idadeParaValidar = temIdadeManual ? idadeManual : idade;
+            
             // Validar responsável para menores de 16 anos
-            if (idade < 16) {
+            if (idadeParaValidar < 16) {
                 if (nomeResponsavel) nomeResponsavel.required = true;
                 if (telefoneResponsavel) telefoneResponsavel.required = true;
                 if (labelNomeResponsavel) labelNomeResponsavel.classList.add('required');
@@ -841,12 +913,19 @@
                 if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
             }
         } else {
-            if (idadeInput) idadeInput.value = '';
+            // Sem data de nascimento - validar idade manual se houver
+            if (!temIdadeManual && idadeInput) idadeInput.value = '';
             if (idadeDisplay) idadeDisplay.style.display = 'none';
-            if (nomeResponsavel) nomeResponsavel.required = false;
-            if (telefoneResponsavel) telefoneResponsavel.required = false;
-            if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
-            if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
+            
+            // Validar idade manual se houver
+            if (temIdadeManual) {
+                validarIdadeManual(index);
+            } else {
+                if (nomeResponsavel) nomeResponsavel.required = false;
+                if (telefoneResponsavel) telefoneResponsavel.required = false;
+                if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
+                if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
+            }
             if (dataNascimentoInput) dataNascimentoInput.setCustomValidity('');
         }
     }
@@ -954,17 +1033,11 @@
                 return;
             }
             
-            // Validar idade entre 5 e 100 anos
+            // Validar idade entre 5 e 100 anos (se houver idade)
             if (!isNaN(idade) && idade > 0) {
-                if (idade < 5) {
+                if (idade < 5 || idade > 100) {
                     temErro = true;
-                    alert(`Aluno ${index + 1} (${nome}): A idade deve ser no mínimo 5 anos.`);
-                    e.preventDefault();
-                    return;
-                }
-                if (idade > 100) {
-                    temErro = true;
-                    alert(`Aluno ${index + 1} (${nome}): A idade deve ser no máximo 100 anos.`);
+                    alert(`Aluno ${index + 1} (${nome}): Idade Inválida`);
                     e.preventDefault();
                     return;
                 }

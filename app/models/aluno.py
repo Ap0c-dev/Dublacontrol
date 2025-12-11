@@ -58,6 +58,39 @@ class Aluno(db.Model):
     def __repr__(self):
         return f'<Aluno {self.nome}>'
     
+    def get_total_mensalidades(self):
+        """Retorna a soma de todas as mensalidades do aluno"""
+        total = 0
+        for matricula in self.matriculas:
+            if matricula.valor_mensalidade:
+                total += float(matricula.valor_mensalidade)
+        return total
+    
+    def get_mensalidades_por_modalidade(self):
+        """Retorna um dicionário com mensalidades agrupadas por modalidade"""
+        resultado = {}
+        for matricula in self.matriculas:
+            modalidade = matricula.tipo_curso
+            valor = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else 0
+            if modalidade not in resultado:
+                resultado[modalidade] = {
+                    'valor': valor,
+                    'professor': matricula.professor.nome if matricula.professor else None,
+                    'quantidade': 1
+                }
+            else:
+                # Se houver múltiplas matrículas na mesma modalidade (improvável, mas possível)
+                resultado[modalidade]['valor'] += valor
+                resultado[modalidade]['quantidade'] += 1
+        return resultado
+    
+    def get_mensalidade_por_modalidade(self, tipo_curso):
+        """Retorna o valor da mensalidade para uma modalidade específica"""
+        for matricula in self.matriculas:
+            if matricula.tipo_curso == tipo_curso:
+                return float(matricula.valor_mensalidade) if matricula.valor_mensalidade else 0
+        return 0
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -80,6 +113,8 @@ class Aluno(db.Model):
             'teatro_tv_cinema': self.teatro_tv_cinema,
             'musical': self.musical,
             'professores_por_curso': self.get_professores_por_curso(),
+            'total_mensalidades': self.get_total_mensalidades(),
+            'mensalidades_por_modalidade': self.get_mensalidades_por_modalidade(),
             'data_cadastro': self.data_cadastro.isoformat() if self.data_cadastro else None
         }
 
