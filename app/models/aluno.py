@@ -12,12 +12,13 @@ class Aluno(db.Model):
     data_nascimento = db.Column(db.Date, nullable=True)
     idade = db.Column(db.Integer, nullable=True)
     
-    # Endereço - campos separados
-    rua = db.Column(db.String(200), nullable=True)
-    numero = db.Column(db.String(20), nullable=True)
-    bairro = db.Column(db.String(100), nullable=True)
-    cidade = db.Column(db.String(100), nullable=True)
-    pais = db.Column(db.String(100), nullable=True)
+    # Endereço - apenas cidade e estado (obrigatórios)
+    cidade = db.Column(db.String(100), nullable=False)
+    estado = db.Column(db.String(2), nullable=False)
+    
+    # Forma de pagamento e vencimento
+    forma_pagamento = db.Column(db.String(50), nullable=False)
+    dia_vencimento = db.Column(db.Integer, nullable=False)  # Dia do mês (1-31) - obrigatório
     
     # Cursos
     dublagem_online = db.Column(db.Boolean, default=False, nullable=False)
@@ -100,11 +101,10 @@ class Aluno(db.Model):
             'telefone_responsavel': self.telefone_responsavel,
             'data_nascimento': self.data_nascimento.isoformat() if self.data_nascimento else None,
             'idade': self.idade,
-            'rua': self.rua,
-            'numero': self.numero,
-            'bairro': self.bairro,
             'cidade': self.cidade,
-            'pais': self.pais,
+            'estado': self.estado,
+            'forma_pagamento': self.forma_pagamento,
+            'dia_vencimento': self.dia_vencimento,
             'dublagem_online': self.dublagem_online,
             'dublagem_presencial': self.dublagem_presencial,
             'teatro_online': self.teatro_online,

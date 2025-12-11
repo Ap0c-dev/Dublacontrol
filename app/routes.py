@@ -8,12 +8,12 @@ import re
 bp = Blueprint('main', __name__)
 
 def validar_telefone(telefone):
-    """Valida o formato do telefone (DDD + 9 dígitos = 11 dígitos numéricos)"""
+    """Valida o formato do telefone internacional (+DDI DDD Número)"""
     if not telefone:
         return False, "Telefone é obrigatório."
-    telefone_numerico = re.sub(r'\D', '', telefone)
-    if not re.fullmatch(r'^\d{11}$', telefone_numerico):
-        return False, "Telefone deve conter 11 dígitos numéricos (DDD + 9 dígitos)."
+    # Formato: +DDI DDD Número (ex: +55 11 987654321)
+    if not re.fullmatch(r'^\+[0-9]{1,3} [0-9]{2} [0-9]{8,9}$', telefone.strip()):
+        return False, "Telefone deve estar no formato +DDI DDD Número (ex: +55 11 987654321)."
     return True, ""
 
 @bp.route('/')
@@ -44,13 +44,13 @@ def cadastro_professores():
                     erros.append(f'Professor {i+1}: Telefone é obrigatório.')
                     continue
                 
-                # Validar formato do telefone (apenas números, DDD + 9 dígitos = 11 dígitos)
-                telefone_limpo = ''.join(filter(str.isdigit, telefone))
-                if len(telefone_limpo) != 11:
-                    erros.append(f'Professor {i+1}: Telefone inválido. Deve conter DDD + 9 dígitos (11 números).')
+                # Validar formato do telefone internacional
+                valido, msg = validar_telefone(telefone)
+                if not valido:
+                    erros.append(f'Professor {i+1}: {msg}')
                     continue
                 
-                telefone = telefone_limpo
+                telefone = telefone.strip()
                 
                 # Modalidades
                 dublagem_presencial = request.form.get(f'dublagem_presencial_{i}') == 'on'
@@ -236,12 +236,13 @@ def cadastro_alunos():
                 telefone_responsavel = request.form.get(f'telefone_responsavel_{i}', '').strip()
                 data_nascimento_str = request.form.get(f'data_nascimento_{i}', '').strip()
                 
-                # Endereço
-                rua = request.form.get(f'rua_{i}', '').strip()
-                numero = request.form.get(f'numero_{i}', '').strip()
-                bairro = request.form.get(f'bairro_{i}', '').strip()
+                # Endereço - apenas cidade e estado (obrigatórios)
                 cidade = request.form.get(f'cidade_{i}', '').strip()
-                pais = request.form.get(f'pais_{i}', '').strip() or 'Brasil'
+                estado = request.form.get(f'estado_{i}', '').strip().upper()
+                
+                # Forma de pagamento e dia de vencimento
+                forma_pagamento = request.form.get(f'forma_pagamento_{i}', '').strip()
+                dia_vencimento_str = request.form.get(f'dia_vencimento_{i}', '').strip()
                 
                 # Validação: nome obrigatório
                 if not nome:
@@ -254,7 +255,22 @@ def cadastro_alunos():
                     erros.append(f'Aluno {i+1} ({nome}): {msg}')
                     continue
                 
-                telefone = ''.join(filter(str.isdigit, telefone))
+                # Manter formato internacional do telefone
+                telefone = telefone.strip()
+                
+                # Validação: cidade obrigatória
+                if not cidade:
+                    erros.append(f'Aluno {i+1} ({nome}): Cidade é obrigatória.')
+                    continue
+                
+                # Validação: estado obrigatório
+                if not estado:
+                    erros.append(f'Aluno {i+1} ({nome}): Estado é obrigatório.')
+                    continue
+                
+                if len(estado) != 2:
+                    erros.append(f'Aluno {i+1} ({nome}): Estado deve ter 2 caracteres (UF).')
+                    continue
                 
                 # Processar data de nascimento
                 data_nascimento = None
@@ -278,6 +294,25 @@ def cadastro_alunos():
                         erros.append(f'Aluno {i+1} ({nome}): Data de nascimento inválida.')
                         continue
                 
+                # Validação: forma de pagamento obrigatória
+                if not forma_pagamento:
+                    erros.append(f'Aluno {i+1} ({nome}): Forma de pagamento é obrigatória.')
+                    continue
+                
+                # Validação: dia de vencimento obrigatório (1-31)
+                if not dia_vencimento_str:
+                    erros.append(f'Aluno {i+1} ({nome}): Dia de vencimento é obrigatório.')
+                    continue
+                
+                try:
+                    dia_vencimento = int(dia_vencimento_str)
+                    if dia_vencimento < 1 or dia_vencimento > 31:
+                        erros.append(f'Aluno {i+1} ({nome}): Dia de vencimento deve ser entre 1 e 31.')
+                        continue
+                except ValueError:
+                    erros.append(f'Aluno {i+1} ({nome}): Dia de vencimento inválido.')
+                    continue
+                
                 # Validação: responsável obrigatório para menores de 16 anos
                 if idade is not None and idade < 16:
                     if not nome_responsavel:
@@ -289,7 +324,7 @@ def cadastro_alunos():
                         erros.append(f'Aluno {i+1} ({nome}): {msg_resp}')
                         continue
                     
-                    telefone_responsavel = ''.join(filter(str.isdigit, telefone_responsavel))
+                    telefone_responsavel = telefone_responsavel.strip()
                 
                 # Verificar se o aluno já existe (mesmo nome e telefone)
                 aluno_existente = Aluno.query.filter_by(
@@ -308,25 +343,41 @@ def cadastro_alunos():
                         professor_id_str = request.form.get(f'professor_{tipo_curso}_{i}', '').strip()
                         mensalidade_str = request.form.get(f'mensalidade_{tipo_curso}_{i}', '').strip()
                         
-                        if professor_id_str:
+                        # Validação: se curso está selecionado, professor é obrigatório
+                        if not professor_id_str:
+                            nome_curso = tipo_curso.replace('_', ' ').title()
+                            erros.append(f'Aluno {i+1} ({nome}): É obrigatório selecionar um professor para o curso "{nome_curso}".')
+                            continue
+                        
+                        # Validação: se curso está selecionado, mensalidade é obrigatória
+                        if not mensalidade_str:
+                            nome_curso = tipo_curso.replace('_', ' ').title()
+                            erros.append(f'Aluno {i+1} ({nome}): É obrigatório informar a mensalidade para o curso "{nome_curso}".')
+                            continue
+                        
+                        try:
+                            professor_id = int(professor_id_str)
+                            
+                            # Processar mensalidade (obrigatória e deve ser > 0)
                             try:
-                                professor_id = int(professor_id_str)
-                                # Processar mensalidade (pode ser vazio)
-                                valor_mensalidade = None
-                                if mensalidade_str:
-                                    try:
-                                        valor_mensalidade = float(mensalidade_str.replace(',', '.'))
-                                        if valor_mensalidade < 0:
-                                            valor_mensalidade = None
-                                    except ValueError:
-                                        valor_mensalidade = None
-                                
-                                cursos_professores[tipo_curso] = {
-                                    'professor_id': professor_id,
-                                    'valor_mensalidade': valor_mensalidade
-                                }
+                                valor_mensalidade = float(mensalidade_str.replace(',', '.'))
+                                if valor_mensalidade <= 0:
+                                    nome_curso = tipo_curso.replace('_', ' ').title()
+                                    erros.append(f'Aluno {i+1} ({nome}): A mensalidade para o curso "{nome_curso}" deve ser maior que zero.')
+                                    continue
                             except ValueError:
-                                pass
+                                nome_curso = tipo_curso.replace('_', ' ').title()
+                                erros.append(f'Aluno {i+1} ({nome}): Mensalidade inválida para o curso "{nome_curso}".')
+                                continue
+                            
+                            cursos_professores[tipo_curso] = {
+                                'professor_id': professor_id,
+                                'valor_mensalidade': valor_mensalidade
+                            }
+                        except ValueError:
+                            nome_curso = tipo_curso.replace('_', ' ').title()
+                            erros.append(f'Aluno {i+1} ({nome}): Professor inválido para o curso "{nome_curso}".')
+                            continue
                 
                 # Criar aluno
                 aluno = Aluno(
@@ -336,11 +387,10 @@ def cadastro_alunos():
                     telefone_responsavel=telefone_responsavel if telefone_responsavel else None,
                     data_nascimento=data_nascimento,
                     idade=idade,
-                    rua=rua if rua else None,
-                    numero=numero if numero else None,
-                    bairro=bairro if bairro else None,
                     cidade=cidade if cidade else None,
-                    pais=pais if pais else None,
+                    estado=estado if estado else None,
+                    forma_pagamento=forma_pagamento,
+                    dia_vencimento=dia_vencimento,
                     dublagem_online=request.form.get(f'dublagem_online_{i}') == 'on',
                     dublagem_presencial=request.form.get(f'dublagem_presencial_{i}') == 'on',
                     teatro_online=request.form.get(f'teatro_online_{i}') == 'on',

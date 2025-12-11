@@ -125,11 +125,11 @@ def corrigir_banco():
                 
                 # Verificar se tem a estrutura correta
                 colunas_esperadas = ['id', 'nome', 'telefone', 'nome_responsavel', 'data_nascimento', 
-                                    'idade', 'rua', 'numero', 'bairro', 'cidade', 'pais',
+                                    'idade', 'cidade', 'estado', 'forma_pagamento', 'dia_vencimento',
                                     'dublagem_online', 'dublagem_presencial', 'teatro_online', 
                                     'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical', 'data_cadastro']
                 
-                tem_estrutura_correta = all(col in columns for col in ['id', 'nome', 'dublagem_online', 'dublagem_presencial'])
+                tem_estrutura_correta = all(col in columns for col in ['id', 'nome', 'dublagem_online', 'dublagem_presencial', 'forma_pagamento'])
                 
                 if not tem_estrutura_correta:
                     print("Estrutura incorreta detectada. Recriando tabela...")
@@ -152,11 +152,10 @@ def corrigir_banco():
                             nome_responsavel VARCHAR(200),
                             data_nascimento DATE,
                             idade INTEGER,
-                            rua VARCHAR(200),
-                            numero VARCHAR(20),
-                            bairro VARCHAR(100),
-                            cidade VARCHAR(100),
-                            pais VARCHAR(100),
+                            cidade VARCHAR(100) NOT NULL,
+                            estado VARCHAR(2) NOT NULL,
+                            forma_pagamento VARCHAR(50) NOT NULL,
+                            dia_vencimento INTEGER NOT NULL,
                             dublagem_online BOOLEAN DEFAULT 0 NOT NULL,
                             dublagem_presencial BOOLEAN DEFAULT 0 NOT NULL,
                             teatro_online BOOLEAN DEFAULT 0 NOT NULL,
@@ -170,16 +169,65 @@ def corrigir_banco():
                     db.session.commit()
                     print("✓ Tabela 'alunos' recriada com estrutura correta.")
                 else:
-                    # Apenas adicionar campos que faltam
+                    # Adicionar campos que faltam
+                    # Nota: SQLite não suporta NOT NULL em ALTER TABLE ADD COLUMN sem DEFAULT
+                    # Então adicionamos como nullable primeiro, depois atualizamos valores e depois tornamos NOT NULL
                     campos_faltantes = {
-                        'rua': 'VARCHAR(200)', 
-                        'numero': 'VARCHAR(20)', 
-                        'bairro': 'VARCHAR(100)', 
-                        'cidade': 'VARCHAR(100)', 
-                        'pais': 'VARCHAR(100)',
-                        'musical': 'BOOLEAN DEFAULT 0',
-                        'telefone_responsavel': 'VARCHAR(20)'
+                        'cidade': ('VARCHAR(100)', '""'),
+                        'estado': ('VARCHAR(2)', '""'),
+                        'forma_pagamento': ('VARCHAR(50)', '"PIX"'),
+                        'dia_vencimento': ('INTEGER', '10'),
+                        'musical': ('BOOLEAN DEFAULT 0', None),
+                        'telefone_responsavel': ('VARCHAR(20)', None)
                     }
+                    
+                    # Se data_vencimento existe, precisamos migrar para dia_vencimento primeiro
+                    if 'data_vencimento' in columns and 'dia_vencimento' not in columns:
+                        try:
+                            # Adicionar coluna dia_vencimento como nullable primeiro
+                            db.session.execute(text('ALTER TABLE alunos ADD COLUMN dia_vencimento INTEGER'))
+                            # Migrar dados: extrair o dia da data_vencimento
+                            db.session.execute(text('''
+                                UPDATE alunos 
+                                SET dia_vencimento = CAST(strftime('%d', data_vencimento) AS INTEGER)
+                                WHERE data_vencimento IS NOT NULL
+                            '''))
+                            # Preencher valores nulos com padrão
+                            db.session.execute(text('UPDATE alunos SET dia_vencimento = 10 WHERE dia_vencimento IS NULL'))
+                            db.session.commit()
+                            print("✓ Campo 'dia_vencimento' adicionado e dados migrados de 'data_vencimento'.")
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"✗ Erro ao migrar 'data_vencimento' para 'dia_vencimento': {e}")
+                    
+                    for campo, (tipo, valor_default) in campos_faltantes.items():
+                        if campo not in columns:
+                            try:
+                                if valor_default is not None:
+                                    # Adicionar coluna com valor padrão
+                                    db.session.execute(text(f'ALTER TABLE alunos ADD COLUMN {campo} {tipo} DEFAULT {valor_default}'))
+                                    # Atualizar registros existentes que possam estar NULL
+                                    if campo in ['cidade', 'estado', 'forma_pagamento', 'dia_vencimento']:
+                                        if campo == 'cidade':
+                                            db.session.execute(text(f"UPDATE alunos SET {campo} = '' WHERE {campo} IS NULL"))
+                                        elif campo == 'estado':
+                                            db.session.execute(text(f"UPDATE alunos SET {campo} = '' WHERE {campo} IS NULL"))
+                                        elif campo == 'forma_pagamento':
+                                            db.session.execute(text(f"UPDATE alunos SET {campo} = 'PIX' WHERE {campo} IS NULL"))
+                                        elif campo == 'dia_vencimento':
+                                            db.session.execute(text(f"UPDATE alunos SET {campo} = 10 WHERE {campo} IS NULL"))
+                                else:
+                                    # Adicionar coluna sem valor padrão (nullable)
+                                    db.session.execute(text(f'ALTER TABLE alunos ADD COLUMN {campo} {tipo}'))
+                                db.session.commit()
+                                print(f"✓ Campo '{campo}' adicionado.")
+                            except Exception as e:
+                                db.session.rollback()
+                                print(f"✗ Erro ao adicionar '{campo}': {e}")
+                    
+                    # Remover campos antigos se existirem (após migração)
+                    if 'data_vencimento' in columns and 'dia_vencimento' in columns:
+                        print("⚠ Campo antigo 'data_vencimento' ainda existe. Considere removê-lo após verificar a migração.")
                     
                     for campo, tipo in campos_faltantes.items():
                         if campo not in columns:
@@ -190,6 +238,16 @@ def corrigir_banco():
                             except Exception as e:
                                 db.session.rollback()
                                 print(f"✗ Erro ao adicionar '{campo}': {e}")
+                    
+                    # Remover campos antigos de endereço se existirem
+                    campos_antigos = ['rua', 'numero', 'bairro', 'pais']
+                    for campo_antigo in campos_antigos:
+                        if campo_antigo in columns:
+                            try:
+                                # SQLite não suporta DROP COLUMN diretamente, então vamos apenas avisar
+                                print(f"⚠ Campo antigo '{campo_antigo}' ainda existe na tabela. Para removê-lo, será necessário recriar a tabela.")
+                            except Exception as e:
+                                print(f"✗ Erro ao verificar campo antigo '{campo_antigo}': {e}")
             else:
                 print("Criando tabela 'alunos'...")
                 db.create_all()

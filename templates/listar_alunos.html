@@ -4,19 +4,85 @@
 {% block page_title %}Lista de Alunos{% endblock %}
 
 {% block extra_css %}
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 20px;
+        -webkit-overflow-scrolling: touch;
+    }
+    
     .alunos-table {
         width: 100%;
+        min-width: 1200px;
         border-collapse: collapse;
-        margin-top: 20px;
         background: white;
-        font-size: 0.9em;
+        font-size: 0.85em;
+        table-layout: auto;
     }
     
     .alunos-table th,
     .alunos-table td {
-        padding: 12px;
+        padding: 10px 8px;
         text-align: left;
         border-bottom: 1px solid #ddd;
+        white-space: nowrap;
+    }
+    
+    .alunos-table th:nth-child(1),
+    .alunos-table td:nth-child(1) {
+        width: 50px;
+        min-width: 50px;
+    }
+    
+    .alunos-table th:nth-child(2),
+    .alunos-table td:nth-child(2) {
+        min-width: 200px;
+        white-space: normal;
+    }
+    
+    .alunos-table th:nth-child(3),
+    .alunos-table td:nth-child(3) {
+        min-width: 130px;
+    }
+    
+    .alunos-table th:nth-child(4),
+    .alunos-table td:nth-child(4),
+    .alunos-table th:nth-child(5),
+    .alunos-table td:nth-child(5) {
+        min-width: 120px;
+    }
+    
+    .alunos-table th:nth-child(6),
+    .alunos-table td:nth-child(6) {
+        width: 60px;
+        min-width: 60px;
+    }
+    
+    .alunos-table th:nth-child(7),
+    .alunos-table td:nth-child(7) {
+        min-width: 120px;
+    }
+    
+    .alunos-table th:nth-child(8),
+    .alunos-table td:nth-child(8) {
+        min-width: 130px;
+    }
+    
+    .alunos-table th:nth-child(9),
+    .alunos-table td:nth-child(9) {
+        min-width: 120px;
+    }
+    
+    .alunos-table th:nth-child(10),
+    .alunos-table td:nth-child(10) {
+        min-width: 250px;
+        white-space: normal;
+    }
+    
+    .alunos-table th:nth-child(11),
+    .alunos-table td:nth-child(11) {
+        min-width: 120px;
+        white-space: normal;
     }
     
     .alunos-table th {
@@ -82,59 +148,47 @@
     
     .cursos-cell {
         max-width: 400px;
-        min-width: 300px;
+        min-width: 250px;
+        white-space: normal;
     }
     
     /* Responsividade */
     @media (max-width: 768px) {
-        .alunos-table {
-            font-size: 0.8em;
-            display: block;
+        .table-container {
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
-        .alunos-table thead {
-            display: none;
+        .alunos-table {
+            font-size: 0.75em;
+            min-width: 1000px;
         }
         
-        .alunos-table tbody,
-        .alunos-table tr {
-            display: block;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-        }
-        
+        .alunos-table th,
         .alunos-table td {
-            display: block;
-            text-align: left;
-            padding: 8px;
-            border: none;
-            border-bottom: 1px solid #eee;
+            padding: 8px 6px;
         }
         
-        .alunos-table td:last-child {
-            border-bottom: none;
+        .alunos-table th:nth-child(11),
+        .alunos-table td:nth-child(11) {
+            min-width: 100px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .alunos-table {
+            font-size: 0.7em;
+            min-width: 900px;
         }
         
-        .alunos-table td::before {
-            content: attr(data-label);
-            font-weight: bold;
-            display: inline-block;
-            width: 120px;
-            color: #667eea;
-        }
-        
-        .cursos-cell {
-            max-width: 100%;
-            min-width: 100%;
+        .alunos-table th,
+        .alunos-table td {
+            padding: 6px 4px;
         }
         
         .badge {
-            display: inline-block;
-            margin: 2px;
-            font-size: 0.7em;
+            font-size: 0.65em;
+            padding: 2px 6px;
         }
     }
     
@@ -157,6 +211,7 @@
 
 {% block content %}
 {% if alunos %}
+    <div class="table-container">
     <table class="alunos-table">
         <thead>
             <tr>
@@ -166,6 +221,9 @@
                 <th>Responsável</th>
                 <th>Telefone Responsável</th>
                 <th>Idade</th>
+                <th>Cidade/Estado</th>
+                <th>Forma Pagamento</th>
+                <th>Dia Vencimento</th>
                 <th>Cursos e Professores</th>
                 <th>Data Cadastro</th>
             </tr>
@@ -179,6 +237,21 @@
                 <td data-label="Responsável">{{ aluno.nome_responsavel or '-' }}</td>
                 <td data-label="Tel. Responsável">{{ aluno.telefone_responsavel or '-' }}</td>
                 <td data-label="Idade">{{ aluno.idade or '-' }}</td>
+                <td data-label="Cidade/Estado">
+                    {% if aluno.cidade or aluno.estado %}
+                        {{ aluno.cidade or '' }}{% if aluno.cidade and aluno.estado %}/{% endif %}{{ aluno.estado or '' }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td data-label="Forma Pagamento">{{ aluno.forma_pagamento or '-' }}</td>
+                <td data-label="Dia Vencimento">
+                    {% if aluno.dia_vencimento %}
+                        Dia {{ aluno.dia_vencimento }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
                 <td data-label="Cursos e Professores" class="cursos-cell">
                     {% if aluno.matriculas %}
                         {% for matricula in aluno.matriculas %}
@@ -205,11 +278,19 @@
                         <span>-</span>
                     {% endif %}
                 </td>
-                <td data-label="Data Cadastro">{{ aluno.data_cadastro.strftime('%d/%m/%Y %H:%M') if aluno.data_cadastro else '-' }}</td>
+                <td data-label="Data Cadastro">
+                    {% if aluno.data_cadastro %}
+                        <div style="line-height: 1.3;">{{ aluno.data_cadastro.strftime('%d/%m/%Y') }}</div>
+                        <div style="font-size: 0.85em; color: #666;">{{ aluno.data_cadastro.strftime('%H:%M') }}</div>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
 {% else %}
     <div class="empty-state">
         <h2>Nenhum aluno cadastrado ainda</h2>
