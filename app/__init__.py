@@ -28,16 +28,25 @@ def create_app():
     
     with app.app_context():
         try:
+            # Verificar se o banco é SQLite e se o diretório existe
+            db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            if db_uri.startswith('sqlite:///'):
+                db_path = db_uri.replace('sqlite:///', '')
+                db_dir = os.path.dirname(db_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+                    print(f"✓ Diretório do banco criado: {db_dir}")
+            
             db.create_all()
             env = app.config.get('ENVIRONMENT', 'dev')
-            db_path = app.config.get('SQLALCHEMY_DATABASE_URI', '')
             print(f"✓ Ambiente: {env.upper()}")
-            print(f"✓ Banco de dados: {db_path}")
+            print(f"✓ Banco de dados: {db_uri}")
             print("✓ Tabelas criadas/verificadas com sucesso")
         except Exception as e:
             print(f"✗ Erro ao criar tabelas: {e}")
             import traceback
             traceback.print_exc()
+            # Não levantar exceção para não quebrar a aplicação, mas logar o erro
     
     # Registrar blueprint
     from app.routes import bp

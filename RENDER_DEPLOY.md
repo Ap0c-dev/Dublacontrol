@@ -27,7 +27,8 @@
 No painel do Render, vá em "Environment" e adicione:
 
 - **SECRET_KEY**: Gere uma chave aleatória (ex: `python -c "import secrets; print(secrets.token_hex(32))"`)
-- **DATABASE_URL**: (Opcional) Se criar um banco PostgreSQL no Render, será fornecido automaticamente
+- **DATABASE_URL**: **OBRIGATÓRIO** - Crie um banco PostgreSQL no Render e adicione a URL fornecida
+  - ⚠️ **IMPORTANTE**: Sem DATABASE_URL, a aplicação usará SQLite temporário e os dados serão perdidos ao reiniciar!
 
 ### 3. Banco de Dados (Recomendado)
 

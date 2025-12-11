@@ -17,14 +17,29 @@ class Config:
         ENVIRONMENT = 'prd'  # Se tem DATABASE_URL, está em produção
     else:
         # SQLite local - separar dev e prd
-        BASE_DB_PATH = os.environ.get('DATABASE_PATH') or '/home/tiago'
-        
-        if ENVIRONMENT == 'prd':
-            # Banco de produção
-            DB_PATH = os.path.join(BASE_DB_PATH, 'banco_lucy_prd')
+        # No Render, usar diretório temporário se não houver DATABASE_URL
+        if os.environ.get('RENDER'):
+            # Render sem DATABASE_URL - usar diretório temporário (dados serão perdidos ao reiniciar)
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            DB_PATH = os.path.join(temp_dir, 'controle_dublagem.db')
+            # Garantir que o diretório existe
+            os.makedirs(temp_dir, exist_ok=True)
+            print(f"⚠️  AVISO: Usando banco SQLite temporário em {DB_PATH}")
+            print("⚠️  Dados serão perdidos ao reiniciar. Configure DATABASE_URL para usar PostgreSQL.")
         else:
-            # Banco de desenvolvimento (padrão quando roda localmente)
-            DB_PATH = os.path.join(BASE_DB_PATH, 'banco_lucy_dev')
+            # Desenvolvimento local
+            BASE_DB_PATH = os.environ.get('DATABASE_PATH') or '/home/tiago'
+            
+            if ENVIRONMENT == 'prd':
+                # Banco de produção local
+                DB_PATH = os.path.join(BASE_DB_PATH, 'banco_lucy_prd')
+            else:
+                # Banco de desenvolvimento (padrão quando roda localmente)
+                DB_PATH = os.path.join(BASE_DB_PATH, 'banco_lucy_dev')
+            
+            # Garantir que o diretório existe
+            os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else BASE_DB_PATH, exist_ok=True)
         
         SQLALCHEMY_DATABASE_URI = f'sqlite:///{DB_PATH}'
     
