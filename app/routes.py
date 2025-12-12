@@ -67,6 +67,77 @@ def index():
             return redirect(url_for('main.cadastro_alunos'))
     return redirect(url_for('main.login'))
 
+@bp.route('/criar-admin-inicial', methods=['GET', 'POST'])
+def criar_admin_inicial():
+    """
+    Rota temporária para criar o usuário admin inicial.
+    Só funciona se a variável de ambiente ENABLE_ADMIN_CREATION estiver configurada.
+    Após criar o admin, desative esta variável por segurança!
+    """
+    import os
+    from werkzeug.security import generate_password_hash
+    
+    # Verificar se a rota está habilitada
+    if not os.environ.get('ENABLE_ADMIN_CREATION'):
+        flash('Esta rota não está habilitada. Configure ENABLE_ADMIN_CREATION para usar.', 'error')
+        return redirect(url_for('main.login'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', 'admin').strip()
+        senha = request.form.get('senha', '').strip()
+        token = request.form.get('token', '').strip()
+        
+        # Verificar token de segurança (opcional, mas recomendado)
+        expected_token = os.environ.get('ADMIN_CREATION_TOKEN', '')
+        if expected_token and token != expected_token:
+            flash('Token de segurança inválido.', 'error')
+            return render_template('criar_admin.html')
+        
+        if not username:
+            flash('Username é obrigatório.', 'error')
+            return render_template('criar_admin.html')
+        
+        if not senha or len(senha) < 6:
+            flash('Senha é obrigatória e deve ter pelo menos 6 caracteres.', 'error')
+            return render_template('criar_admin.html')
+        
+        try:
+            # Verificar se o usuário já existe
+            usuario = Usuario.query.filter_by(username=username).first()
+            
+            if usuario:
+                # Atualizar senha e garantir que é admin
+                usuario.set_password(senha)
+                usuario.role = 'admin'
+                usuario.ativo = True
+                db.session.commit()
+                flash(f'Usuário "{username}" atualizado com sucesso! Você já pode fazer login.', 'success')
+            else:
+                # Criar novo usuário admin
+                usuario = Usuario(
+                    username=username,
+                    email=f'{username}@controle-dublagem.com',
+                    role='admin',
+                    ativo=True
+                )
+                usuario.set_password(senha)
+                db.session.add(usuario)
+                db.session.commit()
+                flash(f'Usuário administrador "{username}" criado com sucesso! Você já pode fazer login.', 'success')
+            
+            # Redirecionar para login
+            return redirect(url_for('main.login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar/atualizar usuário admin: {str(e)}', 'error')
+            admin_creation_token = os.environ.get('ADMIN_CREATION_TOKEN', '')
+            return render_template('criar_admin.html', admin_creation_token=admin_creation_token)
+    
+    # Verificar se há token configurado
+    admin_creation_token = os.environ.get('ADMIN_CREATION_TOKEN', '')
+    return render_template('criar_admin.html', admin_creation_token=admin_creation_token)
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Página de login"""

@@ -68,7 +68,29 @@ def create_app():
                     print(f"✓ Diretório do banco criado: {db_dir}")
             
             db.create_all()
+            
+            # Verificar e criar usuário admin se não existir (apenas em produção)
             env = app.config.get('ENVIRONMENT', 'dev')
+            if env == 'prd':
+                from app.models.usuario import Usuario
+                from werkzeug.security import generate_password_hash
+                admin_exists = Usuario.query.filter_by(role='admin').first()
+                if not admin_exists:
+                    # Criar admin padrão apenas se não existir nenhum admin
+                    # A senha padrão deve ser alterada após o primeiro login
+                    admin_password = generate_password_hash('admin123')
+                    admin = Usuario(
+                        username='admin',
+                        email='admin@controle-dublagem.com',
+                        password_hash=admin_password,
+                        role='admin',
+                        ativo=True
+                    )
+                    db.session.add(admin)
+                    db.session.commit()
+                    print("⚠️  Usuário admin padrão criado (username: admin, senha: admin123)")
+                    print("⚠️  IMPORTANTE: Altere a senha após o primeiro login!")
+            
             print(f"✓ Ambiente: {env.upper()}")
             print(f"✓ Banco de dados: {db_uri}")
             print("✓ Tabelas criadas/verificadas com sucesso")

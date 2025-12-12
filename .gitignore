@@ -30,3 +30,7 @@ instance/
 .DS_Store
 Thumbs.db
 
+# Tokens e informações sensíveis
+TOKEN_ADMIN.txt
+*.token
+
