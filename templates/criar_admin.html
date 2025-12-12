@@ -23,40 +23,44 @@
     <form method="POST">
         <div style="margin-bottom: 20px;">
             <label for="username" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
-                Username:
+                Username do Administrador: <span style="color: #dc3545;">*</span>
             </label>
             <input type="text" 
                    id="username" 
                    name="username" 
                    value="admin"
                    required
+                   placeholder="Ex: admin"
                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;">
+            <small style="color: #6c757d; font-size: 0.85em;">Este será o nome de usuário para fazer login no sistema</small>
         </div>
         
         <div style="margin-bottom: 20px;">
             <label for="senha" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
-                Senha: <span style="color: #dc3545;">*</span>
+                Senha do Administrador: <span style="color: #dc3545;">*</span>
             </label>
             <input type="password" 
                    id="senha" 
                    name="senha" 
                    required
                    minlength="6"
-                   placeholder="Mínimo 6 caracteres"
+                   placeholder="Escolha uma senha segura (mínimo 6 caracteres)"
                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;">
+            <small style="color: #6c757d; font-size: 0.85em;">Esta será a senha para fazer login no sistema</small>
         </div>
         
         {% if admin_creation_token %}
         <div style="margin-bottom: 20px;">
             <label for="token" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
-                Token de Segurança:
+                Token de Segurança: <span style="color: #dc3545;">*</span>
             </label>
             <input type="text" 
                    id="token" 
                    name="token" 
                    required
-                   placeholder="Token configurado em ADMIN_CREATION_TOKEN"
+                   placeholder="Cole o token configurado em ADMIN_CREATION_TOKEN no Render"
                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;">
+            <small style="color: #6c757d; font-size: 0.85em;">Token de segurança configurado no Render (não é a senha do admin)</small>
         </div>
         {% endif %}
         
