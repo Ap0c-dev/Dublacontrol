@@ -47,6 +47,27 @@
         color: white;
     }
     
+    .btn-criar-usuario {
+        display: inline-block;
+        padding: 8px 15px;
+        background: #17a2b8;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 0.9em;
+        font-weight: bold;
+        transition: all 0.3s;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    
+    .btn-criar-usuario:hover {
+        background: #138496;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
     .empty-state {
         text-align: center;
         padding: 40px;
@@ -106,6 +127,12 @@
             margin: 2px;
             font-size: 0.75em;
         }
+        
+        .btn-criar-usuario {
+            width: 100%;
+            text-align: center;
+            margin-top: 5px;
+        }
     }
     
     @media (max-width: 480px) {
@@ -132,8 +159,14 @@
                 <th>ID</th>
                 <th>Nome</th>
                 <th>Telefone</th>
-                <th>Tipo</th>
+                <th>Dia da Semana</th>
+                <th>Horário</th>
+                <th>Modalidades</th>
+                <th>Usuário</th>
                 <th>Data de Cadastro</th>
+                {% if current_user.is_admin() %}
+                <th>Ações</th>
+                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -142,6 +175,8 @@
                 <td data-label="ID">{{ professor.id }}</td>
                 <td data-label="Nome"><strong>{{ professor.nome }}</strong></td>
                 <td data-label="Telefone">{{ professor.telefone or '-' }}</td>
+                <td data-label="Dia da Semana">{{ professor.dia_semana or '-' }}</td>
+                <td data-label="Horário">{{ professor.horario_aula or '-' }}</td>
                 <td data-label="Modalidades">
                     {% if professor.dublagem_presencial %}
                         <span class="badge badge-success">Dublagem Presencial</span>
@@ -168,7 +203,26 @@
                         <span>-</span>
                     {% endif %}
                 </td>
+                <td data-label="Usuário">
+                    {% if professores_com_usuario[professor.id] %}
+                    <span style="color: #28a745; font-weight: bold;">✓ Tem usuário</span>
+                    {% else %}
+                    <span style="color: #dc3545;">✗ Sem usuário</span>
+                    {% endif %}
+                </td>
                 <td data-label="Data Cadastro">{{ professor.data_cadastro.strftime('%d/%m/%Y %H:%M') if professor.data_cadastro else '-' }}</td>
+                {% if current_user.is_admin() %}
+                <td data-label="Ações">
+                    {% if not professores_com_usuario[professor.id] %}
+                    <a href="{{ url_for('main.cadastro_usuario_professor') }}?professor_id={{ professor.id }}" 
+                       class="btn-criar-usuario">
+                        Criar Usuário
+                    </a>
+                    {% else %}
+                    <span style="color: #6c757d;">-</span>
+                    {% endif %}
+                </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>

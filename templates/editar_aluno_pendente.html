@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Aluno Pendente - Controle de Dublagem{% endblock %}
+{% block page_title %}Editar Aluno Pendente{% endblock %}
+
+{% block extra_css %}
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+    }
+    
+    .form-row {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .form-row .form-group {
+        flex: 1;
+    }
+    
+    .required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .checkbox-group {
+        margin: 15px 0;
+    }
+    
+    .checkbox-item {
+        margin: 10px 0;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+        width: auto;
+        margin-right: 8px;
+    }
+    
+    .curso-professor-item {
+        margin: 15px 0;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .curso-professor-item > div {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+    
+    .curso-professor-item > div > div {
+        flex: 1;
+    }
+    
+    .curso-professor-item input[type="number"] {
+        width: 150px;
+    }
+    
+    .btn-submit {
+        background: #667eea;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        cursor: pointer;
+        margin-top: 20px;
+    }
+    
+    .btn-submit:hover {
+        background: #5568d3;
+    }
+    
+    .btn-cancel {
+        background: #6c757d;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        cursor: pointer;
+        margin-top: 20px;
+        text-decoration: none;
+        display: inline-block;
+        margin-right: 10px;
+    }
+    
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="POST">
+        <div class="form-group">
+            <label for="nome" class="required">Nome</label>
+            <input type="text" id="nome" name="nome" value="{{ aluno.nome }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="telefone" class="required">Telefone</label>
+            <input type="tel" id="telefone" name="telefone" value="{{ aluno.telefone }}" 
+                   pattern="\+[0-9]{1,3} [0-9]{2} [0-9]{8,9}" required>
+        </div>
+        
+        <div class="form-group">
+            <label style="display: block; margin-bottom: 8px;">Deseja ter seu aniversário lembrado pela Oficina de Atores?</label>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                    <input type="radio" 
+                           id="lembrar_aniversario_sim" 
+                           name="lembrar_aniversario"
+                           value="sim"
+                           {% if aluno.lembrar_aniversario %}checked{% endif %}
+                           onchange="toggleDataNascimento()">
+                    <span>Sim</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                    <input type="radio" 
+                           id="lembrar_aniversario_nao" 
+                           name="lembrar_aniversario"
+                           value="nao"
+                           {% if not aluno.lembrar_aniversario %}checked{% endif %}
+                           onchange="toggleDataNascimento()">
+                    <span>Não</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="data_nascimento" id="label_data_nascimento">Data de Nascimento</label>
+                <input type="date" 
+                       id="data_nascimento" 
+                       name="data_nascimento" 
+                       value="{% if aluno.data_nascimento %}{{ aluno.data_nascimento.strftime('%Y-%m-%d') }}{% endif %}">
+            </div>
+            <div class="form-group">
+                <label for="idade" class="required">Idade</label>
+                <input type="number" 
+                       id="idade" 
+                       name="idade" 
+                       required
+                       min="8"
+                       max="100"
+                       value="{% if aluno.idade %}{{ aluno.idade }}{% endif %}">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="cidade" class="required">Cidade</label>
+                <input type="text" id="cidade" name="cidade" value="{{ aluno.cidade }}" required>
+            </div>
+            <div class="form-group">
+                <label for="estado" class="required">Estado</label>
+                <input type="text" id="estado" name="estado" value="{{ aluno.estado }}" 
+                       maxlength="2" style="text-transform: uppercase;" required>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="forma_pagamento" class="required">Forma de Pagamento</label>
+                <select id="forma_pagamento" name="forma_pagamento" required>
+                    <option value="">Selecione</option>
+                    <option value="PIX" {% if aluno.forma_pagamento == 'PIX' %}selected{% endif %}>PIX</option>
+                    <option value="Boleto" {% if aluno.forma_pagamento == 'Boleto' %}selected{% endif %}>Boleto</option>
+                    <option value="Cartão de Crédito" {% if aluno.forma_pagamento == 'Cartão de Crédito' %}selected{% endif %}>Cartão de Crédito</option>
+                    <option value="Cartão de Débito" {% if aluno.forma_pagamento == 'Cartão de Débito' %}selected{% endif %}>Cartão de Débito</option>
+                    <option value="Transferência Bancária" {% if aluno.forma_pagamento == 'Transferência Bancária' %}selected{% endif %}>Transferência Bancária</option>
+                    <option value="Dinheiro" {% if aluno.forma_pagamento == 'Dinheiro' %}selected{% endif %}>Dinheiro</option>
+                    <option value="Outro" {% if aluno.forma_pagamento == 'Outro' %}selected{% endif %}>Outro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="data_vencimento" class="required">Data de Vencimento</label>
+                <input type="date" id="data_vencimento" name="data_vencimento" 
+                       value="{{ aluno.data_vencimento.strftime('%Y-%m-%d') if aluno.data_vencimento else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label for="data_inicio" class="required">Data de Início das Aulas</label>
+                <input type="date" id="data_inicio" name="data_inicio" 
+                       value="{% if aluno.matriculas %}{% set data_inicio_valor = '' %}{% for m in aluno.matriculas %}{% if m.data_inicio and not data_inicio_valor %}{% set data_inicio_valor = m.data_inicio.strftime('%Y-%m-%d') %}{% endif %}{% endfor %}{{ data_inicio_valor }}{% endif %}" required>
+            </div>
+        </div>
+        
+        <div class="checkbox-group">
+            <label>Cursos:</label>
+            <div class="checkbox-item">
+                <input type="checkbox" id="dublagem_online" name="dublagem_online" 
+                       {% if aluno.dublagem_online %}checked{% endif %}
+                       onchange="toggleCurso('dublagem_online')">
+                <label for="dublagem_online">Dublagem Online</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="dublagem_presencial" name="dublagem_presencial" 
+                       {% if aluno.dublagem_presencial %}checked{% endif %}
+                       onchange="toggleCurso('dublagem_presencial')">
+                <label for="dublagem_presencial">Dublagem Presencial</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="teatro_online" name="teatro_online" 
+                       {% if aluno.teatro_online %}checked{% endif %}
+                       onchange="toggleCurso('teatro_online')">
+                <label for="teatro_online">Teatro Online</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="teatro_presencial" name="teatro_presencial" 
+                       {% if aluno.teatro_presencial %}checked{% endif %}
+                       onchange="toggleCurso('teatro_presencial')">
+                <label for="teatro_presencial">Teatro Presencial</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="locucao" name="locucao" 
+                       {% if aluno.locucao %}checked{% endif %}
+                       onchange="toggleCurso('locucao')">
+                <label for="locucao">Locução</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="teatro_tv_cinema" name="teatro_tv_cinema" 
+                       {% if aluno.teatro_tv_cinema %}checked{% endif %}
+                       onchange="toggleCurso('teatro_tv_cinema')">
+                <label for="teatro_tv_cinema">Teatro TV e Cinema</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="musical" name="musical" 
+                       {% if aluno.musical %}checked{% endif %}
+                       onchange="toggleCurso('musical')">
+                <label for="musical">Musical</label>
+            </div>
+        </div>
+        
+        <div id="cursos_professores">
+            {% for tipo_curso in ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'] %}
+            {% set matricula = None %}
+            {% for m in aluno.matriculas %}
+                {% if m.tipo_curso == tipo_curso %}
+                    {% set matricula = m %}
+                    {# Debug: comentário para verificar se a matrícula foi encontrada #}
+                {% endif %}
+            {% endfor %}
+            {# Debug: verificar se encontrou matrícula para este curso #}
+            {% if not matricula and aluno.matriculas %}
+                {# Nenhuma matrícula encontrada para {{ tipo_curso }} #}
+            {% endif %}
+            {% if tipo_curso == 'dublagem_online' %}
+                {% set curso_ativo = aluno.dublagem_online %}
+            {% elif tipo_curso == 'dublagem_presencial' %}
+                {% set curso_ativo = aluno.dublagem_presencial %}
+            {% elif tipo_curso == 'teatro_online' %}
+                {% set curso_ativo = aluno.teatro_online %}
+            {% elif tipo_curso == 'teatro_presencial' %}
+                {% set curso_ativo = aluno.teatro_presencial %}
+            {% elif tipo_curso == 'locucao' %}
+                {% set curso_ativo = aluno.locucao %}
+            {% elif tipo_curso == 'teatro_tv_cinema' %}
+                {% set curso_ativo = aluno.teatro_tv_cinema %}
+            {% elif tipo_curso == 'musical' %}
+                {% set curso_ativo = aluno.musical %}
+            {% else %}
+                {% set curso_ativo = False %}
+            {% endif %}
+            <div class="curso-professor-item" id="professor_{{ tipo_curso }}_container" 
+                 style="display: {% if matricula or curso_ativo %}block{% else %}none{% endif %};">
+                <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label for="professor_{{ tipo_curso }}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">
+                            {{ tipo_curso.replace('_', ' ').title() }}:
+                        </label>
+                        <select id="professor_{{ tipo_curso }}" 
+                                name="professor_{{ tipo_curso }}"
+                                onchange="carregarHorariosProfessorEdit('{{ tipo_curso }}', this.value)">
+                            <option value="">Selecione o professor</option>
+                            {% for professor in professores %}
+                            <option value="{{ professor.id }}" 
+                                    {% if matricula and matricula.professor_id == professor.id %}selected{% endif %}>
+                                {{ professor.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 150px;">
+                        <label for="dia_semana_{{ tipo_curso }}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                        <select id="dia_semana_{{ tipo_curso }}" 
+                                name="dia_semana_{{ tipo_curso }}">
+                            <option value="">Selecione o dia</option>
+                            {% if matricula and matricula.dia_semana %}
+                            <option value="{{ matricula.dia_semana }}" selected>{{ matricula.dia_semana }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 150px;">
+                        <label for="horario_{{ tipo_curso }}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                        <select id="horario_{{ tipo_curso }}" 
+                                name="horario_{{ tipo_curso }}">
+                            <option value="">Selecione o horário</option>
+                            {% if matricula and matricula.horario_aula %}
+                            <option value="{{ matricula.horario_aula }}" selected>{{ matricula.horario_aula }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div style="width: 150px;">
+                        <label for="mensalidade_{{ tipo_curso }}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">
+                            Mensalidade (R$):
+                        </label>
+                        <input type="number" id="mensalidade_{{ tipo_curso }}" name="mensalidade_{{ tipo_curso }}" 
+                               step="0.01" min="0.01" required
+                               placeholder="0.00"
+                               value="{% if matricula and matricula.valor_mensalidade %}{{ matricula.valor_mensalidade }}{% endif %}">
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <a href="{{ url_for('main.listar_alunos', filtro='pendentes') }}" class="btn-cancel">Cancelar</a>
+            <button type="submit" class="btn-submit">Salvar Alterações</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleCurso(tipoCurso) {
+    const checkbox = document.getElementById(tipoCurso);
+    const container = document.getElementById('professor_' + tipoCurso + '_container');
+    
+    if (checkbox.checked) {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+        // Limpar valores quando desmarcar
+        const professorSelect = document.getElementById('professor_' + tipoCurso);
+        const mensalidadeInput = document.getElementById('mensalidade_' + tipoCurso);
+        if (professorSelect) professorSelect.value = '';
+        if (mensalidadeInput) mensalidadeInput.value = '';
+    }
+}
+
+function toggleDataNascimento() {
+    const radioSim = document.getElementById('lembrar_aniversario_sim');
+    const radioNao = document.getElementById('lembrar_aniversario_nao');
+    const dataNascimentoInput = document.getElementById('data_nascimento');
+    const labelDataNascimento = document.getElementById('label_data_nascimento');
+    
+    if (radioSim && radioNao && dataNascimentoInput) {
+        if (radioSim.checked) {
+            dataNascimentoInput.required = true;
+            if (labelDataNascimento) {
+                labelDataNascimento.classList.add('required');
+            }
+            dataNascimentoInput.setAttribute('required', 'required');
+        } else {
+            dataNascimentoInput.required = false;
+            if (labelDataNascimento) {
+                labelDataNascimento.classList.remove('required');
+            }
+            dataNascimentoInput.removeAttribute('required');
+        }
+    }
+}
+
+function carregarHorariosProfessorEdit(tipoCurso, professorId) {
+    if (!professorId) {
+        const diaSelect = document.getElementById(`dia_semana_${tipoCurso}`);
+        const horarioSelect = document.getElementById(`horario_${tipoCurso}`);
+        if (diaSelect) {
+            diaSelect.innerHTML = '<option value="">Selecione o dia</option>';
+            diaSelect.disabled = true;
+        }
+        if (horarioSelect) {
+            horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+            horarioSelect.disabled = true;
+        }
+        return;
+    }
+    
+    // Salvar valores atuais antes de limpar (incluindo valores de opções selected)
+    const diaSelect = document.getElementById(`dia_semana_${tipoCurso}`);
+    const horarioSelect = document.getElementById(`horario_${tipoCurso}`);
+    let diaAtual = diaSelect ? diaSelect.value : '';
+    let horarioAtual = horarioSelect ? horarioSelect.value : '';
+    
+    // Se não há valor selecionado, verificar se há uma opção selected no HTML
+    if (!diaAtual && diaSelect) {
+        const selectedOption = diaSelect.querySelector('option[selected]');
+        if (selectedOption) {
+            diaAtual = selectedOption.value;
+        }
+    }
+    if (!horarioAtual && horarioSelect) {
+        const selectedOption = horarioSelect.querySelector('option[selected]');
+        if (selectedOption) {
+            horarioAtual = selectedOption.value;
+        }
+    }
+    
+    fetch(`/api/professor/${professorId}/horarios`)
+        .then(response => response.json())
+        .then(horarios => {
+            if (diaSelect && horarioSelect) {
+                diaSelect.innerHTML = '<option value="">Selecione o dia</option>';
+                horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+                
+                if (horarios.length === 0) {
+                    diaSelect.innerHTML = '<option value="">Nenhum horário cadastrado</option>';
+                    diaSelect.disabled = true;
+                    horarioSelect.disabled = true;
+                } else {
+                    const horariosPorDia = {};
+                    horarios.forEach(horario => {
+                        if (!horariosPorDia[horario.dia_semana]) {
+                            horariosPorDia[horario.dia_semana] = [];
+                        }
+                        horariosPorDia[horario.dia_semana].push(horario);
+                    });
+                    
+                    Object.keys(horariosPorDia).sort().forEach(dia => {
+                        const option = document.createElement('option');
+                        option.value = dia;
+                        option.textContent = dia;
+                        if (dia === diaAtual) {
+                            option.selected = true;
+                        }
+                        diaSelect.appendChild(option);
+                    });
+                    
+                    diaSelect.disabled = false;
+                    
+                    // Se já havia um dia selecionado, carregar os horários desse dia
+                    if (diaAtual && horariosPorDia[diaAtual]) {
+                        horariosPorDia[diaAtual].forEach(horario => {
+                            const option = document.createElement('option');
+                            option.value = horario.horario_aula;
+                            option.textContent = horario.horario_aula;
+                            if (horario.horario_aula === horarioAtual) {
+                                option.selected = true;
+                            }
+                            horarioSelect.appendChild(option);
+                        });
+                        horarioSelect.disabled = false;
+                    }
+                    
+                    diaSelect.onchange = function() {
+                        const diaSelecionado = this.value;
+                        horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+                        
+                        if (diaSelecionado && horariosPorDia[diaSelecionado]) {
+                            horariosPorDia[diaSelecionado].forEach(horario => {
+                                const option = document.createElement('option');
+                                option.value = horario.horario_aula;
+                                option.textContent = horario.horario_aula;
+                                horarioSelect.appendChild(option);
+                            });
+                            horarioSelect.disabled = false;
+                        } else {
+                            horarioSelect.disabled = true;
+                        }
+                    };
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar horários:', error);
+        });
+}
+
+// Inicializar estado do checkbox ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    toggleDataNascimento();
+    
+    // Carregar horários para professores já selecionados
+    const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+    tiposCursos.forEach(tipoCurso => {
+        const professorSelect = document.getElementById(`professor_${tipoCurso}`);
+        const diaSelect = document.getElementById(`dia_semana_${tipoCurso}`);
+        const horarioSelect = document.getElementById(`horario_${tipoCurso}`);
+        
+        // Se há um professor selecionado e valores existentes de dia/horário, carregar os horários
+        if (professorSelect && professorSelect.value) {
+            const diaAtual = diaSelect ? diaSelect.value : '';
+            const horarioAtual = horarioSelect ? horarioSelect.value : '';
+            
+            // Aguardar um pouco para garantir que os elementos estejam prontos
+            setTimeout(() => {
+                carregarHorariosProfessorEdit(tipoCurso, professorSelect.value);
+                
+                // Após carregar, restaurar os valores se existirem
+                if (diaAtual && diaSelect) {
+                    setTimeout(() => {
+                        diaSelect.value = diaAtual;
+                        // Disparar evento para carregar horários do dia
+                        if (diaSelect.onchange) {
+                            diaSelect.onchange();
+                        }
+                        // Restaurar horário após carregar os horários do dia
+                        if (horarioAtual && horarioSelect) {
+                            setTimeout(() => {
+                                horarioSelect.value = horarioAtual;
+                            }, 200);
+                        }
+                    }, 300);
+                }
+            }, 100);
+        }
+    });
+});
+</script>
+{% endblock %}
+

@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_login import LoginManager
 from config import Config
 from app.models.professor import db
 import os
@@ -23,8 +24,37 @@ def create_app():
     
     db.init_app(app)
     
+    # Configurar Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'main.login'
+    login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+    login_manager.login_message_category = 'info'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models.usuario import Usuario
+        return Usuario.query.get(int(user_id))
+    
+    # Filtro customizado para formatar valores monetários
+    @app.template_filter('format_currency')
+    def format_currency(value):
+        """Formata um valor numérico como moeda brasileira"""
+        try:
+            if value is None:
+                return '-'
+            # Converter para float se necessário
+            valor_float = float(value)
+            if valor_float == 0:
+                return '-'
+            # Formatar com 2 casas decimais e substituir ponto por vírgula
+            formatted = f"{valor_float:.2f}".replace('.', ',')
+            return f"R$ {formatted}"
+        except (ValueError, TypeError):
+            return '-'
+    
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula
+    from app.models import professor, aluno, matricula, usuario, horario_professor
     
     with app.app_context():
         try:

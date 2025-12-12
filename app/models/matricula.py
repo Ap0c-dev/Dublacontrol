@@ -14,6 +14,14 @@ class Matricula(db.Model):
     # Valor da mensalidade para esta modalidade
     valor_mensalidade = db.Column(db.Float, nullable=True)  # Permite valores decimais (ex: 150.50)
     
+    # Datas de início e encerramento da matrícula
+    data_inicio = db.Column(db.Date, nullable=True)  # Data de início das aulas
+    data_encerramento = db.Column(db.Date, nullable=True)  # Data de encerramento da matrícula (preenchida na exclusão)
+    
+    # Dia da semana e horário da aula (vinculados ao horário do professor)
+    dia_semana = db.Column(db.String(20), nullable=True)  # Ex: "Segunda-feira"
+    horario_aula = db.Column(db.String(50), nullable=True)  # Ex: "17:00 às 19:00"
+    
     data_matricula = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     # Relacionamentos
@@ -31,6 +39,10 @@ class Matricula(db.Model):
             'tipo_curso': self.tipo_curso,
             'valor_mensalidade': float(self.valor_mensalidade) if self.valor_mensalidade else None,
             'professor_nome': self.professor.nome if self.professor else None,
-            'data_matricula': self.data_matricula.isoformat() if self.data_matricula else None
+            'data_matricula': self.data_matricula.isoformat() if self.data_matricula else None,
+            'data_inicio': self.data_inicio.isoformat() if self.data_inicio else None,
+            'data_encerramento': self.data_encerramento.isoformat() if self.data_encerramento else None,
+            'dia_semana': self.dia_semana,
+            'horario_aula': self.horario_aula
         }
 

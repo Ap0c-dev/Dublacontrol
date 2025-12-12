@@ -54,6 +54,29 @@
             background: #5568d3;
         }
         
+        .user-info {
+            text-align: right;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .user-info span {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .user-info a {
+            color: #dc3545;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+        
+        .user-info a:hover {
+            text-decoration: underline;
+        }
+        
         .messages {
             margin-bottom: 20px;
         }
@@ -140,12 +163,32 @@
     <div class="container">
         <h1>{% block page_title %}Controle de Dublagem{% endblock %}</h1>
         
+        {% if current_user.is_authenticated %}
+        <div class="user-info">
+            <span>Olá, {{ current_user.username }}</span>
+            {% if current_user.is_admin() %}
+            <span style="color: #28a745;">(Administrador)</span>
+            {% elif current_user.is_professor() %}
+            <span style="color: #17a2b8;">(Professor{% if current_user.get_professor() %}: {{ current_user.get_professor().nome }}{% endif %})</span>
+            {% else %}
+            <span style="color: #6c757d;">(Aluno)</span>
+            {% endif %}
+            <a href="{{ url_for('main.logout') }}">Sair</a>
+        </div>
+        
         <nav class="nav">
+            {% if current_user.is_admin() %}
             <a href="{{ url_for('main.cadastro_professores') }}">Cadastro de Professores</a>
             <a href="{{ url_for('main.listar_professores') }}">Listar Professores</a>
             <a href="{{ url_for('main.cadastro_alunos') }}">Cadastro de Alunos</a>
             <a href="{{ url_for('main.listar_alunos') }}">Listar Alunos</a>
+            {% elif current_user.is_professor() %}
+            <a href="{{ url_for('main.listar_alunos') }}">Meus Alunos</a>
+            {% else %}
+            <a href="{{ url_for('main.cadastro_alunos') }}">Cadastro de Alunos</a>
+            {% endif %}
         </nav>
+        {% endif %}
         
         <div class="messages">
             {% with messages = get_flashed_messages(with_categories=true) %}

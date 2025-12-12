@@ -75,12 +75,20 @@
     
     .alunos-table th:nth-child(10),
     .alunos-table td:nth-child(10) {
-        min-width: 250px;
+        min-width: 100px;
         white-space: normal;
+        padding-right: 5px;
     }
     
     .alunos-table th:nth-child(11),
     .alunos-table td:nth-child(11) {
+        min-width: 200px;
+        white-space: normal;
+        padding-left: 5px;
+    }
+    
+    .alunos-table th:nth-child(12),
+    .alunos-table td:nth-child(12) {
         min-width: 120px;
         white-space: normal;
     }
@@ -152,6 +160,184 @@
         white-space: normal;
     }
     
+    .tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .tab {
+        padding: 12px 24px;
+        background: #f8f9fa;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: bold;
+        color: #6c757d;
+        transition: all 0.3s;
+    }
+    
+    .tab:hover {
+        background: #e9ecef;
+        color: #495057;
+    }
+    
+    .tab.active {
+        background: white;
+        color: #667eea;
+        border-bottom-color: #667eea;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+    }
+    
+    .btn-excluir, .btn-reativar {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.3s;
+    }
+    
+    .btn-excluir {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-excluir:hover {
+        background: #c82333;
+    }
+    
+    .btn-reativar {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-reativar:hover {
+        background: #218838;
+    }
+    
+    /* Indicadores de status de vencimento */
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    
+    .status-vencido {
+        background-color: #dc3545; /* Vermelho */
+    }
+    
+    .status-vence-hoje {
+        background-color: #fd7e14; /* Laranja */
+    }
+    
+    .status-vence-amanha {
+        background-color: #007bff; /* Azul */
+    }
+    
+    .status-ok {
+        background-color: #28a745; /* Verde */
+    }
+    
+    .status-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+        background-color: white;
+        margin: 15% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close:hover {
+        color: #000;
+    }
+    
+    .form-group-modal {
+        margin-bottom: 15px;
+    }
+    
+    .form-group-modal label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .form-group-modal select,
+    .form-group-modal input[type="date"] {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+    
+    .btn-modal {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    .btn-modal-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-modal-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
     /* Responsividade */
     @media (max-width: 768px) {
         .table-container {
@@ -169,8 +355,12 @@
             padding: 8px 6px;
         }
         
+        .alunos-table th:nth-child(10),
+        .alunos-table td:nth-child(10),
         .alunos-table th:nth-child(11),
-        .alunos-table td:nth-child(11) {
+        .alunos-table td:nth-child(11),
+        .alunos-table th:nth-child(12),
+        .alunos-table td:nth-child(12) {
             min-width: 100px;
         }
     }
@@ -210,6 +400,20 @@
 {% endblock %}
 
 {% block content %}
+<div class="tabs">
+    <a href="{{ url_for('main.listar_alunos', filtro='ativos') }}" class="tab {% if filtro == 'ativos' %}active{% endif %}">
+        Alunos Ativos
+    </a>
+    {% if current_user.is_admin() %}
+    <a href="{{ url_for('main.listar_alunos', filtro='pendentes') }}" class="tab {% if filtro == 'pendentes' %}active{% endif %}">
+        Pendentes de Aprovação
+    </a>
+    {% endif %}
+    <a href="{{ url_for('main.listar_alunos', filtro='inativos') }}" class="tab {% if filtro == 'inativos' %}active{% endif %}">
+        Alunos Inativos
+    </a>
+</div>
+
 {% if alunos %}
     <div class="table-container">
     <table class="alunos-table">
@@ -223,9 +427,17 @@
                 <th>Idade</th>
                 <th>Cidade/Estado</th>
                 <th>Forma Pagamento</th>
-                <th>Dia Vencimento</th>
+                <th>Data Vencimento</th>
+                {% if filtro == 'ativos' %}
+                <th>Mensalidade</th>
+                {% endif %}
                 <th>Cursos e Professores</th>
                 <th>Data Cadastro</th>
+                {% if filtro == 'inativos' %}
+                <th>Data Exclusão</th>
+                <th>Motivo Exclusão</th>
+                {% endif %}
+                <th>Ações</th>
             </tr>
         </thead>
         <tbody>
@@ -233,9 +445,21 @@
             <tr>
                 <td data-label="ID">{{ aluno.id }}</td>
                 <td data-label="Nome"><strong>{{ aluno.nome }}</strong></td>
-                <td data-label="Telefone">{{ aluno.telefone or '-' }}</td>
+                <td data-label="Telefone">
+                    {% if filtro == 'inativos' and current_user.is_professor() %}
+                    <span style="color: #6c757d;">Restrito</span>
+                    {% else %}
+                    {{ aluno.telefone or '-' }}
+                    {% endif %}
+                </td>
                 <td data-label="Responsável">{{ aluno.nome_responsavel or '-' }}</td>
-                <td data-label="Tel. Responsável">{{ aluno.telefone_responsavel or '-' }}</td>
+                <td data-label="Tel. Responsável">
+                    {% if filtro == 'inativos' and current_user.is_professor() %}
+                    <span style="color: #6c757d;">Restrito</span>
+                    {% else %}
+                    {{ aluno.telefone_responsavel or '-' }}
+                    {% endif %}
+                </td>
                 <td data-label="Idade">{{ aluno.idade or '-' }}</td>
                 <td data-label="Cidade/Estado">
                     {% if aluno.cidade or aluno.estado %}
@@ -245,13 +469,56 @@
                     {% endif %}
                 </td>
                 <td data-label="Forma Pagamento">{{ aluno.forma_pagamento or '-' }}</td>
-                <td data-label="Dia Vencimento">
-                    {% if aluno.dia_vencimento %}
-                        Dia {{ aluno.dia_vencimento }}
+                <td data-label="Data Vencimento" class="status-cell">
+                    {% if filtro == 'ativos' %}
+                        {% set status = aluno.get_status_vencimento() %}
+                        {% if status == 'vencido' %}
+                            <span class="status-indicator status-vencido" title="Vencido"></span>
+                        {% elif status == 'vence_hoje' %}
+                            <span class="status-indicator status-vence-hoje" title="Vence hoje"></span>
+                        {% elif status == 'vence_amanha' %}
+                            <span class="status-indicator status-vence-amanha" title="Vence amanhã"></span>
+                        {% else %}
+                            <span class="status-indicator status-ok" title="OK"></span>
+                        {% endif %}
+                    {% endif %}
+                    {% if aluno.data_vencimento %}
+                        {{ aluno.data_vencimento.strftime('%d/%m/%Y') }}
                     {% else %}
                         -
                     {% endif %}
                 </td>
+                {% if filtro == 'ativos' %}
+                <td data-label="Mensalidade" style="white-space: normal; vertical-align: top;">
+                    {% set total_mensalidade = aluno.get_total_mensalidades() %}
+                    {% set mensalidades_com_valor = [] %}
+                    {% if aluno.matriculas %}
+                        {% for matricula in aluno.matriculas %}
+                            {% if matricula.valor_mensalidade and matricula.valor_mensalidade > 0 %}
+                                {% set _ = mensalidades_com_valor.append(matricula.valor_mensalidade) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if mensalidades_com_valor|length > 0 %}
+                    <div style="line-height: 1.8;">
+                        {% for matricula in aluno.matriculas %}
+                            {% if matricula.valor_mensalidade and matricula.valor_mensalidade > 0 %}
+                            <div style="margin-bottom: 6px; font-size: 0.9em;">
+                                <span style="color: #495057;">{{ matricula.valor_mensalidade|format_currency }}</span>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                        {% if mensalidades_com_valor|length > 1 %}
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #667eea;">
+                            <strong style="color: #667eea; font-size: 1.1em; display: block;">{{ total_mensalidade|format_currency }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span style="color: #6c757d;">-</span>
+                    {% endif %}
+                </td>
+                {% endif %}
                 <td data-label="Cursos e Professores" class="cursos-cell">
                     {% if aluno.matriculas %}
                         {% for matricula in aluno.matriculas %}
@@ -286,6 +553,44 @@
                         -
                     {% endif %}
                 </td>
+                {% if filtro == 'inativos' %}
+                <td data-label="Data Exclusão">
+                    {% if aluno.data_exclusao %}
+                        {{ aluno.data_exclusao.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td data-label="Motivo Exclusão">{{ aluno.motivo_exclusao or '-' }}</td>
+                {% endif %}
+                <td data-label="Ações">
+                    {% if current_user.is_admin() %}
+                    <div class="action-buttons">
+                        {% if filtro == 'pendentes' %}
+                        <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                            Editar
+                        </a>
+                        <form method="POST" action="{{ url_for('main.aprovar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja aprovar o aluno {{ aluno.nome }}?')">
+                                Aprovar
+                            </button>
+                        </form>
+                        {% elif aluno.ativo %}
+                        <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome }}')">
+                            Excluir
+                        </button>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('main.reativar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja reativar o aluno {{ aluno.nome }}?')">
+                                Reativar
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span style="color: #6c757d;">-</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -293,9 +598,83 @@
     </div>
 {% else %}
     <div class="empty-state">
-        <h2>Nenhum aluno cadastrado ainda</h2>
-        <p>Comece cadastrando alunos na página de cadastro.</p>
+        <h2>Nenhum aluno {% if filtro == 'inativos' %}inativo{% elif filtro == 'pendentes' %}pendente{% else %}ativo{% endif %} encontrado</h2>
+        <p>{% if filtro == 'inativos' %}Não há alunos inativos no momento.{% elif filtro == 'pendentes' %}Não há alunos pendentes de aprovação.{% else %}Comece cadastrando alunos na página de cadastro.{% endif %}</p>
     </div>
 {% endif %}
+
+<!-- Modal de Exclusão -->
+<div id="modalExclusao" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Excluir Aluno</h3>
+            <span class="close" onclick="fecharModalExclusao()">&times;</span>
+        </div>
+        <form id="formExclusao" method="POST">
+            <div class="form-group-modal">
+                <label>Aluno:</label>
+                <p id="nomeAlunoExclusao" style="font-weight: bold; margin: 0;"></p>
+            </div>
+            <div class="form-group-modal">
+                <label for="motivo_exclusao">Motivo da Exclusão *</label>
+                <select id="motivo_exclusao" name="motivo_exclusao" required>
+                    <option value="">Selecione o motivo</option>
+                    {% for motivo in motivos_exclusao %}
+                    <option value="{{ motivo }}">{{ motivo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group-modal">
+                <label for="data_encerramento">Data de Encerramento da Matrícula *</label>
+                <input type="date" 
+                       id="data_encerramento" 
+                       name="data_encerramento" 
+                       required
+                       value="{{ data_hoje.strftime('%Y-%m-%d') if data_hoje else '' }}">
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="btn-modal btn-modal-secondary" onclick="fecharModalExclusao()">Cancelar</button>
+                <button type="submit" class="btn-modal btn-modal-primary">Confirmar Exclusão</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalExclusao(alunoId, alunoNome) {
+    document.getElementById('nomeAlunoExclusao').textContent = alunoNome;
+    document.getElementById('formExclusao').action = '/alunos/' + alunoId + '/excluir';
+    
+    // Definir data atual como padrão no campo de data de encerramento
+    const hoje = new Date();
+    const dataFormatada = hoje.toISOString().split('T')[0];
+    const dataEncerramentoInput = document.getElementById('data_encerramento');
+    if (dataEncerramentoInput && !dataEncerramentoInput.value) {
+        dataEncerramentoInput.value = dataFormatada;
+    }
+    
+    document.getElementById('modalExclusao').style.display = 'block';
+}
+
+function fecharModalExclusao() {
+    document.getElementById('modalExclusao').style.display = 'none';
+    document.getElementById('formExclusao').reset();
+    // Resetar data de encerramento para data atual
+    const hoje = new Date();
+    const dataFormatada = hoje.toISOString().split('T')[0];
+    const dataEncerramentoInput = document.getElementById('data_encerramento');
+    if (dataEncerramentoInput) {
+        dataEncerramentoInput.value = dataFormatada;
+    }
+}
+
+// Fechar modal ao clicar fora dele
+window.onclick = function(event) {
+    const modal = document.getElementById('modalExclusao');
+    if (event.target == modal) {
+        fecharModalExclusao();
+    }
+}
+</script>
 {% endblock %}
 

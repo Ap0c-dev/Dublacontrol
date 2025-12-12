@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro de Usuário - Controle de Dublagem{% endblock %}
+{% block page_title %}Criar Conta{% endblock %}
+
+{% block extra_css %}
+    .register-container {
+        max-width: 500px;
+        margin: 30px auto;
+        padding: 30px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label.required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .btn-register {
+        width: 100%;
+        padding: 12px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin-top: 10px;
+    }
+    
+    .btn-register:hover {
+        background: #5568d3;
+    }
+    
+    .login-link {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+    
+    .login-link a {
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .login-link a:hover {
+        text-decoration: underline;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <h2 style="text-align: center; margin-bottom: 30px; color: #667eea;">Criar Conta</h2>
+    
+    <form method="POST" action="{{ url_for('main.cadastro_usuario') }}">
+        <div class="form-group">
+            <label for="username" class="required">Nome de Usuário</label>
+            <input type="text" 
+                   id="username" 
+                   name="username" 
+                   required 
+                   autofocus
+                   minlength="3"
+                   placeholder="Digite seu nome de usuário">
+            <small>Mínimo de 3 caracteres</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="email" class="required">Email</label>
+            <input type="email" 
+                   id="email" 
+                   name="email" 
+                   required
+                   placeholder="seu@email.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password" class="required">Senha</label>
+            <input type="password" 
+                   id="password" 
+                   name="password" 
+                   required
+                   minlength="6"
+                   placeholder="Digite sua senha">
+            <small>Mínimo de 6 caracteres</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="password_confirm" class="required">Confirmar Senha</label>
+            <input type="password" 
+                   id="password_confirm" 
+                   name="password_confirm" 
+                   required
+                   minlength="6"
+                   placeholder="Digite a senha novamente">
+        </div>
+        
+        <button type="submit" class="btn-register">Criar Conta</button>
+    </form>
+    
+    <div class="login-link">
+        <p>Já tem uma conta? <a href="{{ url_for('main.login') }}">Faça login aqui</a></p>
+    </div>
+</div>
+{% endblock %}
+

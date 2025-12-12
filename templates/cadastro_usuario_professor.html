@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro de Usuário Professor - Controle de Dublagem{% endblock %}
+{% block page_title %}Criar Usuário para Professor{% endblock %}
+
+{% block extra_css %}
+    .register-container {
+        max-width: 500px;
+        margin: 30px auto;
+        padding: 30px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label.required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .btn-register {
+        width: 100%;
+        padding: 12px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin-top: 10px;
+    }
+    
+    .btn-register:hover {
+        background: #5568d3;
+    }
+    
+    .info-box {
+        background: #e7f3ff;
+        border-left: 4px solid #17a2b8;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    
+    .info-box p {
+        margin: 0;
+        color: #0c5460;
+        font-size: 0.95em;
+    }
+    
+    .professor-info {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 5px;
+        font-size: 0.9em;
+        color: #6c757d;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <h2 style="text-align: center; margin-bottom: 30px; color: #667eea;">Criar Usuário para Professor</h2>
+    
+    <div class="info-box">
+        <p><strong>Importante:</strong> Este formulário cria um usuário de acesso para um professor já cadastrado no sistema. O professor deve existir na lista de professores antes de criar seu usuário.</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('main.cadastro_usuario_professor') }}">
+        <div class="form-group">
+            <label for="professor_id" class="required">Professor</label>
+            <select id="professor_id" name="professor_id" required>
+                <option value="">Selecione um professor</option>
+                {% for professor in professores %}
+                <option value="{{ professor.id }}" 
+                        {% if professor_id_pre_selecionado == professor.id|string %}selected{% endif %}>
+                    {{ professor.nome }} - {{ professor.telefone }}
+                </option>
+                {% endfor %}
+            </select>
+            <small>Selecione o professor que terá acesso ao sistema</small>
+            {% if professor_id_pre_selecionado %}
+            <div class="professor-info">
+                <strong>Nota:</strong> Professor pré-selecionado da lista de professores.
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="username" class="required">Nome de Usuário</label>
+            <input type="text" 
+                   id="username" 
+                   name="username" 
+                   required 
+                   autofocus
+                   minlength="3"
+                   placeholder="Digite o nome de usuário">
+            <small>Mínimo de 3 caracteres</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="email" class="required">Email</label>
+            <input type="email" 
+                   id="email" 
+                   name="email" 
+                   required
+                   placeholder="professor@email.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password" class="required">Senha</label>
+            <input type="password" 
+                   id="password" 
+                   name="password" 
+                   required
+                   minlength="6"
+                   placeholder="Digite a senha">
+            <small>Mínimo de 6 caracteres</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="password_confirm" class="required">Confirmar Senha</label>
+            <input type="password" 
+                   id="password_confirm" 
+                   name="password_confirm" 
+                   required
+                   minlength="6"
+                   placeholder="Digite a senha novamente">
+        </div>
+        
+        <button type="submit" class="btn-register">Criar Usuário Professor</button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+        <a href="{{ url_for('main.listar_professores') }}" style="color: #667eea; text-decoration: none;">← Voltar para Lista de Professores</a>
+    </div>
+</div>
+{% endblock %}
+

@@ -162,10 +162,6 @@
         cursor: pointer;
     }
     
-    .idade-display {
-        display: inline-block;
-        margin-left: 10px;
-        padding: 5px 15px;
         background: #667eea;
         color: white;
         border-radius: 20px;
@@ -269,10 +265,6 @@
             width: 100%;
         }
         
-        .idade-display {
-            display: block;
-            margin-left: 0;
-            margin-top: 5px;
             text-align: center;
         }
     }
@@ -379,11 +371,11 @@
         alunoDiv.className = 'aluno-form';
         alunoDiv.id = `aluno-${alunoCount}`;
         
-        // Calcular datas min e max baseado no ano atual (idade entre 5 e 100 anos)
+        // Calcular datas min e max baseado no ano atual (idade entre 8 e 100 anos)
         const hoje = new Date();
         const anoAtual = hoje.getFullYear();
         const anoMin = anoAtual - 100; // Idade máxima 100 anos
-        const anoMax = anoAtual - 5;   // Idade mínima 5 anos
+        const anoMax = anoAtual - 8;   // Idade mínima 8 anos
         const dataMin = `${anoMin}-01-01`;
         const dataMax = `${anoMax}-12-31`;
         
@@ -397,7 +389,10 @@
                        id="nome_${alunoCount}" 
                        name="nome_${alunoCount}" 
                        required 
-                       placeholder="Digite o nome completo do aluno">
+                       placeholder="Digite o nome completo do aluno"
+                       onblur="validarNomeCompleto(${alunoCount})">
+                <span class="info-text">Nome completo obrigatório</span>
+                <span id="nomeErro_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
             </div>
             
             <div class="form-group">
@@ -415,7 +410,30 @@
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="data_nascimento_${alunoCount}">Data de Nascimento</label>
+                    <label style="display: block; margin-bottom: 8px;">Deseja ter seu aniversário lembrado pela Oficina de Atores?</label>
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                            <input type="radio" 
+                                   id="lembrar_aniversario_sim_${alunoCount}" 
+                                   name="lembrar_aniversario_${alunoCount}"
+                                   value="sim"
+                                   onchange="toggleDataNascimento(${alunoCount})">
+                            <span>Sim</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                            <input type="radio" 
+                                   id="lembrar_aniversario_nao_${alunoCount}" 
+                                   name="lembrar_aniversario_${alunoCount}"
+                                   value="nao"
+                                   checked
+                                   onchange="toggleDataNascimento(${alunoCount})">
+                            <span>Não</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="data_nascimento_${alunoCount}" id="label_data_nascimento_${alunoCount}">Data de Nascimento</label>
                     <input type="date" 
                            id="data_nascimento_${alunoCount}" 
                            name="data_nascimento_${alunoCount}" 
@@ -424,16 +442,16 @@
                            onchange="calcularIdade(${alunoCount}); validarDataNascimento(${alunoCount})"
                            onblur="validarDataNascimento(${alunoCount}); this.reportValidity()"
                            title="A idade será calculada automaticamente ou pode ser inserida manualmente">
-                    <span id="idadeDisplay_${alunoCount}" class="idade-display" style="display: none;"></span>
                     <span id="idadeErro_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
                 </div>
                 
                 <div class="form-group">
-                    <label for="idade_${alunoCount}">Idade</label>
+                    <label for="idade_${alunoCount}" class="required">Idade</label>
                     <input type="number" 
                            id="idade_${alunoCount}" 
                            name="idade_${alunoCount}" 
-                           min="5"
+                           required
+                           min="8"
                            max="100"
                            placeholder="Digite a idade ou será calculada automaticamente"
                            oninput="validarIdadeManual(${alunoCount})"
@@ -500,16 +518,21 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="dia_vencimento_${alunoCount}" class="required">Dia de Vencimento</label>
-                    <input type="number" 
-                           id="dia_vencimento_${alunoCount}" 
-                           name="dia_vencimento_${alunoCount}"
+                    <label for="data_vencimento_${alunoCount}" class="required">Data de Vencimento</label>
+                    <input type="date" 
+                           id="data_vencimento_${alunoCount}" 
+                           name="data_vencimento_${alunoCount}"
                            required
-                           min="1"
-                           max="31"
-                           placeholder="Dia do mês (1-31)"
-                           title="Dia do mês em que a mensalidade vence (ex: 10 = dia 10 de todo mês)">
-                    <span class="info-text">Dia do mês em que a mensalidade vence (ex: 10 = dia 10 de todo mês)</span>
+                           onchange="validarDataVencimento(${alunoCount})"
+                           onblur="validarDataVencimento(${alunoCount})">
+                    <span id="dataVencimentoErro_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
+                </div>
+                <div class="form-group">
+                    <label for="data_inicio_${alunoCount}" class="required">Data de Início das Aulas</label>
+                    <input type="date" 
+                           id="data_inicio_${alunoCount}" 
+                           name="data_inicio_${alunoCount}"
+                           required>
                 </div>
             </div>
             
@@ -570,176 +593,218 @@
                 <label style="margin-top: 15px; display: block;">Professores e Mensalidades</label>
                 <div class="cursos-professores-container" id="cursos_professores_${alunoCount}">
                     <div class="curso-professor-item" id="professor_dublagem_online_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_dublagem_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dublagem Online:</label>
                                 <select id="professor_dublagem_online_${alunoCount}" 
                                         name="professor_dublagem_online_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'dublagem_online', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_dublagem_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_dublagem_online_${alunoCount}" 
-                                       name="mensalidade_dublagem_online_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_dublagem_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_dublagem_online_${alunoCount}" 
+                                        name="dia_semana_dublagem_online_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_dublagem_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_dublagem_online_${alunoCount}" 
+                                        name="horario_dublagem_online_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_dublagem_presencial_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_dublagem_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dublagem Presencial:</label>
                                 <select id="professor_dublagem_presencial_${alunoCount}" 
                                         name="professor_dublagem_presencial_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'dublagem_presencial', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_dublagem_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_dublagem_presencial_${alunoCount}" 
-                                       name="mensalidade_dublagem_presencial_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_dublagem_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_dublagem_presencial_${alunoCount}" 
+                                        name="dia_semana_dublagem_presencial_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_dublagem_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_dublagem_presencial_${alunoCount}" 
+                                        name="horario_dublagem_presencial_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_teatro_online_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Teatro Online:</label>
                                 <select id="professor_teatro_online_${alunoCount}" 
                                         name="professor_teatro_online_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'teatro_online', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_teatro_online_${alunoCount}" 
-                                       name="mensalidade_teatro_online_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_teatro_online_${alunoCount}" 
+                                        name="dia_semana_teatro_online_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_teatro_online_${alunoCount}" 
+                                        name="horario_teatro_online_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_teatro_presencial_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_teatro_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Teatro Presencial:</label>
                                 <select id="professor_teatro_presencial_${alunoCount}" 
                                         name="professor_teatro_presencial_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'teatro_presencial', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_teatro_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_teatro_presencial_${alunoCount}" 
-                                       name="mensalidade_teatro_presencial_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_teatro_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_teatro_presencial_${alunoCount}" 
+                                        name="dia_semana_teatro_presencial_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_teatro_presencial_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_teatro_presencial_${alunoCount}" 
+                                        name="horario_teatro_presencial_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_locucao_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_locucao_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Locução:</label>
                                 <select id="professor_locucao_${alunoCount}" 
                                         name="professor_locucao_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'locucao', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_locucao_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_locucao_${alunoCount}" 
-                                       name="mensalidade_locucao_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_locucao_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_locucao_${alunoCount}" 
+                                        name="dia_semana_locucao_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_locucao_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_locucao_${alunoCount}" 
+                                        name="horario_locucao_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_teatro_tv_cinema_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_teatro_tv_cinema_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Teatro TV e Cinema:</label>
                                 <select id="professor_teatro_tv_cinema_${alunoCount}" 
                                         name="professor_teatro_tv_cinema_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'teatro_tv_cinema', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_teatro_tv_cinema_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_teatro_tv_cinema_${alunoCount}" 
-                                       name="mensalidade_teatro_tv_cinema_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_teatro_tv_cinema_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_teatro_tv_cinema_${alunoCount}" 
+                                        name="dia_semana_teatro_tv_cinema_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_teatro_tv_cinema_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_teatro_tv_cinema_${alunoCount}" 
+                                        name="horario_teatro_tv_cinema_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
                     
                     <div class="curso-professor-item" id="professor_musical_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
                                 <label for="professor_musical_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Musical:</label>
                                 <select id="professor_musical_${alunoCount}" 
                                         name="professor_musical_${alunoCount}" 
                                         class="professor-select-curso"
+                                        onchange="carregarHorariosProfessor(${alunoCount}, 'musical', this.value)"
                                         disabled>
                                     <option value="">Selecione o professor</option>
                                 </select>
                             </div>
-                            <div style="width: 150px;">
-                                <label for="mensalidade_musical_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
-                                <input type="number" 
-                                       id="mensalidade_musical_${alunoCount}" 
-                                       name="mensalidade_musical_${alunoCount}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       placeholder="0.00"
-                                       disabled
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9em;">
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="dia_semana_musical_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                                <select id="dia_semana_musical_${alunoCount}" 
+                                        name="dia_semana_musical_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o dia</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 150px;">
+                                <label for="horario_musical_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
+                                <select id="horario_musical_${alunoCount}" 
+                                        name="horario_musical_${alunoCount}" 
+                                        disabled>
+                                    <option value="">Selecione o horário</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -748,6 +813,7 @@
         `;
         
         container.appendChild(alunoDiv);
+        configurarDataVencimento(alunoCount);
         alunoCount++;
     }
     
@@ -756,6 +822,95 @@
         if (alunoDiv) {
             alunoDiv.remove();
         }
+    }
+    
+    function validarNomeCompleto(index) {
+        const nomeInput = document.getElementById(`nome_${index}`);
+        const nomeErro = document.getElementById(`nomeErro_${index}`);
+        
+        if (!nomeInput) return;
+        
+        const nome = nomeInput.value.trim();
+        const palavrasNome = nome.split(/\s+/).filter(p => p.length > 0);
+        
+        if (nomeErro) {
+            if (nome && palavrasNome.length < 2) {
+                nomeErro.textContent = 'Nome deve ser completo';
+                nomeErro.style.display = 'block';
+                nomeInput.setCustomValidity('Nome deve ser completo');
+            } else {
+                nomeErro.style.display = 'none';
+                nomeErro.textContent = '';
+                nomeInput.setCustomValidity('');
+            }
+        }
+    }
+    
+    function validarDataVencimento(index) {
+        const dataVencimentoInput = document.getElementById(`data_vencimento_${index}`);
+        const dataVencimentoErro = document.getElementById(`dataVencimentoErro_${index}`);
+        
+        if (!dataVencimentoInput) return;
+        
+        const dataVencimentoStr = dataVencimentoInput.value;
+        
+        if (!dataVencimentoStr) {
+            if (dataVencimentoErro) {
+                dataVencimentoErro.style.display = 'none';
+                dataVencimentoErro.textContent = '';
+            }
+            dataVencimentoInput.setCustomValidity('');
+            return;
+        }
+        
+        const dataVencimento = new Date(dataVencimentoStr + 'T00:00:00');
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        // Validar que a data não é no passado
+        if (dataVencimento < hoje) {
+            if (dataVencimentoErro) {
+                dataVencimentoErro.textContent = 'A data de vencimento não pode ser no passado';
+                dataVencimentoErro.style.display = 'block';
+            }
+            dataVencimentoInput.setCustomValidity('A data de vencimento não pode ser no passado');
+            return;
+        }
+        
+        // Calcular diferença em dias
+        const diffTime = dataVencimento - hoje;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 35) {
+            if (dataVencimentoErro) {
+                dataVencimentoErro.textContent = `A data de vencimento não pode ser mais de 35 dias após hoje (seria ${diffDays} dias)`;
+                dataVencimentoErro.style.display = 'block';
+            }
+            dataVencimentoInput.setCustomValidity('A data de vencimento não pode ser mais de 35 dias após hoje');
+        } else {
+            if (dataVencimentoErro) {
+                dataVencimentoErro.style.display = 'none';
+                dataVencimentoErro.textContent = '';
+            }
+            dataVencimentoInput.setCustomValidity('');
+        }
+    }
+    
+    // Configurar data mínima e máxima ao adicionar aluno
+    function configurarDataVencimento(index) {
+        const dataVencimentoInput = document.getElementById(`data_vencimento_${index}`);
+        if (!dataVencimentoInput) return;
+        
+        const hoje = new Date();
+        const dataMin = hoje.toISOString().split('T')[0];
+        
+        // Data máxima: 35 dias a partir de hoje
+        const dataMax = new Date(hoje);
+        dataMax.setDate(dataMax.getDate() + 35);
+        const dataMaxStr = dataMax.toISOString().split('T')[0];
+        
+        dataVencimentoInput.setAttribute('min', dataMin);
+        dataVencimentoInput.setAttribute('max', dataMaxStr);
     }
     
     function validarDataNascimento(index) {
@@ -780,7 +935,7 @@
         const hoje = new Date();
         const anoAtual = hoje.getFullYear();
         const anoMin = anoAtual - 100; // Idade máxima 100 anos
-        const anoMax = anoAtual - 5;   // Idade mínima 5 anos
+        const anoMax = anoAtual - 8;   // Idade mínima 8 anos
         
         // Validar se o ano está no intervalo permitido
         if (ano < anoMin || ano > anoMax) {
@@ -823,10 +978,10 @@
         }
         
         if (idadeInput.value && !isNaN(idade)) {
-            // Validar idade entre 5 e 100 anos
-            if (idade < 5 || idade > 100) {
+            // Validar idade entre 8 e 100 anos
+            if (idade < 8 || idade > 100) {
                 if (idadeErroManual) {
-                    idadeErroManual.textContent = 'Idade Inválida';
+                    idadeErroManual.textContent = 'Idade deve ser entre 8 e 100 anos';
                     idadeErroManual.style.display = 'block';
                 }
                 idadeInput.setCustomValidity('Idade Inválida');
@@ -864,11 +1019,37 @@
         }
     }
     
+    function toggleDataNascimento(index) {
+        const radioSim = document.getElementById(`lembrar_aniversario_sim_${index}`);
+        const radioNao = document.getElementById(`lembrar_aniversario_nao_${index}`);
+        const dataNascimentoInput = document.getElementById(`data_nascimento_${index}`);
+        const labelDataNascimento = document.getElementById(`label_data_nascimento_${index}`);
+        
+        if (radioSim && radioNao && dataNascimentoInput) {
+            if (radioSim.checked) {
+                dataNascimentoInput.required = true;
+                // Adicionar classe required ao label para mostrar asterisco
+                if (labelDataNascimento) {
+                    labelDataNascimento.classList.add('required');
+                }
+                // Forçar validação visual
+                dataNascimentoInput.setAttribute('required', 'required');
+            } else {
+                dataNascimentoInput.required = false;
+                // Remover classe required do label
+                if (labelDataNascimento) {
+                    labelDataNascimento.classList.remove('required');
+                }
+                // Remover atributo required
+                dataNascimentoInput.removeAttribute('required');
+            }
+        }
+    }
+    
     function calcularIdade(index) {
         const dataNascimentoInput = document.getElementById(`data_nascimento_${index}`);
         const dataNascimento = dataNascimentoInput ? dataNascimentoInput.value : '';
         const idadeInput = document.getElementById(`idade_${index}`);
-        const idadeDisplay = document.getElementById(`idadeDisplay_${index}`);
         const idadeErro = document.getElementById(`idadeErro_${index}`);
         const nomeResponsavel = document.getElementById(`nome_responsavel_${index}`);
         const telefoneResponsavel = document.getElementById(`telefone_responsavel_${index}`);
@@ -892,7 +1073,6 @@
             // Verificar se a data é válida
             if (isNaN(nascimento.getTime())) {
                 if (!temIdadeManual && idadeInput) idadeInput.value = '';
-                if (idadeDisplay) idadeDisplay.style.display = 'none';
                 return;
             }
             
@@ -903,10 +1083,9 @@
                 idade--;
             }
             
-            // Validar idade entre 5 e 100 anos
-            if (idade < 5 || idade > 100) {
+            // Validar idade entre 8 e 100 anos
+            if (idade < 8 || idade > 100) {
                 if (!temIdadeManual && idadeInput) idadeInput.value = '';
-                if (idadeDisplay) idadeDisplay.style.display = 'none';
                 if (idadeErro) {
                     idadeErro.textContent = 'Idade Inválida';
                     idadeErro.style.display = 'block';
@@ -936,10 +1115,7 @@
             if (!temIdadeManual && idadeInput) {
                 idadeInput.value = idade;
             }
-            if (idadeDisplay) {
-                idadeDisplay.textContent = idade + ' anos';
-                idadeDisplay.style.display = 'inline-block';
-            }
+            // Não exibir a idade calculada (removido conforme solicitado)
             
             // Usar idade calculada ou manual para validar responsável
             const idadeParaValidar = temIdadeManual ? idadeManual : idade;
@@ -959,8 +1135,6 @@
         } else {
             // Sem data de nascimento - validar idade manual se houver
             if (!temIdadeManual && idadeInput) idadeInput.value = '';
-            if (idadeDisplay) idadeDisplay.style.display = 'none';
-            
             // Validar idade manual se houver
             if (temIdadeManual) {
                 validarIdadeManual(index);
@@ -1042,6 +1216,93 @@
             });
     }
     
+    function carregarHorariosProfessor(alunoIndex, tipoCurso, professorId) {
+        if (!professorId) {
+            // Limpar dropdowns de dia e horário
+            const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
+            const horarioSelect = document.getElementById(`horario_${tipoCurso}_${alunoIndex}`);
+            if (diaSelect) {
+                diaSelect.innerHTML = '<option value="">Selecione o dia</option>';
+                diaSelect.disabled = true;
+            }
+            if (horarioSelect) {
+                horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+                horarioSelect.disabled = true;
+            }
+            return;
+        }
+        
+        // Buscar horários do professor
+        fetch(`/api/professor/${professorId}/horarios`)
+            .then(response => response.json())
+            .then(horarios => {
+                const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
+                const horarioSelect = document.getElementById(`horario_${tipoCurso}_${alunoIndex}`);
+                
+                if (diaSelect && horarioSelect) {
+                    // Limpar selects
+                    diaSelect.innerHTML = '<option value="">Selecione o dia</option>';
+                    horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+                    
+                    if (horarios.length === 0) {
+                        diaSelect.innerHTML = '<option value="">Nenhum horário cadastrado</option>';
+                        diaSelect.disabled = true;
+                        horarioSelect.disabled = true;
+                    } else {
+                        // Agrupar horários por dia
+                        const horariosPorDia = {};
+                        horarios.forEach(horario => {
+                            if (!horariosPorDia[horario.dia_semana]) {
+                                horariosPorDia[horario.dia_semana] = [];
+                            }
+                            horariosPorDia[horario.dia_semana].push(horario);
+                        });
+                        
+                        // Preencher dropdown de dias
+                        Object.keys(horariosPorDia).sort().forEach(dia => {
+                            const option = document.createElement('option');
+                            option.value = dia;
+                            option.textContent = dia;
+                            diaSelect.appendChild(option);
+                        });
+                        
+                        diaSelect.disabled = false;
+                        
+                        // Quando selecionar um dia, filtrar horários
+                        diaSelect.onchange = function() {
+                            const diaSelecionado = this.value;
+                            horarioSelect.innerHTML = '<option value="">Selecione o horário</option>';
+                            
+                            if (diaSelecionado && horariosPorDia[diaSelecionado]) {
+                                horariosPorDia[diaSelecionado].forEach(horario => {
+                                    const option = document.createElement('option');
+                                    option.value = horario.horario_aula;
+                                    option.textContent = horario.horario_aula;
+                                    horarioSelect.appendChild(option);
+                                });
+                                horarioSelect.disabled = false;
+                            } else {
+                                horarioSelect.disabled = true;
+                            }
+                        };
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao buscar horários:', error);
+                const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
+                const horarioSelect = document.getElementById(`horario_${tipoCurso}_${alunoIndex}`);
+                if (diaSelect) {
+                    diaSelect.innerHTML = '<option value="">Erro ao carregar horários</option>';
+                    diaSelect.disabled = true;
+                }
+                if (horarioSelect) {
+                    horarioSelect.innerHTML = '<option value="">Erro ao carregar horários</option>';
+                    horarioSelect.disabled = true;
+                }
+            });
+    }
+    
     function resetarFormulario() {
         document.getElementById('alunosForm').reset();
         const container = document.getElementById('alunosContainer');
@@ -1051,6 +1312,21 @@
     
     // Validação antes de enviar formulário
     document.getElementById('alunosForm').addEventListener('submit', function(e) {
+        // Habilitar todos os campos disabled antes do submit para garantir que sejam enviados
+        const allDisabledFields = document.querySelectorAll('select[disabled], input[disabled]');
+        allDisabledFields.forEach(field => {
+            // Criar um campo hidden com o mesmo nome e valor se o campo estiver disabled e tiver valor
+            if (field.value && field.value !== '') {
+                const hiddenField = document.createElement('input');
+                hiddenField.type = 'hidden';
+                hiddenField.name = field.name;
+                hiddenField.value = field.value;
+                field.parentNode.appendChild(hiddenField);
+            }
+            // Habilitar o campo também
+            field.disabled = false;
+        });
+        
         const alunos = document.querySelectorAll('.aluno-form');
         let temErro = false;
         
@@ -1067,6 +1343,28 @@
                 alert(`Aluno ${index + 1}: Nome é obrigatório.`);
                 e.preventDefault();
                 return;
+            }
+            
+            // Validar nome completo (pelo menos duas palavras)
+            const palavrasNome = nome.trim().split(/\s+/).filter(p => p.length > 0);
+            if (palavrasNome.length < 2) {
+                temErro = true;
+                alert(`Aluno ${index + 1} (${nome}): Nome deve ser completo.`);
+                e.preventDefault();
+                return;
+            }
+            
+            // Validar radio de lembrar aniversário
+            const lembrarAniversarioRadioSim = aluno.querySelector(`input[id^="lembrar_aniversario_sim_"]`);
+            const dataNascimentoInput = aluno.querySelector(`input[name^="data_nascimento_"]`);
+            
+            if (lembrarAniversarioRadioSim && lembrarAniversarioRadioSim.checked) {
+                if (!dataNascimentoInput || !dataNascimentoInput.value) {
+                    temErro = true;
+                    alert(`Aluno ${index + 1} (${nome}): Data de nascimento é obrigatória quando deseja ter aniversário lembrado.`);
+                    e.preventDefault();
+                    return;
+                }
             }
             
             // Validar telefone (formato internacional: +DDI DDD Número)
@@ -1096,19 +1394,36 @@
                 return;
             }
             
-            // Validar dia de vencimento
-            const diaVencimento = aluno.querySelector(`input[name^="dia_vencimento_"]`).value.trim();
-            if (!diaVencimento) {
+            // Validar data de vencimento
+            const dataVencimentoInput = aluno.querySelector(`input[name^="data_vencimento_"]`);
+            const dataVencimentoStr = dataVencimentoInput ? dataVencimentoInput.value.trim() : '';
+            
+            if (!dataVencimentoStr) {
                 temErro = true;
-                alert(`Aluno ${index + 1} (${nome}): Dia de vencimento é obrigatório.`);
+                alert(`Aluno ${index + 1} (${nome}): Data de vencimento é obrigatória.`);
                 e.preventDefault();
                 return;
             }
             
-            const diaVencimentoNum = parseInt(diaVencimento);
-            if (isNaN(diaVencimentoNum) || diaVencimentoNum < 1 || diaVencimentoNum > 31) {
+            const dataVencimento = new Date(dataVencimentoStr + 'T00:00:00');
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            
+            // Validar que a data não é no passado
+            if (dataVencimento < hoje) {
                 temErro = true;
-                alert(`Aluno ${index + 1} (${nome}): Dia de vencimento deve ser entre 1 e 31.`);
+                alert(`Aluno ${index + 1} (${nome}): A data de vencimento não pode ser no passado.`);
+                e.preventDefault();
+                return;
+            }
+            
+            // Calcular diferença em dias
+            const diffTime = dataVencimento - hoje;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 35) {
+                temErro = true;
+                alert(`Aluno ${index + 1} (${nome}): A data de vencimento não pode ser mais de 35 dias após hoje (seria ${diffDays} dias).`);
                 e.preventDefault();
                 return;
             }
@@ -1123,26 +1438,33 @@
                 }
             }
             
-            // Validar cursos selecionados: se um curso está marcado, professor e mensalidade são obrigatórios
+            // Validar cursos selecionados: se um curso está marcado, professor, dia da semana e horário são obrigatórios (mensalidade será preenchida na aprovação)
             const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
             for (const tipoCurso of tiposCursos) {
                 const checkbox = aluno.querySelector(`input[name="${tipoCurso}_${index}"]`);
                 if (checkbox && checkbox.checked) {
                     const professorSelect = aluno.querySelector(`select[name="professor_${tipoCurso}_${index}"]`);
-                    const mensalidadeInput = aluno.querySelector(`input[name="mensalidade_${tipoCurso}_${index}"]`);
+                    const diaSemanaSelect = aluno.querySelector(`select[name="dia_semana_${tipoCurso}_${index}"]`);
+                    const horarioSelect = aluno.querySelector(`select[name="horario_${tipoCurso}_${index}"]`);
+                    const nomeCurso = tipoCurso.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     
                     if (!professorSelect || !professorSelect.value || professorSelect.value === '') {
                         temErro = true;
-                        const nomeCurso = tipoCurso.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         alert(`Aluno ${index + 1} (${nome}): É obrigatório selecionar um professor para o curso "${nomeCurso}".`);
                         e.preventDefault();
                         return;
                     }
                     
-                    if (!mensalidadeInput || !mensalidadeInput.value || parseFloat(mensalidadeInput.value) <= 0) {
+                    if (!diaSemanaSelect || !diaSemanaSelect.value || diaSemanaSelect.value === '') {
                         temErro = true;
-                        const nomeCurso = tipoCurso.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        alert(`Aluno ${index + 1} (${nome}): É obrigatório informar a mensalidade para o curso "${nomeCurso}".`);
+                        alert(`Aluno ${index + 1} (${nome}): É obrigatório selecionar o dia da semana para o curso "${nomeCurso}".`);
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    if (!horarioSelect || !horarioSelect.value || horarioSelect.value === '') {
+                        temErro = true;
+                        alert(`Aluno ${index + 1} (${nome}): É obrigatório selecionar o horário para o curso "${nomeCurso}".`);
                         e.preventDefault();
                         return;
                     }
