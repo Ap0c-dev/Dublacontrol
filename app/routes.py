@@ -5,6 +5,8 @@ from app.models.aluno import Aluno
 from app.models.matricula import Matricula
 from app.models.usuario import Usuario
 from app.models.horario_professor import HorarioProfessor
+from app.models.nota import Nota
+from app.models.nota import Nota
 from datetime import datetime, date
 from sqlalchemy import text
 from functools import wraps
@@ -1307,4 +1309,333 @@ def aprovar_aluno(aluno_id):
         flash(f'Erro ao aprovar aluno: {str(e)}', 'error')
     
     return redirect(url_for('main.listar_alunos', filtro='pendentes'))
+
+# ==================== ROTAS DE NOTAS ====================
+
+@bp.route('/notas', methods=['GET'])
+@login_required
+def listar_notas():
+    """Lista todas as notas (admin vê todas, professor vê apenas dos seus alunos)"""
+    from sqlalchemy.orm import joinedload
+    
+    # Filtros
+    aluno_id = request.args.get('aluno_id', type=int)
+    professor_id = request.args.get('professor_id', type=int)
+    tipo_curso = request.args.get('tipo_curso', '')
+    
+    # Base query com eager loading
+    query = Nota.query.options(
+        joinedload(Nota.aluno),
+        joinedload(Nota.professor),
+        joinedload(Nota.matricula)
+    )
+    
+    # Se for professor, só pode ver notas dos seus alunos
+    if current_user.is_professor():
+        professor = current_user.get_professor()
+        if not professor:
+            flash('Professor não encontrado.', 'error')
+            return redirect(url_for('main.index'))
+        
+        # Buscar IDs dos alunos deste professor através das matrículas
+        alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
+            professor_id=professor.id
+        ).distinct().all()
+        alunos_ids = [row[0] for row in alunos_ids]
+        
+        if not alunos_ids:
+            # Professor sem alunos
+            return render_template('listar_notas.html', notas=[], alunos=[], professores=[])
+        
+        query = query.filter(Nota.aluno_id.in_(alunos_ids))
+        query = query.filter(Nota.professor_id == professor.id)
+    
+    # Aplicar filtros adicionais
+    if aluno_id:
+        query = query.filter(Nota.aluno_id == aluno_id)
+    if professor_id and current_user.is_admin():
+        query = query.filter(Nota.professor_id == professor_id)
+    if tipo_curso:
+        query = query.filter(Nota.tipo_curso == tipo_curso)
+    
+    notas = query.order_by(Nota.data_avaliacao.desc(), Nota.data_cadastro.desc()).all()
+    
+    # Buscar alunos e professores para filtros (apenas admin)
+    alunos = []
+    professores = []
+    if current_user.is_admin():
+        alunos = Aluno.query.filter_by(ativo=True).order_by(Aluno.nome).all()
+        professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
+    elif current_user.is_professor():
+        # Professor só vê seus próprios alunos
+        professor = current_user.get_professor()
+        if professor:
+            alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
+                professor_id=professor.id
+            ).distinct().all()
+            alunos_ids = [row[0] for row in alunos_ids]
+            if alunos_ids:
+                alunos = Aluno.query.filter(
+                    Aluno.id.in_(alunos_ids),
+                    Aluno.ativo == True
+                ).order_by(Aluno.nome).all()
+    
+    return render_template('listar_notas.html', 
+                         notas=notas, 
+                         alunos=alunos, 
+                         professores=professores,
+                         aluno_id=aluno_id,
+                         professor_id=professor_id,
+                         tipo_curso=tipo_curso)
+
+@bp.route('/notas/cadastrar', methods=['GET', 'POST'])
+@login_required
+def cadastrar_nota():
+    """Cadastrar nova nota (admin pode cadastrar para qualquer aluno, professor apenas para seus alunos)"""
+    from sqlalchemy.orm import joinedload
+    
+    if request.method == 'POST':
+        aluno_id = request.form.get('aluno_id', type=int)
+        professor_id = request.form.get('professor_id', type=int)
+        matricula_id = request.form.get('matricula_id', type=int) or None
+        tipo_curso = request.form.get('tipo_curso', '').strip()
+        valor = request.form.get('valor', type=float)
+        observacao = request.form.get('observacao', '').strip()
+        data_avaliacao_str = request.form.get('data_avaliacao', '').strip()
+        tipo_avaliacao = request.form.get('tipo_avaliacao', '').strip()
+        
+        # Validações
+        if not aluno_id:
+            flash('Aluno é obrigatório.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        if not professor_id:
+            flash('Professor é obrigatório.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        if not tipo_curso:
+            flash('Tipo de curso é obrigatório.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        if valor is None:
+            flash('Valor da nota é obrigatório.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        if valor < 0 or valor > 10:
+            flash('Valor da nota deve estar entre 0 e 10.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        if not data_avaliacao_str:
+            flash('Data da avaliação é obrigatória.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        try:
+            data_avaliacao = datetime.strptime(data_avaliacao_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Data da avaliação inválida.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        # Verificar se professor pode cadastrar nota para este aluno
+        if current_user.is_professor():
+            professor = current_user.get_professor()
+            if not professor or professor.id != professor_id:
+                flash('Você não tem permissão para cadastrar nota para este professor.', 'error')
+                return redirect(url_for('main.cadastrar_nota'))
+            
+            # Verificar se o aluno está matriculado com este professor
+            matricula_existe = Matricula.query.filter_by(
+                aluno_id=aluno_id,
+                professor_id=professor_id,
+                tipo_curso=tipo_curso
+            ).first()
+            
+            if not matricula_existe:
+                flash('Aluno não está matriculado com você neste curso.', 'error')
+                return redirect(url_for('main.cadastrar_nota'))
+        
+        # Verificar se aluno existe e está ativo
+        aluno = Aluno.query.get(aluno_id)
+        if not aluno or not aluno.ativo:
+            flash('Aluno não encontrado ou inativo.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        # Verificar se professor existe e está ativo
+        professor = Professor.query.get(professor_id)
+        if not professor or not professor.ativo:
+            flash('Professor não encontrado ou inativo.', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+        
+        # Criar nota
+        nota = Nota(
+            aluno_id=aluno_id,
+            professor_id=professor_id,
+            matricula_id=matricula_id,
+            tipo_curso=tipo_curso,
+            valor=valor,
+            observacao=observacao if observacao else None,
+            data_avaliacao=data_avaliacao,
+            tipo_avaliacao=tipo_avaliacao if tipo_avaliacao else None,
+            cadastrado_por=current_user.id
+        )
+        
+        try:
+            db.session.add(nota)
+            db.session.commit()
+            flash(f'Nota cadastrada com sucesso para {aluno.nome}!', 'success')
+            return redirect(url_for('main.listar_notas'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao cadastrar nota: {str(e)}', 'error')
+            return redirect(url_for('main.cadastrar_nota'))
+    
+    # GET - mostrar formulário
+    aluno_id = request.args.get('aluno_id', type=int)
+    professor_id = request.args.get('professor_id', type=int)
+    
+    # Buscar alunos e professores disponíveis
+    alunos = []
+    professores = []
+    matriculas = []
+    
+    if current_user.is_admin():
+        alunos = Aluno.query.filter_by(ativo=True).order_by(Aluno.nome).all()
+        professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
+        if aluno_id and professor_id:
+            matriculas = Matricula.query.filter_by(
+                aluno_id=aluno_id,
+                professor_id=professor_id
+            ).all()
+    elif current_user.is_professor():
+        professor = current_user.get_professor()
+        if professor:
+            # Buscar alunos deste professor
+            alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
+                professor_id=professor.id
+            ).distinct().all()
+            alunos_ids = [row[0] for row in alunos_ids]
+            
+            if alunos_ids:
+                alunos = Aluno.query.filter(
+                    Aluno.id.in_(alunos_ids),
+                    Aluno.ativo == True
+                ).order_by(Aluno.nome).all()
+            
+            professores = [professor]  # Professor só pode cadastrar para si mesmo
+            
+            if aluno_id:
+                matriculas = Matricula.query.filter_by(
+                    aluno_id=aluno_id,
+                    professor_id=professor.id
+                ).all()
+    
+    tipos_cursos = {
+        'dublagem_online': 'Dublagem Online',
+        'dublagem_presencial': 'Dublagem Presencial',
+        'teatro_online': 'Teatro Online',
+        'teatro_presencial': 'Teatro Presencial',
+        'locucao': 'Locução',
+        'teatro_tv_cinema': 'Teatro TV Cinema',
+        'musical': 'Musical'
+    }
+    
+    data_hoje = date.today().isoformat()
+    
+    return render_template('cadastrar_nota.html',
+                         alunos=alunos,
+                         professores=professores,
+                         matriculas=matriculas,
+                         tipos_cursos=tipos_cursos,
+                         aluno_id=aluno_id,
+                         professor_id=professor_id,
+                         data_hoje=data_hoje)
+
+@bp.route('/notas/<int:nota_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_nota(nota_id):
+    """Editar nota existente"""
+    nota = Nota.query.get_or_404(nota_id)
+    
+    # Verificar permissão
+    if current_user.is_professor():
+        professor = current_user.get_professor()
+        if not professor or nota.professor_id != professor.id:
+            flash('Você não tem permissão para editar esta nota.', 'error')
+            return redirect(url_for('main.listar_notas'))
+    
+    if request.method == 'POST':
+        valor = request.form.get('valor', type=float)
+        observacao = request.form.get('observacao', '').strip()
+        data_avaliacao_str = request.form.get('data_avaliacao', '').strip()
+        tipo_avaliacao = request.form.get('tipo_avaliacao', '').strip()
+        
+        # Validações
+        if valor is None:
+            flash('Valor da nota é obrigatório.', 'error')
+            return redirect(url_for('main.editar_nota', nota_id=nota_id))
+        
+        if valor < 0 or valor > 10:
+            flash('Valor da nota deve estar entre 0 e 10.', 'error')
+            return redirect(url_for('main.editar_nota', nota_id=nota_id))
+        
+        if not data_avaliacao_str:
+            flash('Data da avaliação é obrigatória.', 'error')
+            return redirect(url_for('main.editar_nota', nota_id=nota_id))
+        
+        try:
+            data_avaliacao = datetime.strptime(data_avaliacao_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Data da avaliação inválida.', 'error')
+            return redirect(url_for('main.editar_nota', nota_id=nota_id))
+        
+        # Atualizar nota
+        nota.valor = valor
+        nota.observacao = observacao if observacao else None
+        nota.data_avaliacao = data_avaliacao
+        nota.tipo_avaliacao = tipo_avaliacao if tipo_avaliacao else None
+        
+        try:
+            db.session.commit()
+            flash('Nota atualizada com sucesso!', 'success')
+            return redirect(url_for('main.listar_notas'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar nota: {str(e)}', 'error')
+            return redirect(url_for('main.editar_nota', nota_id=nota_id))
+    
+    # GET - mostrar formulário
+    tipos_cursos = {
+        'dublagem_online': 'Dublagem Online',
+        'dublagem_presencial': 'Dublagem Presencial',
+        'teatro_online': 'Teatro Online',
+        'teatro_presencial': 'Teatro Presencial',
+        'locucao': 'Locução',
+        'teatro_tv_cinema': 'Teatro TV Cinema',
+        'musical': 'Musical'
+    }
+    
+    return render_template('editar_nota.html', nota=nota, tipos_cursos=tipos_cursos)
+
+@bp.route('/notas/<int:nota_id>/excluir', methods=['POST'])
+@login_required
+def excluir_nota(nota_id):
+    """Excluir nota"""
+    nota = Nota.query.get_or_404(nota_id)
+    
+    # Verificar permissão
+    if current_user.is_professor():
+        professor = current_user.get_professor()
+        if not professor or nota.professor_id != professor.id:
+            flash('Você não tem permissão para excluir esta nota.', 'error')
+            return redirect(url_for('main.listar_notas'))
+    
+    try:
+        aluno_nome = nota.aluno.nome if nota.aluno else 'Aluno'
+        db.session.delete(nota)
+        db.session.commit()
+        flash(f'Nota de {aluno_nome} excluída com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir nota: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_notas'))
 

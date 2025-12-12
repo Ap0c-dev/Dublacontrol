@@ -54,7 +54,7 @@ def create_app():
             return '-'
     
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula, usuario, horario_professor
+    from app.models import professor, aluno, matricula, usuario, horario_professor, nota
     
     with app.app_context():
         try:

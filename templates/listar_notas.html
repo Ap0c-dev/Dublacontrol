@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Listar Notas - Controle de Dublagem{% endblock %}
+{% block page_title %}Lista de Notas{% endblock %}
+
+{% block extra_css %}
+    .filters {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .filters form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: flex-end;
+    }
+    
+    .filter-group {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+    }
+    
+    .btn-filter {
+        padding: 8px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+    }
+    
+    .btn-filter:hover {
+        background: #5568d3;
+    }
+    
+    .btn-add {
+        margin-bottom: 20px;
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 1em;
+    }
+    
+    .btn-add:hover {
+        background: #218838;
+    }
+    
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        margin-top: 20px;
+    }
+    
+    .notas-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+    
+    .notas-table th,
+    .notas-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .notas-table th {
+        background: #667eea;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .notas-table tr:hover {
+        background: #f5f5f5;
+    }
+    
+    .btn-edit,
+    .btn-delete {
+        padding: 5px 10px;
+        margin: 0 3px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 0.9em;
+    }
+    
+    .btn-edit {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .btn-edit:hover {
+        background: #138496;
+    }
+    
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-delete:hover {
+        background: #c82333;
+    }
+    
+    .nota-valor {
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+    
+    .nota-valor.aprovado {
+        color: #28a745;
+    }
+    
+    .nota-valor.reprovado {
+        color: #dc3545;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="filters">
+    <form method="GET" action="{{ url_for('main.listar_notas') }}">
+        {% if alunos %}
+        <div class="filter-group">
+            <label for="aluno_id">Aluno:</label>
+            <select name="aluno_id" id="aluno_id">
+                <option value="">Todos</option>
+                {% for aluno in alunos %}
+                <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
+                    {{ aluno.nome }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        {% if professores and current_user.is_admin() %}
+        <div class="filter-group">
+            <label for="professor_id">Professor:</label>
+            <select name="professor_id" id="professor_id">
+                <option value="">Todos</option>
+                {% for professor in professores %}
+                <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
+                    {{ professor.nome }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <div class="filter-group">
+            <label for="tipo_curso">Curso:</label>
+            <select name="tipo_curso" id="tipo_curso">
+                <option value="">Todos</option>
+                <option value="dublagem_online" {% if tipo_curso == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
+                <option value="dublagem_presencial" {% if tipo_curso == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
+                <option value="teatro_online" {% if tipo_curso == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
+                <option value="teatro_presencial" {% if tipo_curso == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
+                <option value="locucao" {% if tipo_curso == 'locucao' %}selected{% endif %}>Locução</option>
+                <option value="teatro_tv_cinema" {% if tipo_curso == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV Cinema</option>
+                <option value="musical" {% if tipo_curso == 'musical' %}selected{% endif %}>Musical</option>
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <button type="submit" class="btn-filter">Filtrar</button>
+            <a href="{{ url_for('main.listar_notas') }}" class="btn-filter" style="text-decoration: none; display: inline-block; margin-left: 10px;">Limpar</a>
+        </div>
+    </form>
+</div>
+
+<a href="{{ url_for('main.cadastrar_nota') }}" class="btn-add">+ Cadastrar Nota</a>
+
+<div class="table-container">
+    {% if notas %}
+    <table class="notas-table">
+        <thead>
+            <tr>
+                <th>Aluno</th>
+                <th>Professor</th>
+                <th>Curso</th>
+                <th>Valor</th>
+                <th>Tipo de Avaliação</th>
+                <th>Data da Avaliação</th>
+                <th>Observação</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nota in notas %}
+            <tr>
+                <td>{{ nota.aluno.nome if nota.aluno else 'N/A' }}</td>
+                <td>{{ nota.professor.nome if nota.professor else 'N/A' }}</td>
+                <td>
+                    {% set tipos_cursos_dict = {
+                        'dublagem_online': 'Dublagem Online',
+                        'dublagem_presencial': 'Dublagem Presencial',
+                        'teatro_online': 'Teatro Online',
+                        'teatro_presencial': 'Teatro Presencial',
+                        'locucao': 'Locução',
+                        'teatro_tv_cinema': 'Teatro TV Cinema',
+                        'musical': 'Musical'
+                    } %}
+                    {{ tipos_cursos_dict.get(nota.tipo_curso, nota.tipo_curso) }}
+                </td>
+                <td>
+                    <span class="nota-valor {% if nota.valor >= 6 %}aprovado{% else %}reprovado{% endif %}">
+                        {{ "%.1f"|format(nota.valor) }}
+                    </span>
+                </td>
+                <td>{{ nota.tipo_avaliacao or '-' }}</td>
+                <td>{{ nota.data_avaliacao.strftime('%d/%m/%Y') if nota.data_avaliacao else '-' }}</td>
+                <td>{{ nota.observacao[:50] + '...' if nota.observacao and nota.observacao|length > 50 else (nota.observacao or '-') }}</td>
+                <td>
+                    <a href="{{ url_for('main.editar_nota', nota_id=nota.id) }}" class="btn-edit">Editar</a>
+                    <form method="POST" action="{{ url_for('main.excluir_nota', nota_id=nota.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta nota?');">
+                        <button type="submit" class="btn-delete">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>Nenhuma nota encontrada.</p>
+        <a href="{{ url_for('main.cadastrar_nota') }}" class="btn-add">Cadastrar Primeira Nota</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -602,7 +602,8 @@ def corrigir_banco():
                         id INTEGER PRIMARY KEY,
                         professor_id INTEGER NOT NULL,
                         dia_semana VARCHAR(20) NOT NULL,
-                        horario_aula VARCHAR(50) NOT NULL,
+                        horario_inicio VARCHAR(5) NOT NULL,
+                        horario_termino VARCHAR(5) NOT NULL,
                         FOREIGN KEY (professor_id) REFERENCES professores(id)
                     )
                 '''))
@@ -611,7 +612,46 @@ def corrigir_banco():
             else:
                 columns = [col['name'] for col in inspector.get_columns('horarios_professor')]
                 print(f"Colunas atuais: {', '.join(columns)}")
+                
+                # Verificar se tem horario_inicio e horario_termino (nova estrutura)
+                if 'horario_inicio' not in columns or 'horario_termino' not in columns:
+                    if 'horario_aula' in columns:
+                        print("Migrando estrutura antiga para nova...")
+                        # Se tem horario_aula antigo, manter por enquanto
+                        # A migração completa pode ser feita depois
+                        print("⚠️  Tabela tem estrutura antiga. Considere migrar os dados.")
+                
                 print("✓ Tabela 'horarios_professor' verificada.")
+            
+            # 6. Criar/verificar tabela notas
+            print("\n=== Verificando tabela 'notas' ===")
+            if 'notas' not in tables:
+                print("Criando tabela 'notas'...")
+                db.session.execute(text('''
+                    CREATE TABLE notas (
+                        id INTEGER PRIMARY KEY,
+                        aluno_id INTEGER NOT NULL,
+                        professor_id INTEGER NOT NULL,
+                        matricula_id INTEGER,
+                        tipo_curso VARCHAR(50) NOT NULL,
+                        valor REAL NOT NULL,
+                        observacao TEXT,
+                        data_avaliacao DATE NOT NULL,
+                        tipo_avaliacao VARCHAR(100),
+                        data_cadastro DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        cadastrado_por INTEGER,
+                        FOREIGN KEY (aluno_id) REFERENCES alunos(id),
+                        FOREIGN KEY (professor_id) REFERENCES professores(id),
+                        FOREIGN KEY (matricula_id) REFERENCES matriculas(id),
+                        FOREIGN KEY (cadastrado_por) REFERENCES usuarios(id)
+                    )
+                '''))
+                db.session.commit()
+                print("✓ Tabela 'notas' criada.")
+            else:
+                columns = [col['name'] for col in inspector.get_columns('notas')]
+                print(f"Colunas atuais: {', '.join(columns)}")
+                print("✓ Tabela 'notas' verificada.")
             
             print("\n✓ Correção do banco de dados concluída com sucesso!")
             

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastrar Nota - Controle de Dublagem{% endblock %}
+{% block page_title %}Cadastrar Nota{% endblock %}
+
+{% block extra_css %}
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label .required {
+        color: #dc3545;
+    }
+    
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        font-family: inherit;
+    }
+    
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    .form-group input[type="number"] {
+        max-width: 200px;
+    }
+    
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .btn-submit {
+        padding: 12px 30px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        font-weight: bold;
+    }
+    
+    .btn-submit:hover {
+        background: #218838;
+    }
+    
+    .btn-cancel {
+        padding: 12px 30px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+    
+    .form-actions {
+        margin-top: 30px;
+        text-align: center;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="POST" action="{{ url_for('main.cadastrar_nota') }}">
+        <div class="form-group">
+            <label for="aluno_id">Aluno <span class="required">*</span></label>
+            <select name="aluno_id" id="aluno_id" required onchange="carregarMatriculas()">
+                <option value="">Selecione um aluno</option>
+                {% for aluno in alunos %}
+                <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
+                    {{ aluno.nome }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="professor_id">Professor <span class="required">*</span></label>
+            <select name="professor_id" id="professor_id" required onchange="carregarMatriculas()" {% if not current_user.is_admin() %}disabled{% endif %}>
+                {% if current_user.is_admin() %}
+                    <option value="">Selecione um professor</option>
+                    {% for professor in professores %}
+                    <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
+                        {{ professor.nome }}
+                    </option>
+                    {% endfor %}
+                {% else %}
+                    {% for professor in professores %}
+                    <option value="{{ professor.id }}" selected>{{ professor.nome }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+            {% if not current_user.is_admin() %}
+            <input type="hidden" name="professor_id" value="{{ professores[0].id if professores else '' }}">
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="matricula_id">Matrícula (Opcional)</label>
+            <select name="matricula_id" id="matricula_id">
+                <option value="">Nenhuma</option>
+                {% for matricula in matriculas %}
+                <option value="{{ matricula.id }}">
+                    {{ tipos_cursos.get(matricula.tipo_curso, matricula.tipo_curso) }} - 
+                    {{ matricula.dia_semana or 'N/A' }} {{ matricula.horario_aula or '' }}
+                </option>
+                {% endfor %}
+            </select>
+            <small>Vincular a nota a uma matrícula específica (opcional)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="tipo_curso">Tipo de Curso <span class="required">*</span></label>
+            <select name="tipo_curso" id="tipo_curso" required>
+                <option value="">Selecione um curso</option>
+                {% for key, value in tipos_cursos.items() %}
+                <option value="{{ key }}">{{ value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="valor">Valor da Nota <span class="required">*</span></label>
+            <input type="number" 
+                   name="valor" 
+                   id="valor" 
+                   min="0" 
+                   max="10" 
+                   step="0.1" 
+                   required
+                   placeholder="0.0 a 10.0">
+            <small>Valor entre 0.0 e 10.0</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="tipo_avaliacao">Tipo de Avaliação</label>
+            <input type="text" 
+                   name="tipo_avaliacao" 
+                   id="tipo_avaliacao"
+                   placeholder="Ex: Prova, Trabalho, Apresentação, etc.">
+            <small>Ex: Prova, Trabalho, Apresentação, Participação, etc.</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="data_avaliacao">Data da Avaliação <span class="required">*</span></label>
+            <input type="date" 
+                   name="data_avaliacao" 
+                   id="data_avaliacao" 
+                   required
+                   value="{{ data_hoje if data_hoje else '' }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="observacao">Observação</label>
+            <textarea name="observacao" 
+                      id="observacao"
+                      placeholder="Observações sobre a avaliação (opcional)"></textarea>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">Cadastrar Nota</button>
+            <a href="{{ url_for('main.listar_notas') }}" class="btn-cancel">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function carregarMatriculas() {
+    const alunoId = document.getElementById('aluno_id').value;
+    const professorId = document.getElementById('professor_id').value;
+    
+    if (!alunoId || !professorId) {
+        document.getElementById('matricula_id').innerHTML = '<option value="">Nenhuma</option>';
+        return;
+    }
+    
+    // Redirecionar para recarregar com os parâmetros
+    const url = new URL(window.location.href);
+    url.searchParams.set('aluno_id', alunoId);
+    url.searchParams.set('professor_id', professorId);
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}
+
