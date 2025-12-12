@@ -17,16 +17,16 @@ Quando você acessar `https://seu-app.onrender.com/criar-admin-inicial`, verá 3
 
 ### 3️⃣ **Token de Segurança** (só aparece se você configurou ADMIN_CREATION_TOKEN)
 - **O que é**: Um código de segurança que você configurou no Render
-- **Valor**: `o2T0av5pTA4XZvUPMP4-Sfri-9LO__Z4u5wotsm3QTk`
-- **Onde pegar**: Você configurou este valor na variável `ADMIN_CREATION_TOKEN` no Render
+- **Onde pegar**: O valor que você configurou na variável `ADMIN_CREATION_TOKEN` no Render
 - **Importante**: Este NÃO é a senha do admin, é apenas um código de segurança
+- **⚠️ ATENÇÃO**: O token está no arquivo `TOKEN_ADMIN.txt` local (não commitado) ou nas variáveis de ambiente do Render
 
 ## 📝 Exemplo de Preenchimento
 
 ```
 Username do Administrador: admin
 Senha do Administrador: MinhaSenhaSegura123!
-Token de Segurança: o2T0av5pTA4XZvUPMP4-Sfri-9LO__Z4u5wotsm3QTk
+Token de Segurança: [cole o token que você configurou no Render em ADMIN_CREATION_TOKEN]
 ```
 
 ## 🔐 Após Criar o Admin
