@@ -518,6 +518,9 @@
     <a href="{{ url_for('main.listar_alunos', filtro='notas') }}" class="tab {% if filtro == 'notas' %}active{% endif %}">
         Notas
     </a>
+    <a href="{{ url_for('main.listar_alunos', filtro='pagamentos') }}" class="tab {% if filtro == 'pagamentos' %}active{% endif %}">
+        💰 Pagamentos
+    </a>
 </div>
 
 {% if filtro == 'notas' %}
@@ -1005,6 +1008,51 @@
             <p>Selecione um professor e um curso para visualizar as notas dos alunos.</p>
         </div>
     {% endif %}
+{% elif filtro == 'pagamentos' %}
+    <div class="table-container">
+        <table class="alunos-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Total Mensalidades</th>
+                    <th>Pagamentos</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for aluno in alunos %}
+                <tr>
+                    <td data-label="ID">{{ aluno.id }}</td>
+                    <td data-label="Nome">{{ aluno.nome|format_name }}</td>
+                    <td data-label="Telefone">{{ aluno.telefone }}</td>
+                    <td data-label="Total Mensalidades">{{ aluno.get_total_mensalidades()|format_currency }}</td>
+                    <td data-label="Pagamentos">
+                        {% set pagamentos_aluno = aluno.pagamentos|list %}
+                        {% if pagamentos_aluno %}
+                            <span style="color: #28a745; font-weight: bold;">{{ pagamentos_aluno|length }} registro(s)</span>
+                        {% else %}
+                            <span style="color: #6c757d;">Nenhum pagamento</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Ações">
+                        <div class="action-buttons">
+                            {% if aluno.ativo %}
+                            <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                                💰 Enviar Pagamento
+                            </a>
+                            <a href="{{ url_for('main.listar_pagamentos_aluno', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                                Ver Pagamentos
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% elif alunos %}
     <div class="table-container">
         <table class="alunos-table">
@@ -1156,13 +1204,6 @@
                 {% endif %}
                 <td data-label="Ações">
                     <div class="action-buttons">
-                        {% if aluno.ativo %}
-                        {# Comentado até que a rota seja implementada
-                        <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
-                            💰 Pagamento
-                        </a>
-                        #}
-                        {% endif %}
                         {% if current_user.is_admin() %}
                             {% if filtro == 'pendentes' %}
                             <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">

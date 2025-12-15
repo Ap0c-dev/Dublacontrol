@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from app.models.professor import db, Professor
 from app.models.aluno import Aluno
@@ -7,10 +7,13 @@ from app.models.usuario import Usuario
 from app.models.horario_professor import HorarioProfessor
 from app.models.nota import Nota
 from app.models.nota import Nota
-from datetime import datetime, date
+from app.models.pagamento import Pagamento
+from datetime import datetime, date, timedelta
 from sqlalchemy import text
 from functools import wraps
 import re
+import os
+from werkzeug.utils import secure_filename
 
 bp = Blueprint('main', __name__)
 
@@ -1029,6 +1032,9 @@ def listar_alunos():
                 import traceback
                 print(f"Erro ao filtrar alunos experimentais: {traceback.format_exc()}")
                 alunos = []
+        elif filtro == 'pagamentos':
+            # Para a aba de pagamentos, mostrar todos os alunos ativos
+            alunos = Aluno.query.options(subqueryload(Aluno.matriculas), subqueryload(Aluno.pagamentos)).filter_by(ativo=True).order_by(Aluno.nome).all()
         else:
             # Alunos ativos e aprovados que NÃO são experimentais
             try:
@@ -1049,6 +1055,12 @@ def listar_alunos():
                 Matricula.professor_id == professor.id,
                 Aluno.ativo == False
             ).order_by(Aluno.data_exclusao.desc(), Aluno.nome).distinct().all()
+        elif filtro == 'pagamentos':
+            # Para a aba de pagamentos, mostrar alunos ativos do professor
+            alunos = Aluno.query.options(subqueryload(Aluno.matriculas), subqueryload(Aluno.pagamentos)).join(Matricula).filter(
+                Matricula.professor_id == professor.id,
+                Aluno.ativo == True
+            ).order_by(Aluno.nome).distinct().all()
         else:
             alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).join(Matricula).filter(
                 Matricula.professor_id == professor.id,
@@ -1740,5 +1752,355 @@ def excluir_nota(nota_id):
         flash(f'Erro ao excluir nota: {str(e)}', 'error')
     
     return redirect(url_for('main.listar_notas'))
+
+# ==================== ROTAS DE PAGAMENTO ====================
+
+@bp.route('/alunos/<int:aluno_id>/pagamento/upload', methods=['GET', 'POST'])
+@login_required
+def upload_comprovante(aluno_id):
+    """Upload de comprovante de pagamento"""
+    aluno = Aluno.query.get_or_404(aluno_id)
+    
+    # Verificar permissão: admin ou professor podem acessar qualquer aluno
+    # Alunos podem acessar apenas se houver uma relação (por enquanto, apenas admin e professor)
+    if not current_user.is_admin() and not current_user.is_professor():
+        flash('Acesso negado. Apenas administradores e professores podem enviar comprovantes.', 'error')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            # Validar credenciais do Cloudinary
+            import cloudinary
+            import cloudinary.uploader
+            
+            cloud_name = current_app.config.get('CLOUDINARY_CLOUD_NAME')
+            api_key = current_app.config.get('CLOUDINARY_API_KEY')
+            api_secret = current_app.config.get('CLOUDINARY_API_SECRET')
+            
+            if not api_key or not api_secret:
+                flash('Erro de configuração: Credenciais do Cloudinary não encontradas. Entre em contato com o administrador.', 'error')
+                return render_template('upload_comprovante.html', aluno=aluno)
+            
+            # Obter dados do formulário
+            mes_referencia = request.form.get('mes_referencia', '').strip()
+            ano_referencia = request.form.get('ano_referencia', '').strip()
+            valor_pago = request.form.get('valor_pago', '').strip()
+            data_pagamento_str = request.form.get('data_pagamento', '').strip()
+            observacoes = request.form.get('observacoes', '').strip()
+            
+            # Validações
+            erros = []
+            
+            if not mes_referencia:
+                erros.append('Mês de referência é obrigatório.')
+            else:
+                try:
+                    mes_referencia = int(mes_referencia)
+                    if mes_referencia < 1 or mes_referencia > 12:
+                        erros.append('Mês inválido.')
+                except ValueError:
+                    erros.append('Mês inválido.')
+            
+            if not ano_referencia:
+                erros.append('Ano de referência é obrigatório.')
+            else:
+                try:
+                    ano_referencia = int(ano_referencia)
+                    if ano_referencia < 2020 or ano_referencia > 2100:
+                        erros.append('Ano inválido.')
+                except ValueError:
+                    erros.append('Ano inválido.')
+            
+            if not valor_pago:
+                erros.append('Valor pago é obrigatório.')
+            else:
+                try:
+                    valor_pago = float(valor_pago.replace(',', '.'))
+                    if valor_pago <= 0:
+                        erros.append('Valor pago deve ser maior que zero.')
+                except ValueError:
+                    erros.append('Valor pago inválido.')
+            
+            if not data_pagamento_str:
+                erros.append('Data do pagamento é obrigatória.')
+            else:
+                try:
+                    data_pagamento = datetime.strptime(data_pagamento_str, '%Y-%m-%d').date()
+                except ValueError:
+                    erros.append('Data do pagamento inválida.')
+            
+            # Validar arquivo
+            if 'comprovante' not in request.files:
+                erros.append('Comprovante é obrigatório.')
+            else:
+                arquivo = request.files['comprovante']
+                if arquivo.filename == '':
+                    erros.append('Comprovante é obrigatório.')
+                else:
+                    # Validar extensão
+                    extensoes_permitidas = {'.png', '.jpg', '.jpeg', '.gif', '.pdf', '.webp'}
+                    nome_arquivo = secure_filename(arquivo.filename)
+                    _, ext = os.path.splitext(nome_arquivo.lower())
+                    
+                    if ext not in extensoes_permitidas:
+                        erros.append(f'Formato de arquivo não permitido. Use: {", ".join(extensoes_permitidas)}')
+                    
+                    # Validar tamanho (10MB)
+                    arquivo.seek(0, os.SEEK_END)
+                    tamanho = arquivo.tell()
+                    arquivo.seek(0)
+                    if tamanho > 10 * 1024 * 1024:  # 10MB
+                        erros.append('Arquivo muito grande. Tamanho máximo: 10MB')
+            
+            if erros:
+                for erro in erros:
+                    flash(erro, 'error')
+                return render_template('upload_comprovante.html', aluno=aluno)
+            
+            # Verificar se já existe pagamento aprovado para o mesmo mês/ano
+            pagamento_existente = Pagamento.query.filter_by(
+                aluno_id=aluno_id,
+                mes_referencia=mes_referencia,
+                ano_referencia=ano_referencia,
+                status='aprovado'
+            ).first()
+            
+            if pagamento_existente:
+                flash(f'Já existe um pagamento aprovado para {mes_referencia}/{ano_referencia}.', 'error')
+                return render_template('upload_comprovante.html', aluno=aluno)
+            
+            # Fazer upload para Cloudinary
+            try:
+                arquivo.seek(0)  # Garantir que está no início
+                resultado = cloudinary.uploader.upload(
+                    arquivo,
+                    folder=f'comprovantes/{aluno_id}',
+                    resource_type='auto',
+                    allowed_formats=['png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp']
+                )
+                
+                url_comprovante = resultado.get('secure_url')
+                public_id = resultado.get('public_id')
+                
+            except Exception as e:
+                flash(f'Erro ao fazer upload do comprovante: {str(e)}', 'error')
+                return render_template('upload_comprovante.html', aluno=aluno)
+            
+            # Criar registro de pagamento
+            pagamento = Pagamento(
+                aluno_id=aluno_id,
+                mes_referencia=mes_referencia,
+                ano_referencia=ano_referencia,
+                valor_pago=valor_pago,
+                data_pagamento=data_pagamento,
+                url_comprovante=url_comprovante,
+                public_id=public_id,
+                observacoes=observacoes if observacoes else None,
+                status='pendente'
+            )
+            
+            db.session.add(pagamento)
+            db.session.commit()
+            
+            flash('Comprovante enviado com sucesso! Aguardando aprovação do administrador.', 'success')
+            return redirect(url_for('main.listar_pagamentos_aluno', aluno_id=aluno_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            print(f"Erro ao processar upload: {traceback.format_exc()}")
+            flash(f'Erro ao processar upload: {str(e)}', 'error')
+            return render_template('upload_comprovante.html', aluno=aluno)
+    
+    # GET - mostrar formulário
+    return render_template('upload_comprovante.html', aluno=aluno)
+
+@bp.route('/alunos/<int:aluno_id>/pagamentos')
+@login_required
+def listar_pagamentos_aluno(aluno_id):
+    """Listar pagamentos de um aluno específico"""
+    aluno = Aluno.query.get_or_404(aluno_id)
+    
+    # Verificar permissão: admin ou professor podem acessar qualquer aluno
+    if not current_user.is_admin() and not current_user.is_professor():
+        flash('Acesso negado. Apenas administradores e professores podem visualizar pagamentos.', 'error')
+        return redirect(url_for('main.index'))
+    
+    pagamentos = Pagamento.query.filter_by(aluno_id=aluno_id).order_by(
+        Pagamento.ano_referencia.desc(),
+        Pagamento.mes_referencia.desc()
+    ).all()
+    
+    return render_template('listar_pagamentos_aluno.html', aluno=aluno, pagamentos=pagamentos)
+
+@bp.route('/pagamentos')
+@admin_required
+def listar_pagamentos():
+    """Listar todos os pagamentos (apenas admin)"""
+    # Filtros
+    status_filtro = request.args.get('status', '').strip()
+    aluno_id_filtro = request.args.get('aluno_id', '').strip()
+    mes_filtro = request.args.get('mes', '').strip()
+    ano_filtro = request.args.get('ano', '').strip()
+    
+    # Query base - buscar TODOS os pagamentos
+    query = Pagamento.query
+    
+    # Aplicar filtros apenas se tiverem valor válido (não vazio)
+    # Status: aplicar apenas se não for vazio
+    if status_filtro and status_filtro.strip():
+        query = query.filter_by(status=status_filtro)
+    
+    # Aluno: aplicar apenas se não for vazio
+    if aluno_id_filtro and aluno_id_filtro.strip():
+        try:
+            query = query.filter_by(aluno_id=int(aluno_id_filtro))
+        except (ValueError, TypeError):
+            pass
+    
+    # Mês: aplicar apenas se não for vazio
+    if mes_filtro and mes_filtro.strip():
+        try:
+            query = query.filter_by(mes_referencia=int(mes_filtro))
+        except (ValueError, TypeError):
+            pass
+    
+    # Ano: aplicar apenas se não for vazio
+    if ano_filtro and ano_filtro.strip():
+        try:
+            query = query.filter_by(ano_referencia=int(ano_filtro))
+        except (ValueError, TypeError):
+            pass
+    
+    pagamentos = query.order_by(
+        Pagamento.data_cadastro.desc()
+    ).all()
+    
+    # Buscar alunos para o filtro
+    alunos = Aluno.query.filter_by(ativo=True).order_by(Aluno.nome).all()
+    
+    return render_template('listar_pagamentos.html', 
+                         pagamentos=pagamentos,
+                         alunos=alunos,
+                         status_filtro=status_filtro,
+                         aluno_id_filtro=aluno_id_filtro,
+                         mes_filtro=mes_filtro,
+                         ano_filtro=ano_filtro)
+
+@bp.route('/pagamentos/<int:pagamento_id>/aprovar', methods=['POST'])
+@admin_required
+def aprovar_pagamento(pagamento_id):
+    """Aprovar um pagamento"""
+    pagamento = Pagamento.query.get_or_404(pagamento_id)
+    
+    if pagamento.status != 'pendente':
+        flash('Este pagamento já foi processado.', 'info')
+        return redirect(url_for('main.listar_pagamentos'))
+    
+    observacoes_admin = request.form.get('observacoes_admin', '').strip()
+    
+    pagamento.status = 'aprovado'
+    pagamento.aprovado_por = current_user.id
+    pagamento.data_aprovacao = datetime.now()
+    if observacoes_admin:
+        pagamento.observacoes_admin = observacoes_admin
+    
+    # Atualizar data de vencimento do aluno se o pagamento for do mês corrente
+    aluno = pagamento.aluno
+    if aluno:
+        hoje = date.today()
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        # Verificar se o pagamento é do mês corrente
+        if pagamento.mes_referencia == mes_atual and pagamento.ano_referencia == ano_atual:
+            # Calcular próxima data de vencimento (próximo mês, mantendo o dia)
+            if mes_atual == 12:
+                # Se for dezembro, vai para janeiro do próximo ano
+                proximo_mes = 1
+                proximo_ano = ano_atual + 1
+            else:
+                proximo_mes = mes_atual + 1
+                proximo_ano = ano_atual
+            
+            # Manter o dia da data de vencimento atual
+            dia_vencimento = aluno.data_vencimento.day if aluno.data_vencimento else hoje.day
+            
+            # Ajustar o dia se o próximo mês não tiver esse dia (ex: 31 de janeiro -> 28/29 de fevereiro)
+            try:
+                nova_data_vencimento = date(proximo_ano, proximo_mes, dia_vencimento)
+            except ValueError:
+                # Se o dia não existe no próximo mês (ex: 31 de janeiro -> fevereiro), usar o último dia do mês
+                from calendar import monthrange
+                ultimo_dia = monthrange(proximo_ano, proximo_mes)[1]
+                nova_data_vencimento = date(proximo_ano, proximo_mes, ultimo_dia)
+            
+            aluno.data_vencimento = nova_data_vencimento
+            # Atualizar também o campo legado dia_vencimento
+            aluno.dia_vencimento = nova_data_vencimento.day
+    
+    try:
+        db.session.commit()
+        flash(f'Pagamento de {pagamento.aluno.nome if pagamento.aluno else "aluno"} aprovado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao aprovar pagamento: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_pagamentos'))
+
+@bp.route('/pagamentos/<int:pagamento_id>/rejeitar', methods=['POST'])
+@admin_required
+def rejeitar_pagamento(pagamento_id):
+    """Rejeitar um pagamento"""
+    pagamento = Pagamento.query.get_or_404(pagamento_id)
+    
+    if pagamento.status != 'pendente':
+        flash('Este pagamento já foi processado.', 'info')
+        return redirect(url_for('main.listar_pagamentos'))
+    
+    observacoes_admin = request.form.get('observacoes_admin', '').strip()
+    
+    if not observacoes_admin:
+        flash('É obrigatório informar o motivo da rejeição.', 'error')
+        return redirect(url_for('main.listar_pagamentos'))
+    
+    pagamento.status = 'rejeitado'
+    pagamento.aprovado_por = current_user.id
+    pagamento.data_aprovacao = datetime.now()
+    pagamento.observacoes_admin = observacoes_admin
+    
+    try:
+        db.session.commit()
+        flash(f'Pagamento de {pagamento.aluno.nome if pagamento.aluno else "aluno"} rejeitado.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao rejeitar pagamento: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_pagamentos'))
+
+@bp.route('/pagamentos/<int:pagamento_id>/deletar', methods=['POST'])
+@admin_required
+def deletar_pagamento(pagamento_id):
+    """Deletar um pagamento e seu comprovante"""
+    pagamento = Pagamento.query.get_or_404(pagamento_id)
+    
+    # Deletar arquivo do Cloudinary se existir
+    if pagamento.public_id:
+        try:
+            import cloudinary.uploader
+            cloudinary.uploader.destroy(pagamento.public_id)
+        except Exception as e:
+            print(f"Erro ao deletar arquivo do Cloudinary: {e}")
+            # Continuar mesmo se houver erro ao deletar o arquivo
+    
+    try:
+        db.session.delete(pagamento)
+        db.session.commit()
+        flash('Pagamento deletado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao deletar pagamento: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_pagamentos'))
 
 

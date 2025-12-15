@@ -238,7 +238,7 @@
                 <select name="aluno_id">
                     <option value="">Todos</option>
                     {% for aluno in alunos %}
-                        <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
+                        <option value="{{ aluno.id }}" {% if aluno_id_filtro|string == aluno.id|string %}selected{% endif %}>
                             {{ aluno.nome }}
                         </option>
                     {% endfor %}
@@ -249,24 +249,24 @@
                 <label>Mês</label>
                 <select name="mes">
                     <option value="">Todos</option>
-                    <option value="1" {% if mes == 1 %}selected{% endif %}>Janeiro</option>
-                    <option value="2" {% if mes == 2 %}selected{% endif %}>Fevereiro</option>
-                    <option value="3" {% if mes == 3 %}selected{% endif %}>Março</option>
-                    <option value="4" {% if mes == 4 %}selected{% endif %}>Abril</option>
-                    <option value="5" {% if mes == 5 %}selected{% endif %}>Maio</option>
-                    <option value="6" {% if mes == 6 %}selected{% endif %}>Junho</option>
-                    <option value="7" {% if mes == 7 %}selected{% endif %}>Julho</option>
-                    <option value="8" {% if mes == 8 %}selected{% endif %}>Agosto</option>
-                    <option value="9" {% if mes == 9 %}selected{% endif %}>Setembro</option>
-                    <option value="10" {% if mes == 10 %}selected{% endif %}>Outubro</option>
-                    <option value="11" {% if mes == 11 %}selected{% endif %}>Novembro</option>
-                    <option value="12" {% if mes == 12 %}selected{% endif %}>Dezembro</option>
+                    <option value="1" {% if mes_filtro|string == '1' %}selected{% endif %}>Janeiro</option>
+                    <option value="2" {% if mes_filtro|string == '2' %}selected{% endif %}>Fevereiro</option>
+                    <option value="3" {% if mes_filtro|string == '3' %}selected{% endif %}>Março</option>
+                    <option value="4" {% if mes_filtro|string == '4' %}selected{% endif %}>Abril</option>
+                    <option value="5" {% if mes_filtro|string == '5' %}selected{% endif %}>Maio</option>
+                    <option value="6" {% if mes_filtro|string == '6' %}selected{% endif %}>Junho</option>
+                    <option value="7" {% if mes_filtro|string == '7' %}selected{% endif %}>Julho</option>
+                    <option value="8" {% if mes_filtro|string == '8' %}selected{% endif %}>Agosto</option>
+                    <option value="9" {% if mes_filtro|string == '9' %}selected{% endif %}>Setembro</option>
+                    <option value="10" {% if mes_filtro|string == '10' %}selected{% endif %}>Outubro</option>
+                    <option value="11" {% if mes_filtro|string == '11' %}selected{% endif %}>Novembro</option>
+                    <option value="12" {% if mes_filtro|string == '12' %}selected{% endif %}>Dezembro</option>
                 </select>
             </div>
             
             <div class="filter-group">
                 <label>Ano</label>
-                <input type="number" name="ano" min="2020" max="2100" value="{{ ano or '' }}" placeholder="Ex: 2024">
+                <input type="number" name="ano" min="2020" max="2100" value="{{ ano_filtro or '' }}" placeholder="Ex: 2024">
             </div>
             
             <div class="filter-group">
@@ -285,7 +285,6 @@
                     <th>Valor</th>
                     <th>Data Pagamento</th>
                     <th>Status</th>
-                    <th>Data Cadastro</th>
                     <th>Ações</th>
                 </tr>
             </thead>
@@ -301,7 +300,6 @@
                             {{ pagamento.get_status_label() }}
                         </span>
                     </td>
-                    <td>{{ pagamento.data_cadastro.strftime('%d/%m/%Y %H:%M') if pagamento.data_cadastro else '-' }}</td>
                     <td>
                         {% if pagamento.url_comprovante %}
                             <a href="{{ pagamento.url_comprovante }}" target="_blank" class="btn-action btn-view">Ver</a>
@@ -317,14 +315,14 @@
                 </tr>
                 {% if pagamento.observacoes %}
                 <tr>
-                    <td colspan="7" style="background: #e9ecef; padding: 10px; font-size: 0.85em;">
+                    <td colspan="6" style="background: #e9ecef; padding: 10px; font-size: 0.85em;">
                         <strong>Observações:</strong> {{ pagamento.observacoes }}
                     </td>
                 </tr>
                 {% endif %}
                 {% if pagamento.observacoes_admin %}
                 <tr>
-                    <td colspan="7" style="background: #fff3cd; padding: 10px; font-size: 0.85em;">
+                    <td colspan="6" style="background: #fff3cd; padding: 10px; font-size: 0.85em;">
                         <strong>Observação do Admin:</strong> {{ pagamento.observacoes_admin }}
                         {% if pagamento.aprovador %}
                             <br><small>Aprovado por: {{ pagamento.aprovador.username }} em {{ pagamento.data_aprovacao.strftime('%d/%m/%Y %H:%M') if pagamento.data_aprovacao else '' }}</small>
