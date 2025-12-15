@@ -169,7 +169,7 @@
             {% if current_user.is_admin() %}
             <span style="color: #28a745;">(Administrador)</span>
             {% elif current_user.is_professor() %}
-            <span style="color: #17a2b8;">(Professor{% if current_user.get_professor() %}: {{ current_user.get_professor().nome }}{% endif %})</span>
+            <span style="color: #17a2b8;">(Professor{% if current_user.get_professor() %}: {{ current_user.get_professor().nome|format_name }}{% endif %})</span>
             {% else %}
             <span style="color: #6c757d;">(Aluno)</span>
             {% endif %}
@@ -182,10 +182,8 @@
             <a href="{{ url_for('main.listar_professores') }}">Listar Professores</a>
             <a href="{{ url_for('main.cadastro_alunos') }}">Cadastro de Alunos</a>
             <a href="{{ url_for('main.listar_alunos') }}">Listar Alunos</a>
-            <a href="{{ url_for('main.listar_notas') }}">Notas</a>
             {% elif current_user.is_professor() %}
             <a href="{{ url_for('main.listar_alunos') }}">Meus Alunos</a>
-            <a href="{{ url_for('main.listar_notas') }}">Notas</a>
             {% else %}
             <a href="{{ url_for('main.cadastro_alunos') }}">Cadastro de Alunos</a>
             {% endif %}

@@ -315,9 +315,11 @@
             <!-- Alunos serão adicionados aqui dinamicamente -->
         </div>
         
+        {% if not current_user.is_aluno() %}
         <button type="button" class="btn btn-secondary" onclick="adicionarAluno()" style="margin-bottom: 20px;">
             + Adicionar Aluno
         </button>
+        {% endif %}
         <div class="buttons">
             <button type="submit" class="btn btn-primary">Cadastrar Alunos</button>
             <button type="reset" class="btn btn-secondary" onclick="resetarFormulario()">Limpar</button>
@@ -326,6 +328,17 @@
 </div>
 
 <script>
+    // Função para formatar nomes (primeira letra maiúscula, resto minúscula)
+    function formatarNome(nome) {
+        if (!nome) return nome;
+        return nome.toLowerCase().split(' ').map(palavra => 
+            palavra.charAt(0).toUpperCase() + palavra.slice(1)
+        ).join(' ');
+    }
+    
+    // Verificar se o usuário é admin
+    const isAdmin = {% if current_user.is_admin() %}true{% else %}false{% endif %};
+    
     let alunoCount = 0;
     
     function formatarTelefone(index, input, isResponsavel = false) {
@@ -367,6 +380,11 @@
     
     function adicionarAluno() {
         const container = document.getElementById('alunosContainer');
+        if (!container) {
+            console.error('Container de alunos não encontrado!');
+            alert('Erro: Container de alunos não encontrado. Por favor, recarregue a página.');
+            return;
+        }
         const alunoDiv = document.createElement('div');
         alunoDiv.className = 'aluno-form';
         alunoDiv.id = `aluno-${alunoCount}`;
@@ -379,7 +397,7 @@
         const dataMin = `${anoMin}-01-01`;
         const dataMax = `${anoMax}-12-31`;
         
-        alunoDiv.innerHTML = `
+        let alunoHTML = `
             <button type="button" class="remove-aluno-btn" onclick="removerAluno(${alunoCount})">× Remover</button>
             <h3>Aluno ${alunoCount + 1}</h3>
             
@@ -503,6 +521,16 @@
             
             <div class="form-row">
                 <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal; margin-bottom: 10px;">
+                        <input type="checkbox" 
+                               id="experimental_${alunoCount}" 
+                               name="experimental_${alunoCount}">
+                        <span style="font-weight: bold; color: #17a2b8;">Aula Experimental</span>
+                    </label>
+                    <small style="display: block; margin-bottom: 10px; color: #6c757d; font-size: 0.9em;">
+                        Marque esta opção se o aluno está fazendo apenas uma aula experimental. Você poderá efetivá-lo depois se ele decidir continuar.
+                    </small>
+                    
                     <label for="forma_pagamento_${alunoCount}" class="required">Forma de Pagamento</label>
                     <select id="forma_pagamento_${alunoCount}" 
                             name="forma_pagamento_${alunoCount}" 
@@ -552,13 +580,6 @@
                                name="dublagem_presencial_${alunoCount}"
                                onchange="toggleProfessorSelect(${alunoCount}, 'dublagem_presencial', true)">
                         <label for="dublagem_presencial_${alunoCount}">Dublagem Presencial</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="teatro_online_${alunoCount}" 
-                               name="teatro_online_${alunoCount}"
-                               onchange="toggleProfessorSelect(${alunoCount}, 'teatro_online', false)">
-                        <label for="teatro_online_${alunoCount}">Teatro Online</label>
                     </div>
                     <div class="checkbox-item">
                         <input type="checkbox" 
@@ -620,6 +641,20 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
+                            ` + (isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_dublagem_online_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_dublagem_online_${alunoCount}" 
+                                       name="mensalidade_dublagem_online_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                            ` : '') + `
                         </div>
                     </div>
                     
@@ -651,37 +686,20 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="curso-professor-item" id="professor_teatro_online_container_${alunoCount}" style="display: none;">
-                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 200px;">
-                                <label for="professor_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Teatro Online:</label>
-                                <select id="professor_teatro_online_${alunoCount}" 
-                                        name="professor_teatro_online_${alunoCount}" 
-                                        class="professor-select-curso"
-                                        onchange="carregarHorariosProfessor(${alunoCount}, 'teatro_online', this.value)"
-                                        disabled>
-                                    <option value="">Selecione o professor</option>
-                                </select>
+                            ${isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_dublagem_presencial_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_dublagem_presencial_${alunoCount}" 
+                                       name="mensalidade_dublagem_presencial_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                             </div>
-                            <div style="flex: 1; min-width: 150px;">
-                                <label for="dia_semana_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
-                                <select id="dia_semana_teatro_online_${alunoCount}" 
-                                        name="dia_semana_teatro_online_${alunoCount}" 
-                                        disabled>
-                                    <option value="">Selecione o dia</option>
-                                </select>
-                            </div>
-                            <div style="flex: 1; min-width: 150px;">
-                                <label for="horario_teatro_online_${alunoCount}" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Horário:</label>
-                                <select id="horario_teatro_online_${alunoCount}" 
-                                        name="horario_teatro_online_${alunoCount}" 
-                                        disabled>
-                                    <option value="">Selecione o horário</option>
-                                </select>
-                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -713,6 +731,20 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
+                            ${isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_teatro_presencial_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_teatro_presencial_${alunoCount}" 
+                                       name="mensalidade_teatro_presencial_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -744,6 +776,20 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
+                            ${isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_locucao_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_locucao_${alunoCount}" 
+                                       name="mensalidade_locucao_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -775,6 +821,20 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
+                            ${isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_teatro_tv_cinema_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_teatro_tv_cinema_${alunoCount}" 
+                                       name="mensalidade_teatro_tv_cinema_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -806,13 +866,83 @@
                                     <option value="">Selecione o horário</option>
                                 </select>
                             </div>
+                            ${isAdmin ? `
+                            <div style="flex: 1; min-width: 120px;">
+                                <label for="mensalidade_musical_${alunoCount}" class="required" style="font-size: 0.9em; margin-bottom: 5px; display: block;">Mensalidade (R$):</label>
+                                <input type="number" 
+                                       id="mensalidade_musical_${alunoCount}" 
+                                       name="mensalidade_musical_${alunoCount}" 
+                                       step="0.01" 
+                                       min="0.01" 
+                                       required
+                                       placeholder="0.00"
+                                       disabled
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
             </div>
         `;
         
+        // Adicionar campos de usuário/senha se for admin
+        if (isAdmin) {
+            alunoHTML += `
+            <div class="form-group" style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 2px solid #2196F3;">
+                <h4 style="margin-top: 0; color: #1976D2; font-size: 1.1em;">Dados de Acesso do Aluno</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username_${alunoCount}" class="required">Nome de Usuário</label>
+                        <input type="text" 
+                               id="username_${alunoCount}" 
+                               name="username_${alunoCount}" 
+                               required
+                               placeholder="Digite o nome de usuário"
+                               pattern=".{3,}"
+                               title="Mínimo de 3 caracteres">
+                        <span class="info-text">Mínimo de 3 caracteres</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="email_${alunoCount}">Email</label>
+                        <input type="email" 
+                               id="email_${alunoCount}" 
+                               name="email_${alunoCount}" 
+                               placeholder="exemplo@email.com (opcional)">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password_${alunoCount}" class="required">Senha</label>
+                        <input type="password" 
+                               id="password_${alunoCount}" 
+                               name="password_${alunoCount}" 
+                               required
+                               minlength="6"
+                               placeholder="Mínimo de 6 caracteres">
+                        <span class="info-text">Mínimo de 6 caracteres</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="password_confirm_${alunoCount}" class="required">Confirmar Senha</label>
+                        <input type="password" 
+                               id="password_confirm_${alunoCount}" 
+                               name="password_confirm_${alunoCount}" 
+                               required
+                               minlength="6"
+                               placeholder="Digite a senha novamente"
+                               onblur="validarSenha(${alunoCount})">
+                        <span id="senhaErro_${alunoCount}" style="color: #dc3545; font-size: 0.9em; display: none;"></span>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+        
+        // Fechar o HTML e atribuir ao elemento
+        alunoDiv.innerHTML = alunoHTML;
         container.appendChild(alunoDiv);
+        
+        // Configurar data de vencimento e incrementar contador
         configurarDataVencimento(alunoCount);
         alunoCount++;
     }
@@ -882,11 +1012,16 @@
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
         if (diffDays > 35) {
+            // Calcular data limite (hoje + 35 dias)
+            const dataLimite = new Date(hoje);
+            dataLimite.setDate(dataLimite.getDate() + 35);
+            const dataLimiteStr = dataLimite.toLocaleDateString('pt-BR');
+            
             if (dataVencimentoErro) {
-                dataVencimentoErro.textContent = `A data de vencimento não pode ser mais de 35 dias após hoje (seria ${diffDays} dias)`;
+                dataVencimentoErro.textContent = `Data Limite: ${dataLimiteStr}`;
                 dataVencimentoErro.style.display = 'block';
             }
-            dataVencimentoInput.setCustomValidity('A data de vencimento não pode ser mais de 35 dias após hoje');
+            dataVencimentoInput.setCustomValidity(`Data Limite: ${dataLimiteStr}`);
         } else {
             if (dataVencimentoErro) {
                 dataVencimentoErro.style.display = 'none';
@@ -1009,6 +1144,9 @@
                 if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
                 if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
             }
+            
+            // Recarregar horários quando a idade mudar
+            recarregarHorariosPorIdade(index);
         } else if (idadeInput.value === '') {
             // Campo vazio - limpar validações
             idadeInput.setCustomValidity('');
@@ -1132,6 +1270,9 @@
                 if (labelNomeResponsavel) labelNomeResponsavel.classList.remove('required');
                 if (labelTelefoneResponsavel) labelTelefoneResponsavel.classList.remove('required');
             }
+            
+            // Recarregar horários quando a idade mudar
+            recarregarHorariosPorIdade(index);
         } else {
             // Sem data de nascimento - validar idade manual se houver
             if (!temIdadeManual && idadeInput) idadeInput.value = '';
@@ -1180,6 +1321,30 @@
             if (mensalidadeInput) {
                 mensalidadeInput.disabled = true;
                 mensalidadeInput.value = '';
+                mensalidadeInput.removeAttribute('required');
+            }
+        }
+    }
+    
+    function validarSenha(index) {
+        const senhaInput = document.getElementById(`password_${index}`);
+        const senhaConfirmInput = document.getElementById(`password_confirm_${index}`);
+        const senhaErro = document.getElementById(`senhaErro_${index}`);
+        
+        if (!senhaInput || !senhaConfirmInput) return;
+        
+        const senha = senhaInput.value;
+        const senhaConfirm = senhaConfirmInput.value;
+        
+        if (senhaErro) {
+            if (senhaConfirm && senha !== senhaConfirm) {
+                senhaErro.textContent = 'As senhas não coincidem';
+                senhaErro.style.display = 'block';
+                senhaConfirmInput.setCustomValidity('As senhas não coincidem');
+            } else {
+                senhaErro.style.display = 'none';
+                senhaErro.textContent = '';
+                senhaConfirmInput.setCustomValidity('');
             }
         }
     }
@@ -1203,7 +1368,7 @@
                     professores.forEach(professor => {
                         const option = document.createElement('option');
                         option.value = professor.id;
-                        option.textContent = professor.nome;
+                        option.textContent = formatarNome(professor.nome);
                         selectElement.appendChild(option);
                     });
                     selectElement.disabled = false;
@@ -1232,8 +1397,18 @@
             return;
         }
         
+        // Obter idade do aluno
+        const idadeInput = document.getElementById(`idade_${alunoIndex}`);
+        const idadeAluno = idadeInput ? parseInt(idadeInput.value) : null;
+        
+        // Construir URL da API com idade do aluno (se disponível)
+        let apiUrl = `/api/professor/${professorId}/horarios`;
+        if (idadeAluno && !isNaN(idadeAluno)) {
+            apiUrl += `?idade_aluno=${idadeAluno}`;
+        }
+        
         // Buscar horários do professor
-        fetch(`/api/professor/${professorId}/horarios`)
+        fetch(apiUrl)
             .then(response => response.json())
             .then(horarios => {
                 const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
@@ -1277,7 +1452,23 @@
                                 horariosPorDia[diaSelecionado].forEach(horario => {
                                     const option = document.createElement('option');
                                     option.value = horario.horario_aula;
-                                    option.textContent = horario.horario_aula;
+                                    
+                                    // Adicionar indicador se a idade não for válida
+                                    let textoHorario = horario.horario_aula;
+                                    if (idadeAluno && !isNaN(idadeAluno) && horario.idade_valida === false) {
+                                        let motivo = [];
+                                        if (horario.idade_minima && idadeAluno < horario.idade_minima) {
+                                            motivo.push(`idade mínima: ${horario.idade_minima} anos`);
+                                        }
+                                        if (horario.idade_maxima && idadeAluno > horario.idade_maxima) {
+                                            motivo.push(`idade máxima: ${horario.idade_maxima} anos`);
+                                        }
+                                        textoHorario += ` (Idade não permitida - ${motivo.join(', ')})`;
+                                        option.disabled = true;
+                                        option.style.color = '#dc3545';
+                                    }
+                                    
+                                    option.textContent = textoHorario;
                                     horarioSelect.appendChild(option);
                                 });
                                 horarioSelect.disabled = false;
@@ -1301,6 +1492,18 @@
                     horarioSelect.disabled = true;
                 }
             });
+    }
+    
+    function recarregarHorariosPorIdade(alunoIndex) {
+        // Recarregar horários para todos os professores selecionados quando a idade mudar
+        const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+        tiposCursos.forEach(tipoCurso => {
+            const professorSelect = document.getElementById(`professor_${tipoCurso}_${alunoIndex}`);
+            if (professorSelect && professorSelect.value) {
+                // Recarregar horários com a nova idade
+                carregarHorariosProfessor(alunoIndex, tipoCurso, professorSelect.value);
+            }
+        });
     }
     
     function resetarFormulario() {
@@ -1422,8 +1625,13 @@
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
             if (diffDays > 35) {
+                // Calcular data limite (hoje + 35 dias)
+                const dataLimite = new Date(hoje);
+                dataLimite.setDate(dataLimite.getDate() + 35);
+                const dataLimiteStr = dataLimite.toLocaleDateString('pt-BR');
+                
                 temErro = true;
-                alert(`Aluno ${index + 1} (${nome}): A data de vencimento não pode ser mais de 35 dias após hoje (seria ${diffDays} dias).`);
+                alert(`Aluno ${index + 1} (${nome}): Data Limite: ${dataLimiteStr}`);
                 e.preventDefault();
                 return;
             }
@@ -1439,7 +1647,7 @@
             }
             
             // Validar cursos selecionados: se um curso está marcado, professor, dia da semana e horário são obrigatórios (mensalidade será preenchida na aprovação)
-            const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+            const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
             for (const tipoCurso of tiposCursos) {
                 const checkbox = aluno.querySelector(`input[name="${tipoCurso}_${index}"]`);
                 if (checkbox && checkbox.checked) {
@@ -1502,9 +1710,30 @@
     });
     
     // Inicializar com um aluno ao carregar a página
-    window.onload = function() {
-        adicionarAluno();
-    };
+    // Aguardar o DOM estar completamente carregado
+    (function() {
+        function init() {
+            try {
+                const container = document.getElementById('alunosContainer');
+                if (container) {
+                    adicionarAluno();
+                } else {
+                    console.warn('Container de alunos ainda não está disponível, tentando novamente...');
+                    setTimeout(init, 100);
+                }
+            } catch (error) {
+                console.error('Erro ao adicionar aluno inicial:', error);
+                alert('Erro ao inicializar formulário. Por favor, recarregue a página ou clique em "+ Adicionar Aluno".');
+            }
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            // DOM já está carregado
+            init();
+        }
+    })();
 </script>
 {% endblock %}
 

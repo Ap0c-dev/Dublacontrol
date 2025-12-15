@@ -9,6 +9,10 @@ class HorarioProfessor(db.Model):
     dia_semana = db.Column(db.String(20), nullable=False)  # Ex: "Segunda-feira", "Terça-feira", etc.
     horario_aula = db.Column(db.String(50), nullable=False)  # Ex: "17:00 às 19:00", "20:00 às 22:00"
     
+    # Faixa etária permitida para este horário
+    idade_minima = db.Column(db.Integer, nullable=True)  # Idade mínima permitida (ex: 8 anos)
+    idade_maxima = db.Column(db.Integer, nullable=True)  # Idade máxima permitida (ex: 15 anos)
+    
     # Relacionamento
     professor = db.relationship('Professor', backref='horarios')
     
@@ -20,6 +24,8 @@ class HorarioProfessor(db.Model):
             'id': self.id,
             'professor_id': self.professor_id,
             'dia_semana': self.dia_semana,
-            'horario_aula': self.horario_aula
+            'horario_aula': self.horario_aula,
+            'idade_minima': self.idade_minima,
+            'idade_maxima': self.idade_maxima
         }
 

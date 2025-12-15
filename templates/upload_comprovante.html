@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Enviar Comprovante - Controle de Dublagem{% endblock %}
+{% block page_title %}Enviar Comprovante de Pagamento{% endblock %}
+
+{% block extra_css %}
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .aluno-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .aluno-info strong {
+        color: #667eea;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label .required {
+        color: #dc3545;
+    }
+    
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        font-family: inherit;
+    }
+    
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    .form-group input[type="number"],
+    .form-group input[type="date"] {
+        max-width: 300px;
+    }
+    
+    .form-group input[type="file"] {
+        padding: 5px;
+    }
+    
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .btn-submit {
+        padding: 12px 30px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        font-weight: bold;
+    }
+    
+    .btn-submit:hover {
+        background: #218838;
+    }
+    
+    .btn-cancel {
+        padding: 12px 30px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+    
+    .form-actions {
+        margin-top: 30px;
+        text-align: center;
+    }
+    
+    .file-preview {
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        display: none;
+    }
+    
+    .file-preview img {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 5px;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="aluno-info">
+        <strong>Aluno:</strong> {{ aluno.nome }}<br>
+        <strong>Total de Mensalidades:</strong> {{ aluno.get_total_mensalidades()|format_currency }}
+    </div>
+    
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}">
+        <div class="form-group">
+            <label for="mes_referencia">Mês de Referência <span class="required">*</span></label>
+            <select name="mes_referencia" id="mes_referencia" required>
+                <option value="">Selecione o mês</option>
+                <option value="1">Janeiro</option>
+                <option value="2">Fevereiro</option>
+                <option value="3">Março</option>
+                <option value="4">Abril</option>
+                <option value="5">Maio</option>
+                <option value="6">Junho</option>
+                <option value="7">Julho</option>
+                <option value="8">Agosto</option>
+                <option value="9">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="ano_referencia">Ano de Referência <span class="required">*</span></label>
+            <input type="number" name="ano_referencia" id="ano_referencia" 
+                   min="2020" max="2100" 
+                   value="2024" 
+                   required>
+        </div>
+        
+        <div class="form-group">
+            <label for="valor_pago">Valor Pago (R$) <span class="required">*</span></label>
+            <input type="number" name="valor_pago" id="valor_pago" 
+                   step="0.01" min="0.01" 
+                   placeholder="0.00" required>
+            <small>Informe o valor total pago neste comprovante</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="data_pagamento">Data do Pagamento <span class="required">*</span></label>
+            <input type="date" name="data_pagamento" id="data_pagamento" 
+                   required>
+        </div>
+        
+        <div class="form-group">
+            <label for="comprovante">Comprovante <span class="required">*</span></label>
+            <input type="file" name="comprovante" id="comprovante" 
+                   accept="image/*,.pdf" required>
+            <small>Formatos aceitos: PNG, JPG, JPEG, GIF, PDF, WEBP (máx. 10MB)</small>
+            <div class="file-preview" id="file-preview">
+                <img id="preview-image" src="" alt="Preview">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="observacoes">Observações (opcional)</label>
+            <textarea name="observacoes" id="observacoes" 
+                      placeholder="Informações adicionais sobre o pagamento..."></textarea>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">Enviar Comprovante</button>
+            <a href="{{ url_for('main.listar_alunos') }}" class="btn-cancel">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Preview da imagem antes do upload
+    document.getElementById('comprovante').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const preview = document.getElementById('file-preview');
+        const previewImage = document.getElementById('preview-image');
+        
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}
+

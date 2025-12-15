@@ -45,6 +45,15 @@ class Config:
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Configurações do Cloudinary (armazenamento de comprovantes)
+    # Valores padrão caso não estejam nas variáveis de ambiente
+    CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME') or 'docvxvt4v'
+    CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
+    CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
+    
+    # Tamanho máximo de upload (10MB)
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB
+    
     @staticmethod
     def get_environment():
         """Retorna o ambiente atual (dev ou prd)"""

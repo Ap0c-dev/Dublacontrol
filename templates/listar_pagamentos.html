@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Pagamentos - Controle de Dublagem{% endblock %}
+{% block page_title %}Gerenciar Pagamentos{% endblock %}
+
+{% block extra_css %}
+    .pagamentos-container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .filters {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .filters form {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+    
+    .filter-group {
+        flex: 1;
+        min-width: 150px;
+    }
+    
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+        font-size: 0.9em;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 0.9em;
+    }
+    
+    .btn-filter {
+        padding: 8px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    
+    .btn-filter:hover {
+        background: #5568d3;
+    }
+    
+    .btn-clear {
+        padding: 8px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .pagamentos-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+    
+    .pagamentos-table th,
+    .pagamentos-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .pagamentos-table th {
+        background: #667eea;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .pagamentos-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+    
+    .status-pendente {
+        background: #ffc107;
+        color: #000;
+    }
+    
+    .status-aprovado {
+        background: #28a745;
+        color: white;
+    }
+    
+    .status-rejeitado {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-action {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.85em;
+        margin-right: 5px;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-approve {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-approve:hover {
+        background: #218838;
+    }
+    
+    .btn-reject {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-reject:hover {
+        background: #c82333;
+    }
+    
+    .btn-view {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .btn-view:hover {
+        background: #138496;
+    }
+    
+    .btn-delete {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-delete:hover {
+        background: #5a6268;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+        background: white;
+        margin: 15% auto;
+        padding: 20px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .modal-header {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+    }
+    
+    .modal-body textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        min-height: 100px;
+        margin-bottom: 15px;
+    }
+    
+    .modal-actions {
+        text-align: right;
+    }
+    
+    .modal-actions button {
+        padding: 8px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="pagamentos-container">
+    <div class="filters">
+        <form method="GET" action="{{ url_for('main.listar_pagamentos') }}">
+            <div class="filter-group">
+                <label>Status</label>
+                <select name="status">
+                    <option value="">Todos</option>
+                    <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+                    <option value="aprovado" {% if status_filtro == 'aprovado' %}selected{% endif %}>Aprovado</option>
+                    <option value="rejeitado" {% if status_filtro == 'rejeitado' %}selected{% endif %}>Rejeitado</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Aluno</label>
+                <select name="aluno_id">
+                    <option value="">Todos</option>
+                    {% for aluno in alunos %}
+                        <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
+                            {{ aluno.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Mês</label>
+                <select name="mes">
+                    <option value="">Todos</option>
+                    <option value="1" {% if mes == 1 %}selected{% endif %}>Janeiro</option>
+                    <option value="2" {% if mes == 2 %}selected{% endif %}>Fevereiro</option>
+                    <option value="3" {% if mes == 3 %}selected{% endif %}>Março</option>
+                    <option value="4" {% if mes == 4 %}selected{% endif %}>Abril</option>
+                    <option value="5" {% if mes == 5 %}selected{% endif %}>Maio</option>
+                    <option value="6" {% if mes == 6 %}selected{% endif %}>Junho</option>
+                    <option value="7" {% if mes == 7 %}selected{% endif %}>Julho</option>
+                    <option value="8" {% if mes == 8 %}selected{% endif %}>Agosto</option>
+                    <option value="9" {% if mes == 9 %}selected{% endif %}>Setembro</option>
+                    <option value="10" {% if mes == 10 %}selected{% endif %}>Outubro</option>
+                    <option value="11" {% if mes == 11 %}selected{% endif %}>Novembro</option>
+                    <option value="12" {% if mes == 12 %}selected{% endif %}>Dezembro</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Ano</label>
+                <input type="number" name="ano" min="2020" max="2100" value="{{ ano or '' }}" placeholder="Ex: 2024">
+            </div>
+            
+            <div class="filter-group">
+                <button type="submit" class="btn-filter">Filtrar</button>
+                <a href="{{ url_for('main.listar_pagamentos') }}" class="btn-clear">Limpar</a>
+            </div>
+        </form>
+    </div>
+    
+    {% if pagamentos %}
+        <table class="pagamentos-table">
+            <thead>
+                <tr>
+                    <th>Aluno</th>
+                    <th>Mês/Ano</th>
+                    <th>Valor</th>
+                    <th>Data Pagamento</th>
+                    <th>Status</th>
+                    <th>Data Cadastro</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pagamento in pagamentos %}
+                <tr>
+                    <td>{{ pagamento.aluno.nome if pagamento.aluno else '-' }}</td>
+                    <td>{{ pagamento.get_mes_nome() }}/{{ pagamento.ano_referencia }}</td>
+                    <td>{{ pagamento.valor_pago|format_currency }}</td>
+                    <td>{{ pagamento.data_pagamento.strftime('%d/%m/%Y') if pagamento.data_pagamento else '-' }}</td>
+                    <td>
+                        <span class="status-badge status-{{ pagamento.status }}">
+                            {{ pagamento.get_status_label() }}
+                        </span>
+                    </td>
+                    <td>{{ pagamento.data_cadastro.strftime('%d/%m/%Y %H:%M') if pagamento.data_cadastro else '-' }}</td>
+                    <td>
+                        {% if pagamento.url_comprovante %}
+                            <a href="{{ pagamento.url_comprovante }}" target="_blank" class="btn-action btn-view">Ver</a>
+                        {% endif %}
+                        
+                        {% if pagamento.status == 'pendente' %}
+                            <button onclick="openApproveModal({{ pagamento.id }})" class="btn-action btn-approve">Aprovar</button>
+                            <button onclick="openRejectModal({{ pagamento.id }})" class="btn-action btn-reject">Rejeitar</button>
+                        {% endif %}
+                        
+                        <button onclick="confirmDelete({{ pagamento.id }})" class="btn-action btn-delete">Deletar</button>
+                    </td>
+                </tr>
+                {% if pagamento.observacoes %}
+                <tr>
+                    <td colspan="7" style="background: #e9ecef; padding: 10px; font-size: 0.85em;">
+                        <strong>Observações:</strong> {{ pagamento.observacoes }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if pagamento.observacoes_admin %}
+                <tr>
+                    <td colspan="7" style="background: #fff3cd; padding: 10px; font-size: 0.85em;">
+                        <strong>Observação do Admin:</strong> {{ pagamento.observacoes_admin }}
+                        {% if pagamento.aprovador %}
+                            <br><small>Aprovado por: {{ pagamento.aprovador.username }} em {{ pagamento.data_aprovacao.strftime('%d/%m/%Y %H:%M') if pagamento.data_aprovacao else '' }}</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <p>Nenhum pagamento encontrado com os filtros selecionados.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Aprovação -->
+<div id="approveModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Aprovar Pagamento</div>
+        <div class="modal-body">
+            <form id="approveForm" method="POST">
+                <textarea name="observacoes_admin" placeholder="Observações (opcional)"></textarea>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('approveModal')" style="background: #6c757d; color: white;">Cancelar</button>
+                    <button type="submit" style="background: #28a745; color: white;">Aprovar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Rejeição -->
+<div id="rejectModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Rejeitar Pagamento</div>
+        <div class="modal-body">
+            <form id="rejectForm" method="POST">
+                <textarea name="observacoes_admin" placeholder="Motivo da rejeição (obrigatório)" required></textarea>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('rejectModal')" style="background: #6c757d; color: white;">Cancelar</button>
+                    <button type="submit" style="background: #dc3545; color: white;">Rejeitar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openApproveModal(pagamentoId) {
+        document.getElementById('approveForm').action = '{{ url_for("main.aprovar_pagamento", pagamento_id=0) }}'.replace('0', pagamentoId);
+        document.getElementById('approveModal').style.display = 'block';
+    }
+    
+    function openRejectModal(pagamentoId) {
+        document.getElementById('rejectForm').action = '{{ url_for("main.rejeitar_pagamento", pagamento_id=0) }}'.replace('0', pagamentoId);
+        document.getElementById('rejectModal').style.display = 'block';
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+    
+    function confirmDelete(pagamentoId) {
+        if (confirm('Tem certeza que deseja deletar este pagamento? Esta ação não pode ser desfeita.')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("main.deletar_pagamento", pagamento_id=0) }}'.replace('0', pagamentoId);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    // Fechar modal ao clicar fora
+    window.onclick = function(event) {
+        const approveModal = document.getElementById('approveModal');
+        const rejectModal = document.getElementById('rejectModal');
+        if (event.target == approveModal) {
+            approveModal.style.display = 'none';
+        }
+        if (event.target == rejectModal) {
+            rejectModal.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
+

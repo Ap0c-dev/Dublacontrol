@@ -105,12 +105,12 @@
     <form method="POST" action="{{ url_for('main.editar_nota', nota_id=nota.id) }}">
         <div class="form-group">
             <label>Aluno</label>
-            <div class="info-field">{{ nota.aluno.nome if nota.aluno else 'N/A' }}</div>
+            <div class="info-field">{% if nota.aluno %}{{ nota.aluno.nome|format_name }}{% else %}N/A{% endif %}</div>
         </div>
         
         <div class="form-group">
             <label>Professor</label>
-            <div class="info-field">{{ nota.professor.nome if nota.professor else 'N/A' }}</div>
+            <div class="info-field">{% if nota.professor %}{{ nota.professor.nome|format_name }}{% else %}N/A{% endif %}</div>
         </div>
         
         <div class="form-group">

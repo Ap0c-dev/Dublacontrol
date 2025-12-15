@@ -14,6 +14,7 @@ class Professor(db.Model):
     dublagem_online = db.Column(db.Boolean, default=False, nullable=False)
     teatro_presencial = db.Column(db.Boolean, default=False, nullable=False)
     teatro_online = db.Column(db.Boolean, default=False, nullable=False)
+    teatro_tv_cinema = db.Column(db.Boolean, default=False, nullable=False)
     musical = db.Column(db.Boolean, default=False, nullable=False)
     locucao = db.Column(db.Boolean, default=False, nullable=False)
     curso_apresentador = db.Column(db.Boolean, default=False, nullable=False)
@@ -33,6 +34,8 @@ class Professor(db.Model):
         return f'<Professor {self.nome}>'
     
     def to_dict(self):
+        # Verificar se a coluna teatro_tv_cinema existe antes de acessar
+        teatro_tv_cinema = getattr(self, 'teatro_tv_cinema', False)
         return {
             'id': self.id,
             'nome': self.nome,
@@ -41,6 +44,7 @@ class Professor(db.Model):
             'dublagem_online': self.dublagem_online,
             'teatro_presencial': self.teatro_presencial,
             'teatro_online': self.teatro_online,
+            'teatro_tv_cinema': teatro_tv_cinema,
             'musical': self.musical,
             'locucao': self.locucao,
             'curso_apresentador': self.curso_apresentador,

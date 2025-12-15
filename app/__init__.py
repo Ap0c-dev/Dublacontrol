@@ -1,8 +1,37 @@
+import os
+
+# IMPORTANTE: Carregar .env ANTES de importar Config
+# Carregar variáveis de ambiente do arquivo .env
+try:
+    from dotenv import load_dotenv
+    # Carregar .env da raiz do projeto
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        print(f"✓ Arquivo .env carregado: {env_path}")
+    else:
+        print(f"⚠️  Arquivo .env não encontrado em: {env_path}")
+        print("⚠️  Usando variáveis de ambiente do sistema")
+except ImportError:
+    # python-dotenv não instalado, tentar carregar manualmente
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    if os.path.exists(env_path):
+        print(f"⚠️  python-dotenv não instalado. Carregando .env manualmente...")
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+        print(f"✓ Arquivo .env carregado manualmente")
+    else:
+        print("⚠️  Arquivo .env não encontrado. Usando variáveis de ambiente do sistema")
+
+# Agora importar Config (que vai ler as variáveis de ambiente já carregadas)
 from flask import Flask
 from flask_login import LoginManager
 from config import Config
 from app.models.professor import db
-import os
 
 def create_app():
     # Obter o diretório raiz do projeto
@@ -53,8 +82,41 @@ def create_app():
         except (ValueError, TypeError):
             return '-'
     
+    # Filtro customizado para formatar nomes (primeira letra maiúscula, resto minúscula)
+    @app.template_filter('format_name')
+    def format_name(value):
+        """Formata um nome com primeira letra maiúscula e resto minúscula"""
+        if not value:
+            return value
+        try:
+            # Converte para string e aplica title case
+            return str(value).title()
+        except (ValueError, TypeError):
+            return value
+    
+    # Adicionar range ao contexto do template (Jinja2 não tem range por padrão)
+    @app.context_processor
+    def utility_processor():
+        def range_func(start, stop=None, step=1):
+            if stop is None:
+                return list(range(start))
+            return list(range(start, stop, step))
+        return dict(range=range_func)
+    
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula, usuario, horario_professor, nota
+    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento
+    
+    # Configurar Cloudinary
+    import cloudinary
+    import cloudinary.uploader
+    import cloudinary.api
+    
+    cloudinary.config(
+        cloud_name=app.config.get('CLOUDINARY_CLOUD_NAME', ''),
+        api_key=app.config.get('CLOUDINARY_API_KEY', ''),
+        api_secret=app.config.get('CLOUDINARY_API_SECRET', ''),
+        secure=True
+    )
     
     with app.app_context():
         try:

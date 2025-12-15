@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Aluno Pendente - Controle de Dublagem{% endblock %}
-{% block page_title %}Editar Aluno Pendente{% endblock %}
+{% block title %}{% if efetivar %}Efetivar Aluno Experimental{% else %}Editar Aluno Pendente{% endif %} - Controle de Dublagem{% endblock %}
+{% block page_title %}{% if efetivar %}Efetivar Aluno Experimental{% else %}Editar Aluno Pendente{% endif %}{% endblock %}
 
 {% block extra_css %}
     .form-container {
@@ -113,7 +113,15 @@
 
 {% block content %}
 <div class="form-container">
-    <form method="POST">
+    {% if efetivar %}
+    <div style="background: #e3f2fd; border-left: 4px solid #2196F3; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+        <p style="margin: 0; color: #1976D2;"><strong>Efetivação:</strong> Após salvar as alterações, este aluno será automaticamente efetivado e se tornará um aluno regular.</p>
+    </div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}">
+        {% if efetivar %}
+        <input type="hidden" name="efetivar" value="1">
+        {% endif %}
         <div class="form-group">
             <label for="nome" class="required">Nome</label>
             <input type="text" id="nome" name="nome" value="{{ aluno.nome }}" required>
@@ -222,10 +230,6 @@
                 <label for="dublagem_presencial">Dublagem Presencial</label>
             </div>
             <div class="checkbox-item">
-                <input type="checkbox" id="teatro_online" name="teatro_online" 
-                       {% if aluno.teatro_online %}checked{% endif %}
-                       onchange="toggleCurso('teatro_online')">
-                <label for="teatro_online">Teatro Online</label>
             </div>
             <div class="checkbox-item">
                 <input type="checkbox" id="teatro_presencial" name="teatro_presencial" 
@@ -254,7 +258,7 @@
         </div>
         
         <div id="cursos_professores">
-            {% for tipo_curso in ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'] %}
+            {% for tipo_curso in ['dublagem_online', 'dublagem_presencial', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'] %}
             {% set matricula = None %}
             {% for m in aluno.matriculas %}
                 {% if m.tipo_curso == tipo_curso %}
@@ -270,8 +274,6 @@
                 {% set curso_ativo = aluno.dublagem_online %}
             {% elif tipo_curso == 'dublagem_presencial' %}
                 {% set curso_ativo = aluno.dublagem_presencial %}
-            {% elif tipo_curso == 'teatro_online' %}
-                {% set curso_ativo = aluno.teatro_online %}
             {% elif tipo_curso == 'teatro_presencial' %}
                 {% set curso_ativo = aluno.teatro_presencial %}
             {% elif tipo_curso == 'locucao' %}
@@ -297,7 +299,7 @@
                             {% for professor in professores %}
                             <option value="{{ professor.id }}" 
                                     {% if matricula and matricula.professor_id == professor.id %}selected{% endif %}>
-                                {{ professor.nome }}
+                                {{ professor.nome|format_name }}
                             </option>
                             {% endfor %}
                         </select>
@@ -338,7 +340,7 @@
         
         <div style="margin-top: 30px;">
             <a href="{{ url_for('main.listar_alunos', filtro='pendentes') }}" class="btn-cancel">Cancelar</a>
-            <button type="submit" class="btn-submit">Salvar Alterações</button>
+            <button type="submit" class="btn-submit">{% if efetivar %}Salvar e Efetivar Aluno{% else %}Salvar Alterações{% endif %}</button>
         </div>
     </form>
 </div>
@@ -350,13 +352,21 @@ function toggleCurso(tipoCurso) {
     
     if (checkbox.checked) {
         container.style.display = 'block';
+        // Adicionar required quando visível
+        const mensalidadeInput = document.getElementById('mensalidade_' + tipoCurso);
+        if (mensalidadeInput) {
+            mensalidadeInput.required = true;
+        }
     } else {
         container.style.display = 'none';
-        // Limpar valores quando desmarcar
+        // Limpar valores e remover required quando desmarcar
         const professorSelect = document.getElementById('professor_' + tipoCurso);
         const mensalidadeInput = document.getElementById('mensalidade_' + tipoCurso);
         if (professorSelect) professorSelect.value = '';
-        if (mensalidadeInput) mensalidadeInput.value = '';
+        if (mensalidadeInput) {
+            mensalidadeInput.value = '';
+            mensalidadeInput.required = false;
+        }
     }
 }
 
@@ -492,21 +502,100 @@ function carregarHorariosProfessorEdit(tipoCurso, professorId) {
 document.addEventListener('DOMContentLoaded', function() {
     toggleDataNascimento();
     
+    // Inicializar estado required dos campos de mensalidade baseado na visibilidade
+    const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
+    tiposCursos.forEach(tipoCurso => {
+        const checkbox = document.getElementById(tipoCurso);
+        const container = document.getElementById('professor_' + tipoCurso + '_container');
+        const mensalidadeInput = document.getElementById('mensalidade_' + tipoCurso);
+        const professorSelect = document.getElementById(`professor_${tipoCurso}`);
+        
+        // Verificar se há professor selecionado ou se o container está visível (indica que há matrícula)
+        let temDados = false;
+        if (container && container.style.display !== 'none') {
+            temDados = true;
+            // Garantir que o checkbox está marcado se o container está visível
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+            }
+        } else if (professorSelect) {
+            // Verificar se há professor selecionado no HTML
+            const selectedOption = professorSelect.querySelector('option[selected]');
+            if (selectedOption && selectedOption.value) {
+                temDados = true;
+                // Mostrar container e marcar checkbox
+                if (container) {
+                    container.style.display = 'block';
+                }
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            }
+        }
+        
+        // Se o container está oculto, remover required
+        if (container && mensalidadeInput) {
+            if (container.style.display === 'none' || (!checkbox || !checkbox.checked)) {
+                mensalidadeInput.required = false;
+            } else {
+                mensalidadeInput.required = true;
+            }
+        }
+    });
+    
     // Carregar horários para professores já selecionados
-    const tiposCursos = ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical'];
     tiposCursos.forEach(tipoCurso => {
         const professorSelect = document.getElementById(`professor_${tipoCurso}`);
         const diaSelect = document.getElementById(`dia_semana_${tipoCurso}`);
         const horarioSelect = document.getElementById(`horario_${tipoCurso}`);
         
-        // Se há um professor selecionado e valores existentes de dia/horário, carregar os horários
-        if (professorSelect && professorSelect.value) {
-            const diaAtual = diaSelect ? diaSelect.value : '';
-            const horarioAtual = horarioSelect ? horarioSelect.value : '';
+        // Verificar se há professor selecionado (no value ou no HTML)
+        let professorId = null;
+        if (professorSelect) {
+            professorId = professorSelect.value;
+            // Se não há value, verificar se há uma opção selected no HTML
+            if (!professorId) {
+                const selectedOption = professorSelect.querySelector('option[selected]');
+                if (selectedOption) {
+                    professorId = selectedOption.value;
+                }
+            }
+        }
+        
+        // Verificar valores de dia e horário (no value ou no HTML)
+        let diaAtual = '';
+        let horarioAtual = '';
+        
+        if (diaSelect) {
+            diaAtual = diaSelect.value;
+            if (!diaAtual) {
+                const selectedOption = diaSelect.querySelector('option[selected]');
+                if (selectedOption) {
+                    diaAtual = selectedOption.value;
+                }
+            }
+        }
+        
+        if (horarioSelect) {
+            horarioAtual = horarioSelect.value;
+            if (!horarioAtual) {
+                const selectedOption = horarioSelect.querySelector('option[selected]');
+                if (selectedOption) {
+                    horarioAtual = selectedOption.value;
+                }
+            }
+        }
+        
+        // Se há um professor selecionado, carregar os horários
+        if (professorId) {
+            // Definir o valor do professor no select se ainda não estiver definido
+            if (professorSelect && !professorSelect.value && professorId) {
+                professorSelect.value = professorId;
+            }
             
             // Aguardar um pouco para garantir que os elementos estejam prontos
             setTimeout(() => {
-                carregarHorariosProfessorEdit(tipoCurso, professorSelect.value);
+                carregarHorariosProfessorEdit(tipoCurso, professorId);
                 
                 // Após carregar, restaurar os valores se existirem
                 if (diaAtual && diaSelect) {
@@ -520,11 +609,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (horarioAtual && horarioSelect) {
                             setTimeout(() => {
                                 horarioSelect.value = horarioAtual;
-                            }, 200);
+                            }, 600);
                         }
-                    }, 300);
+                    }, 500);
+                } else if (horarioAtual && horarioSelect) {
+                    // Se não há dia mas há horário, tentar restaurar o horário após um tempo maior
+                    setTimeout(() => {
+                        horarioSelect.value = horarioAtual;
+                    }, 800);
                 }
-            }, 100);
+            }, 300);
         }
     });
 });

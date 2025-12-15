@@ -48,6 +48,26 @@ MOTIVOS_EXCLUSAO = [
     'Outro motivo'
 ]
 
+def normalizar_texto(texto):
+    """
+    Normaliza texto: primeira letra de cada palavra maiúscula, resto minúscula.
+    Retorna string vazia se o texto for None ou vazio.
+    """
+    if not texto or not texto.strip():
+        return texto.strip() if texto else ''
+    
+    # Dividir em palavras, normalizar cada uma e juntar novamente
+    palavras = texto.strip().split()
+    palavras_normalizadas = []
+    
+    for palavra in palavras:
+        if palavra:
+            # Primeira letra maiúscula, resto minúscula
+            palavra_normalizada = palavra[0].upper() + palavra[1:].lower() if len(palavra) > 1 else palavra.upper()
+            palavras_normalizadas.append(palavra_normalizada)
+    
+    return ' '.join(palavras_normalizadas)
+
 def validar_telefone(telefone):
     """Valida o formato do telefone internacional (+DDI DDD Número)"""
     if not telefone:
@@ -143,34 +163,56 @@ def criar_admin_inicial():
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Página de login"""
-    if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
+    try:
+        if current_user.is_authenticated:
+            return redirect(url_for('main.index'))
         
-        if not username or not password:
-            flash('Por favor, preencha todos os campos.', 'error')
-            return render_template('login.html')
-        
-        # Buscar usuário por username ou email
-        usuario = Usuario.query.filter(
-            (Usuario.username == username) | (Usuario.email == username)
-        ).first()
-        
-        if usuario and usuario.check_password(password) and usuario.ativo:
-            login_user(usuario)
-            usuario.ultimo_acesso = datetime.now()
-            db.session.commit()
+        if request.method == 'POST':
+            username = request.form.get('username', '').strip()
+            password = request.form.get('password', '')
             
-            flash(f'Bem-vindo, {usuario.username}!', 'success')
-            next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('main.index'))
-        else:
-            flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
-    
-    return render_template('login.html')
+            if not username or not password:
+                flash('Por favor, preencha todos os campos.', 'error')
+                return render_template('login.html')
+            
+            # Buscar usuário por username ou email
+            usuario = Usuario.query.filter(
+                (Usuario.username == username) | (Usuario.email == username)
+            ).first()
+            
+            if usuario and usuario.check_password(password) and usuario.ativo:
+                login_user(usuario)
+                try:
+                    usuario.ultimo_acesso = datetime.now()
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    import traceback
+                    print(f"Erro ao atualizar ultimo_acesso: {traceback.format_exc()}")
+                    # Continuar mesmo se houver erro ao atualizar ultimo_acesso
+                
+                flash(f'Bem-vindo, {usuario.username}!', 'success')
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                else:
+                    try:
+                        return redirect(url_for('main.index'))
+                    except Exception as e:
+                        import traceback
+                        print(f"Erro ao redirecionar após login: {traceback.format_exc()}")
+                        flash(f'Login realizado com sucesso, mas houve um erro ao redirecionar: {str(e)}', 'warning')
+                        return render_template('login.html')
+            else:
+                flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
+        
+        return render_template('login.html')
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Erro na rota de login: {error_details}")
+        flash(f'Erro interno ao processar login: {str(e)}', 'error')
+        return render_template('login.html')
 
 @bp.route('/logout')
 @login_required
@@ -261,7 +303,7 @@ def cadastro_professores():
             # Processar cada professor do formulário
             for i, professor_data in enumerate(professores_data):
                 # Obter dados do professor
-                nome = request.form.get(f'nome_{i}', '').strip()
+                nome = normalizar_texto(request.form.get(f'nome_{i}', '').strip())
                 telefone = request.form.get(f'telefone_{i}', '').strip()
                 
                 # Coletar horários do professor (múltiplos horários possíveis)
@@ -658,9 +700,9 @@ def cadastro_alunos():
         
         try:
             for i in sorted(indices):
-                nome = request.form.get(f'nome_{i}', '').strip()
+                nome = normalizar_texto(request.form.get(f'nome_{i}', '').strip())
                 telefone = request.form.get(f'telefone_{i}', '').strip()
-                nome_responsavel = request.form.get(f'nome_responsavel_{i}', '').strip()
+                nome_responsavel = normalizar_texto(request.form.get(f'nome_responsavel_{i}', '').strip())
                 telefone_responsavel = request.form.get(f'telefone_responsavel_{i}', '').strip()
                 data_nascimento_str = request.form.get(f'data_nascimento_{i}', '').strip()
                 idade_str = request.form.get(f'idade_{i}', '').strip()
@@ -668,11 +710,11 @@ def cadastro_alunos():
                 lembrar_aniversario = lembrar_aniversario_str == 'sim'
                 
                 # Endereço - apenas cidade e estado (obrigatórios)
-                cidade = request.form.get(f'cidade_{i}', '').strip()
+                cidade = normalizar_texto(request.form.get(f'cidade_{i}', '').strip())
                 estado = request.form.get(f'estado_{i}', '').strip().upper()
                 
                 # Forma de pagamento e data de vencimento
-                forma_pagamento = request.form.get(f'forma_pagamento_{i}', '').strip()
+                forma_pagamento = normalizar_texto(request.form.get(f'forma_pagamento_{i}', '').strip())
                 data_vencimento_str = request.form.get(f'data_vencimento_{i}', '').strip()
                 data_inicio_str = request.form.get(f'data_inicio_{i}', '').strip()
                 
@@ -770,7 +812,11 @@ def cadastro_alunos():
                     diff_dias = (data_vencimento - hoje).days
                     
                     if diff_dias > 35:
-                        erros.append(f'Aluno {i+1} ({nome}): A data de vencimento não pode ser mais de 35 dias após hoje (seria {diff_dias} dias).')
+                        # Calcular data limite (hoje + 35 dias)
+                        from datetime import timedelta
+                        data_limite = hoje + timedelta(days=35)
+                        data_limite_str = data_limite.strftime('%d/%m/%Y')
+                        erros.append(f'Aluno {i+1} ({nome}): Data Limite: {data_limite_str}')
                         continue
                 except ValueError:
                     erros.append(f'Aluno {i+1} ({nome}): Data de vencimento inválida.')
@@ -873,6 +919,9 @@ def cadastro_alunos():
                             erros.append(f'Aluno {i+1} ({nome}): Professor inválido para o curso "{nome_curso}".')
                             continue
                 
+                # Verificar se é aluno experimental
+                experimental = request.form.get(f'experimental_{i}') == 'on'
+                
                 # Criar aluno (sempre ativo por padrão)
                 # Se não for admin, marcar como pendente de aprovação
                 aprovado = current_user.is_admin() if current_user.is_authenticated else False
@@ -896,6 +945,7 @@ def cadastro_alunos():
                     locucao=request.form.get(f'locucao_{i}') == 'on',
                     teatro_tv_cinema=request.form.get(f'teatro_tv_cinema_{i}') == 'on',
                     musical=request.form.get(f'musical_{i}') == 'on',
+                    experimental=experimental,
                     ativo=True,
                     aprovado=aprovado
                 )
@@ -969,8 +1019,23 @@ def listar_alunos():
             alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=False).order_by(Aluno.data_exclusao.desc(), Aluno.nome).all()
         elif filtro == 'pendentes':
             alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=True, aprovado=False).order_by(Aluno.data_cadastro).all()
+        elif filtro == 'experimentais':
+            # Filtrar apenas alunos experimentais (experimental=True) que estão ativos
+            try:
+                alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=True, experimental=True).order_by(Aluno.nome).all()
+                print(f"DEBUG: Filtro 'experimentais' - {len(alunos)} alunos encontrados")
+            except Exception as e:
+                # Se a coluna experimental não existir ainda, retornar lista vazia
+                import traceback
+                print(f"Erro ao filtrar alunos experimentais: {traceback.format_exc()}")
+                alunos = []
         else:
-            alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=True, aprovado=True).order_by(Aluno.nome).all()
+            # Alunos ativos e aprovados que NÃO são experimentais
+            try:
+                alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=True, aprovado=True, experimental=False).order_by(Aluno.nome).all()
+            except Exception as e:
+                # Se a coluna experimental não existir ainda, usar filtro antigo
+                alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).filter_by(ativo=True, aprovado=True).order_by(Aluno.nome).all()
     elif current_user.is_professor():
         # Professor vê apenas seus próprios alunos (através de Matricula)
         professor = current_user.get_professor()
@@ -1037,6 +1102,29 @@ def excluir_aluno(aluno_id):
     
     return redirect(url_for('main.listar_alunos'))
 
+@bp.route('/alunos/<int:aluno_id>/efetivar', methods=['POST'])
+@admin_required
+def efetivar_aluno(aluno_id):
+    """Efetivar aluno experimental (converter para aluno regular)"""
+    aluno = Aluno.query.get_or_404(aluno_id)
+    
+    if not aluno.experimental:
+        flash('Este aluno já não é mais experimental.', 'info')
+        return redirect(url_for('main.listar_alunos', filtro='experimentais'))
+    
+    # Converter aluno experimental em aluno regular
+    aluno.experimental = False
+    aluno.aprovado = True  # Alunos efetivados são automaticamente aprovados
+    
+    try:
+        db.session.commit()
+        flash(f'Aluno {aluno.nome} efetivado com sucesso! Ele agora é um aluno regular.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao efetivar aluno: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_alunos', filtro='experimentais'))
+
 @bp.route('/alunos/<int:aluno_id>/reativar', methods=['POST'])
 @admin_required
 def reativar_aluno(aluno_id):
@@ -1070,8 +1158,11 @@ def editar_aluno(aluno_id):
     for m in aluno.matriculas:
         print(f"DEBUG: Matrícula - Curso: {m.tipo_curso}, Professor: {m.professor_id}, Dia: {m.dia_semana}, Horário: {m.horario_aula}, Data Início: {m.data_inicio}")
     
-    # Só pode editar alunos pendentes
-    if aluno.aprovado:
+    # Verificar se é para efetivar (aluno experimental)
+    efetivar = request.args.get('efetivar', '0') == '1'
+    
+    # Permitir editar alunos pendentes ou experimentais
+    if aluno.aprovado and not aluno.experimental:
         flash('Este aluno já foi aprovado. Use a edição normal para modificá-lo.', 'error')
         return redirect(url_for('main.listar_alunos'))
     
@@ -1079,11 +1170,11 @@ def editar_aluno(aluno_id):
         # Processar edição (similar ao cadastro, mas atualizando o aluno existente)
         # Por enquanto, vou criar uma versão simplificada que permite editar os campos principais
         try:
-            nome = request.form.get('nome', '').strip()
+            nome = normalizar_texto(request.form.get('nome', '').strip())
             telefone = request.form.get('telefone', '').strip()
-            cidade = request.form.get('cidade', '').strip()
+            cidade = normalizar_texto(request.form.get('cidade', '').strip())
             estado = request.form.get('estado', '').strip().upper()
-            forma_pagamento = request.form.get('forma_pagamento', '').strip()
+            forma_pagamento = normalizar_texto(request.form.get('forma_pagamento', '').strip())
             data_vencimento_str = request.form.get('data_vencimento', '').strip()
             data_inicio_str = request.form.get('data_inicio', '').strip()
             
@@ -1220,9 +1311,19 @@ def editar_aluno(aluno_id):
                         return render_template('editar_aluno_pendente.html', aluno=aluno, professores=professores)
             
             try:
+                # Se foi solicitado efetivar (aluno experimental), efetivar agora
+                efetivar_param = request.form.get('efetivar', '0') == '1'
+                if efetivar_param and aluno.experimental:
+                    aluno.experimental = False
+                    aluno.aprovado = True
+                    flash(f'Aluno {aluno.nome} atualizado e efetivado com sucesso! Ele agora é um aluno regular.', 'success')
+                    filtro_redirect = 'experimentais'
+                else:
+                    flash(f'Aluno {aluno.nome} atualizado com sucesso!', 'success')
+                    filtro_redirect = 'pendentes' if not aluno.aprovado else 'ativos'
+                
                 db.session.commit()
-                flash(f'Aluno {aluno.nome} atualizado com sucesso!', 'success')
-                return redirect(url_for('main.listar_alunos', filtro='pendentes'))
+                return redirect(url_for('main.listar_alunos', filtro=filtro_redirect))
             except Exception as e:
                 db.session.rollback()
                 flash(f'Erro ao salvar alterações: {str(e)}', 'error')
@@ -1235,7 +1336,7 @@ def editar_aluno(aluno_id):
             print(f"Erro ao atualizar aluno: {error_details}")
             flash(f'Erro ao atualizar aluno: {str(e)}', 'error')
             professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
-            return render_template('editar_aluno_pendente.html', aluno=aluno, professores=professores)
+            return render_template('editar_aluno_pendente.html', aluno=aluno, professores=professores, efetivar=efetivar)
     
     # GET - mostrar formulário de edição
     # O aluno já foi carregado com eager loading no início da função
@@ -1249,9 +1350,10 @@ def editar_aluno(aluno_id):
     for m in aluno.matriculas:
         print(f"DEBUG: Matrícula - Curso: {m.tipo_curso}, Professor: {m.professor_id}, Dia: {m.dia_semana}, Horário: {m.horario_aula}, Data Início: {m.data_inicio}")
     
+    # Passar flag de efetivar para o template
     try:
         professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
-        return render_template('editar_aluno_pendente.html', aluno=aluno, professores=professores)
+        return render_template('editar_aluno_pendente.html', aluno=aluno, professores=professores, efetivar=efetivar)
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -1638,4 +1740,5 @@ def excluir_nota(nota_id):
         flash(f'Erro ao excluir nota: {str(e)}', 'error')
     
     return redirect(url_for('main.listar_notas'))
+
 

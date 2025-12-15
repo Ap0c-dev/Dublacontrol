@@ -159,7 +159,7 @@
                 <option value="">Todos</option>
                 {% for aluno in alunos %}
                 <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
-                    {{ aluno.nome }}
+                    {{ aluno.nome|format_name }}
                 </option>
                 {% endfor %}
             </select>
@@ -173,7 +173,7 @@
                 <option value="">Todos</option>
                 {% for professor in professores %}
                 <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
-                    {{ professor.nome }}
+                    {{ professor.nome|format_name }}
                 </option>
                 {% endfor %}
             </select>
@@ -186,7 +186,6 @@
                 <option value="">Todos</option>
                 <option value="dublagem_online" {% if tipo_curso == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
                 <option value="dublagem_presencial" {% if tipo_curso == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
-                <option value="teatro_online" {% if tipo_curso == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
                 <option value="teatro_presencial" {% if tipo_curso == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
                 <option value="locucao" {% if tipo_curso == 'locucao' %}selected{% endif %}>Locução</option>
                 <option value="teatro_tv_cinema" {% if tipo_curso == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV Cinema</option>
@@ -221,13 +220,12 @@
         <tbody>
             {% for nota in notas %}
             <tr>
-                <td>{{ nota.aluno.nome if nota.aluno else 'N/A' }}</td>
-                <td>{{ nota.professor.nome if nota.professor else 'N/A' }}</td>
+                <td>{% if nota.aluno %}{{ nota.aluno.nome|format_name }}{% else %}N/A{% endif %}</td>
+                <td>{% if nota.professor %}{{ nota.professor.nome|format_name }}{% else %}N/A{% endif %}</td>
                 <td>
                     {% set tipos_cursos_dict = {
                         'dublagem_online': 'Dublagem Online',
                         'dublagem_presencial': 'Dublagem Presencial',
-                        'teatro_online': 'Teatro Online',
                         'teatro_presencial': 'Teatro Presencial',
                         'locucao': 'Locução',
                         'teatro_tv_cinema': 'Teatro TV Cinema',

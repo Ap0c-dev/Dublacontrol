@@ -9,7 +9,7 @@ class Matricula(db.Model):
     professor_id = db.Column(db.Integer, db.ForeignKey('professores.id'), nullable=False)
     
     # Tipo de curso
-    tipo_curso = db.Column(db.String(50), nullable=False)  # dublagem_online, dublagem_presencial, teatro_online, teatro_presencial, locucao, teatro_tv_cinema, musical
+    tipo_curso = db.Column(db.String(50), nullable=False)  # dublagem_online, dublagem_presencial, teatro_presencial, locucao, teatro_tv_cinema, musical
     
     # Valor da mensalidade para esta modalidade
     valor_mensalidade = db.Column(db.Float, nullable=True)  # Permite valores decimais (ex: 150.50)

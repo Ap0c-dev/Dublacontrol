@@ -173,7 +173,7 @@
             {% for professor in professores %}
             <tr>
                 <td data-label="ID">{{ professor.id }}</td>
-                <td data-label="Nome"><strong>{{ professor.nome }}</strong></td>
+                <td data-label="Nome"><strong>{{ professor.nome|format_name }}</strong></td>
                 <td data-label="Telefone">{{ professor.telefone or '-' }}</td>
                 <td data-label="Dia da Semana">{{ professor.dia_semana or '-' }}</td>
                 <td data-label="Horário">{{ professor.horario_aula or '-' }}</td>
@@ -187,9 +187,6 @@
                     {% if professor.teatro_presencial %}
                         <span class="badge badge-info">Teatro Presencial</span>
                     {% endif %}
-                    {% if professor.teatro_online %}
-                        <span class="badge badge-info">Teatro Online</span>
-                    {% endif %}
                     {% if professor.musical %}
                         <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
                     {% endif %}
@@ -199,7 +196,7 @@
                     {% if professor.curso_apresentador %}
                         <span class="badge" style="background: #6c757d; color: white;">Curso de Apresentador</span>
                     {% endif %}
-                    {% if not professor.dublagem_presencial and not professor.dublagem_online and not professor.teatro_presencial and not professor.teatro_online and not professor.musical and not professor.locucao and not professor.curso_apresentador %}
+                    {% if not professor.dublagem_presencial and not professor.dublagem_online and not professor.teatro_presencial and not professor.musical and not professor.locucao and not professor.curso_apresentador %}
                         <span>-</span>
                     {% endif %}
                 </td>

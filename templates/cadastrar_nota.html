@@ -102,7 +102,7 @@
                 <option value="">Selecione um aluno</option>
                 {% for aluno in alunos %}
                 <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
-                    {{ aluno.nome }}
+                    {{ aluno.nome|format_name }}
                 </option>
                 {% endfor %}
             </select>
@@ -115,12 +115,12 @@
                     <option value="">Selecione um professor</option>
                     {% for professor in professores %}
                     <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
-                        {{ professor.nome }}
+                        {{ professor.nome|format_name }}
                     </option>
                     {% endfor %}
                 {% else %}
                     {% for professor in professores %}
-                    <option value="{{ professor.id }}" selected>{{ professor.nome }}</option>
+                    <option value="{{ professor.id }}" selected>{{ professor.nome|format_name }}</option>
                     {% endfor %}
                 {% endif %}
             </select>

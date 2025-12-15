@@ -46,6 +46,9 @@ class Aluno(db.Model):
     # Aprovação de cadastro
     aprovado = db.Column(db.Boolean, default=True, nullable=False)  # True = aprovado, False = pendente
     
+    # Aluno experimental (aula experimental)
+    experimental = db.Column(db.Boolean, default=False, nullable=False)  # True = experimental, False = efetivado
+    
     def get_professores_por_curso(self):
         """Retorna um dicionário com professores por tipo de curso"""
         from app.models.matricula import Matricula

@@ -110,7 +110,7 @@
                 {% for professor in professores %}
                 <option value="{{ professor.id }}" 
                         {% if professor_id_pre_selecionado == professor.id|string %}selected{% endif %}>
-                    {{ professor.nome }} - {{ professor.telefone }}
+                    {{ professor.nome|format_name }} - {{ professor.telefone }}
                 </option>
                 {% endfor %}
             </select>

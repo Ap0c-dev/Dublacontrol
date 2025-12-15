@@ -363,10 +363,10 @@
                     </div>
                     <div class="checkbox-item">
                         <input type="checkbox" 
-                               id="teatro_online_${professorCount}" 
-                               name="teatro_online_${professorCount}"
+                               id="teatro_tv_cinema_${professorCount}" 
+                               name="teatro_tv_cinema_${professorCount}"
                                onchange="validarCheckboxes(${professorCount})">
-                        <label for="teatro_online_${professorCount}">Teatro Online</label>
+                        <label for="teatro_tv_cinema_${professorCount}">Teatro TV e Cinema</label>
                     </div>
                     <div class="checkbox-item">
                         <input type="checkbox" 
@@ -426,7 +426,7 @@
             `dublagem_presencial_${professorId}`,
             `dublagem_online_${professorId}`,
             `teatro_presencial_${professorId}`,
-            `teatro_online_${professorId}`,
+            `teatro_tv_cinema_${professorId}`,
             `musical_${professorId}`,
             `locucao_${professorId}`,
             `curso_apresentador_${professorId}`
@@ -495,6 +495,26 @@
                        max="23:59"
                        required
                        onchange="validarHorario(${professorIndex}, ${horarioIndex})"
+                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div style="flex: 0.8;">
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Mínima:</label>
+                <input type="number" 
+                       name="horario_idade_minima_${professorIndex}_${horarioIndex}" 
+                       id="horario_idade_minima_${professorIndex}_${horarioIndex}"
+                       min="0"
+                       max="100"
+                       placeholder="Ex: 8"
+                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div style="flex: 0.8;">
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Máxima:</label>
+                <input type="number" 
+                       name="horario_idade_maxima_${professorIndex}_${horarioIndex}" 
+                       id="horario_idade_maxima_${professorIndex}_${horarioIndex}"
+                       min="0"
+                       max="100"
+                       placeholder="Ex: 15"
                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
             </div>
             <button type="button" 

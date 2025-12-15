@@ -97,10 +97,110 @@
         background: #667eea;
         color: white;
         font-weight: bold;
+        position: relative;
+    }
+    
+    .alunos-table th.pinned {
+        position: sticky;
+        z-index: 10;
+        background: #667eea !important;
+    }
+    
+    .alunos-table th.pinned-left {
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .alunos-table td.pinned {
+        position: sticky;
+        z-index: 5;
+        background: white;
+    }
+    
+    .alunos-table td.pinned-left {
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .alunos-table tr:hover td.pinned {
+        background: #f8f9fa !important;
+    }
+    
+    .alunos-table thead th.pinned {
+        z-index: 15;
     }
     
     .alunos-table tr:hover {
         background: #f8f9fa;
+    }
+    
+    .filter-header {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .filter-input {
+        width: 100%;
+        padding: 4px 6px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        font-size: 0.85em;
+        background: white;
+        color: #333;
+    }
+    
+    .filter-input::placeholder {
+        color: #999;
+    }
+    
+    .filter-input:focus {
+        outline: none;
+        background: white;
+        border-color: #667eea;
+    }
+    
+    .pin-button {
+        font-size: 0.75em;
+        padding: 2px 4px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+    
+    .pin-button:hover {
+        opacity: 1;
+    }
+    
+    .filter-icon {
+        font-size: 0.75em;
+        opacity: 0.6;
+        margin-right: 3px;
+    }
+    
+    .filter-header-title {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75em;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+    
+    .pin-button:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .pin-button.pinned {
+        background: rgba(255, 255, 255, 0.4);
+        opacity: 1;
     }
     
     .badge {
@@ -408,43 +508,536 @@
     <a href="{{ url_for('main.listar_alunos', filtro='pendentes') }}" class="tab {% if filtro == 'pendentes' %}active{% endif %}">
         Pendentes de Aprovação
     </a>
+    <a href="{{ url_for('main.listar_alunos', filtro='experimentais') }}" class="tab {% if filtro == 'experimentais' %}active{% endif %}">
+        Experimentais
+    </a>
     {% endif %}
     <a href="{{ url_for('main.listar_alunos', filtro='inativos') }}" class="tab {% if filtro == 'inativos' %}active{% endif %}">
         Alunos Inativos
     </a>
+    <a href="{{ url_for('main.listar_alunos', filtro='notas') }}" class="tab {% if filtro == 'notas' %}active{% endif %}">
+        Notas
+    </a>
 </div>
 
-{% if alunos %}
+{% if filtro == 'notas' %}
+    <div class="filters" style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+        <form method="GET" action="{{ url_for('main.listar_alunos') }}" id="formFiltroNotas">
+            <input type="hidden" name="filtro" value="notas">
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label for="professor_id" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
+                        Professor <span style="color: #dc3545;">*</span>
+                    </label>
+                    <select name="professor_id" id="professor_id" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" onchange="carregarCursosProfessor()">
+                        <option value="">Selecione um professor</option>
+                        {% for prof in professores %}
+                        <option value="{{ prof.id }}" {% if professor_id == prof.id %}selected{% endif %}>
+                            {{ prof.nome|format_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="flex: 1; min-width: 200px;">
+                    <label for="tipo_curso" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
+                        Curso <span style="color: #dc3545;">*</span>
+                    </label>
+                    <select name="tipo_curso" id="tipo_curso" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" disabled>
+                        <option value="">Primeiro selecione um professor</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <button type="submit" style="padding: 8px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em;">
+                        Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+    function carregarCursosProfessor() {
+        const professorId = document.getElementById('professor_id').value;
+        const cursoSelect = document.getElementById('tipo_curso');
+        
+        // Limpar e desabilitar o select de cursos
+        cursoSelect.innerHTML = '<option value="">Carregando...</option>';
+        cursoSelect.disabled = true;
+        
+        if (!professorId) {
+            cursoSelect.innerHTML = '<option value="">Primeiro selecione um professor</option>';
+            return;
+        }
+        
+        // Buscar cursos do professor via API
+        fetch(`/api/professor/${professorId}/cursos`)
+            .then(response => response.json())
+            .then(cursos => {
+                cursoSelect.innerHTML = '<option value="">Selecione um curso</option>';
+                
+                if (cursos.length === 0) {
+                    cursoSelect.innerHTML = '<option value="">Este professor não leciona nenhum curso</option>';
+                    return;
+                }
+                
+                // Preencher com os cursos do professor
+                cursos.forEach(curso => {
+                    const option = document.createElement('option');
+                    option.value = curso.key;
+                    option.textContent = curso.nome;
+                    {% if tipo_curso %}
+                    if (curso.key === '{{ tipo_curso }}') {
+                        option.selected = true;
+                    }
+                    {% endif %}
+                    cursoSelect.appendChild(option);
+                });
+                
+                cursoSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erro ao carregar cursos:', error);
+                cursoSelect.innerHTML = '<option value="">Erro ao carregar cursos</option>';
+            });
+    }
+    
+    // Carregar cursos se já houver um professor selecionado
+    {% if professor_id %}
+    document.addEventListener('DOMContentLoaded', function() {
+        carregarCursosProfessor();
+    });
+    {% endif %}
+    </script>
+    
+    {% if professor_id and tipo_curso %}
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+                <form method="GET" action="{{ url_for('main.listar_alunos') }}" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="hidden" name="filtro" value="notas">
+                    <input type="hidden" name="professor_id" value="{{ professor_id }}">
+                    <input type="hidden" name="tipo_curso" value="{{ tipo_curso }}">
+                    <label for="numero_prova" style="font-weight: bold; color: #333;">
+                        Prova:
+                    </label>
+                    <select name="numero_prova" id="numero_prova" 
+                            style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;"
+                            onchange="this.form.submit()">
+                        {% for i in range(1, 9) %}
+                        <option value="{{ i }}" {% if numero_prova == i %}selected{% endif %}>
+                            Prova {{ i }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+                <button type="button" 
+                        onclick="criarNovaProva()" 
+                        style="padding: 8px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;">
+                    + Nova Prova
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="data_prova" style="font-weight: bold; color: #333;">
+                    Data da Prova:
+                </label>
+                <input type="date" 
+                       id="data_prova" 
+                       name="data_prova"
+                       value="{% if data_prova %}{{ data_prova.strftime('%Y-%m-%d') }}{% else %}{{ data_hoje.strftime('%Y-%m-%d') }}{% endif %}"
+                       style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;"
+                       onchange="atualizarDataProva(this.value)">
+                <small style="color: #6c757d; font-size: 0.9em;">
+                    {% if data_prova %}
+                        (Data já cadastrada: {{ data_prova.strftime('%d/%m/%Y') }})
+                    {% else %}
+                        (Data será salva ao enviar as notas)
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+        
+        {% if alunos %}
+        <form method="POST" action="{{ url_for('main.salvar_criterios_notas') }}" id="formNotas" onsubmit="return validarNotas()">
+            <input type="hidden" name="professor_id" value="{{ professor_id }}">
+            <input type="hidden" name="tipo_curso" value="{{ tipo_curso }}">
+            <input type="hidden" name="numero_prova" value="{{ numero_prova }}">
+            <input type="hidden" name="data_avaliacao" id="data_avaliacao_hidden" value="{% if data_prova %}{{ data_prova.strftime('%Y-%m-%d') }}{% else %}{{ data_hoje.strftime('%Y-%m-%d') if data_hoje else '' }}{% endif %}">
+            
+            <div class="table-container">
+                <table class="alunos-table" style="min-width: 1200px; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 20%;">
+                        <col style="width: 15%;">
+                        <col style="width: 15%;">
+                        <col style="width: 18%;">
+                        <col style="width: 12%;">
+                        <col style="width: 10%;">
+                        <col style="width: 10%;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th style="padding: 10px 20px 10px 10px; text-align: left;">Aluno</th>
+                            <th style="padding: 10px; text-align: right; font-size: 0.9em;">Interpretação Vocal e Dramaturgia</th>
+                            <th style="padding: 10px; text-align: right; font-size: 0.9em;">Técnica de Dublagem</th>
+                            <th style="padding: 10px; text-align: right; font-size: 0.9em; white-space: normal; line-height: 1.3;">Aspectos Físicos e<br>Naturais da Performance</th>
+                            <th style="padding: 10px; text-align: right; font-size: 0.9em;">Qualidade do Audio</th>
+                            <th style="padding: 10px; text-align: center;">Média</th>
+                            <th style="padding: 10px; text-align: center;">Média Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for aluno in alunos %}
+                        {% set notas_aluno = notas_dict.get(aluno.id, {}) %}
+                        {% set nota_atual = notas_aluno.get(numero_prova) if notas_aluno else None %}
+                        
+                        {# Calcular média total de todas as provas do aluno (apenas provas salvas) #}
+                        {% set medias_provas = [] %}
+                        {% for num_prova, nota in notas_aluno.items() %}
+                            {% set media_prova = nota.calcular_media() %}
+                            {% if media_prova is not none %}
+                                {% set _ = medias_provas.append(media_prova) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set media_total = (medias_provas|sum / medias_provas|length) if medias_provas|length > 0 else None %}
+                        
+                        {# Contar quantas linhas o aluno terá (provas anteriores + prova atual) #}
+                        {% set num_linhas = 1 %}
+                        {% for num_prova in range(1, numero_prova) %}
+                            {% if notas_aluno.get(num_prova) %}
+                                {% set num_linhas = num_linhas + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {# Calcular médias das provas anteriores para JavaScript #}
+                        {% set medias_anteriores = [] %}
+                        {% for num_prova in range(1, numero_prova) %}
+                            {% if notas_aluno.get(num_prova) %}
+                                {% set nota_ant = notas_aluno.get(num_prova) %}
+                                {% set media_ant = nota_ant.calcular_media() %}
+                                {% if media_ant is not none %}
+                                    {% set _ = medias_anteriores.append(media_ant) %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {# Primeira linha: Nome do aluno (com borda azul no topo) #}
+                        <tr style="background-color: #e3f2fd; border-top: 2px solid #667eea;">
+                            <td colspan="6" style="font-weight: bold; font-size: 1.1em; padding: 10px 20px 10px 10px;">
+                                {{ aluno.nome|format_name }}
+                            </td>
+                            <td rowspan="{{ num_linhas }}" 
+                                id="media_total_{{ aluno.id }}"
+                                style="vertical-align: middle; text-align: center; font-weight: bold; font-size: 1.3em; width: 100px;"
+                                data-medias-anteriores="{{ medias_anteriores|join(',') }}">
+                                {% if media_total is not none %}
+                                    <span style="color: {% if media_total >= 6 %}#28a745{% else %}#dc3545{% endif %};">
+                                        {{ "%.1f"|format(media_total) }}
+                                    </span>
+                                {% else %}
+                                    <span style="color: #6c757d;">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        
+                        {# Mostrar notas das provas anteriores (ordenadas) #}
+                        {% for num_prova in range(1, numero_prova) %}
+                            {% if notas_aluno.get(num_prova) %}
+                                {% set nota = notas_aluno.get(num_prova) %}
+                            <tr style="background-color: #f8f9fa;">
+                                <td style="padding: 8px 20px 8px 20px; color: #6c757d; font-size: 0.9em;">
+                                    <em>Prova {{ num_prova }}</em>
+                                </td>
+                                <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
+                                    {% if nota.criterio1 is not none %}{{ "%.1f"|format(nota.criterio1) }}{% else %}-{% endif %}
+                                </td>
+                                <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
+                                    {% if nota.criterio2 is not none %}{{ "%.1f"|format(nota.criterio2) }}{% else %}-{% endif %}
+                                </td>
+                                <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
+                                    {% if nota.criterio3 is not none %}{{ "%.1f"|format(nota.criterio3) }}{% else %}-{% endif %}
+                                </td>
+                                <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
+                                    {% if nota.criterio4 is not none %}{{ "%.1f"|format(nota.criterio4) }}{% else %}-{% endif %}
+                                </td>
+                                <td style="padding: 8px 10px; color: #6c757d; font-weight: bold; text-align: center;">
+                                    {% set media_antiga = nota.calcular_media() %}
+                                    {% if media_antiga is not none %}
+                                        <span style="color: {% if media_antiga >= 6 %}#28a745{% else %}#dc3545{% endif %};">
+                                            {{ "%.1f"|format(media_antiga) }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {# Linha da prova atual (editável) #}
+                        {% set criterio1_val = '' %}
+                        {% set criterio2_val = '' %}
+                        {% set criterio3_val = '' %}
+                        {% set criterio4_val = '' %}
+                        {% if nota_atual %}
+                            {% if nota_atual.criterio1 is not none %}
+                                {% set criterio1_val = nota_atual.criterio1 %}
+                            {% endif %}
+                            {% if nota_atual.criterio2 is not none %}
+                                {% set criterio2_val = nota_atual.criterio2 %}
+                            {% endif %}
+                            {% if nota_atual.criterio3 is not none %}
+                                {% set criterio3_val = nota_atual.criterio3 %}
+                            {% endif %}
+                            {% if nota_atual.criterio4 is not none %}
+                                {% set criterio4_val = nota_atual.criterio4 %}
+                            {% endif %}
+                        {% endif %}
+                        <tr style="background-color: #fff;">
+                            <td style="padding: 8px 20px 8px 20px; font-weight: bold;">
+                                Prova {{ numero_prova }}
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right;">
+                                <input type="number" 
+                                       name="aluno_{{ aluno.id }}_criterio1" 
+                                       id="criterio1_{{ aluno.id }}"
+                                       min="0" 
+                                       max="10" 
+                                       step="0.1" 
+                                       value="{{ criterio1_val }}"
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
+                                       onblur="validarNotaInput(this)">
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right;">
+                                <input type="number" 
+                                       name="aluno_{{ aluno.id }}_criterio2" 
+                                       id="criterio2_{{ aluno.id }}"
+                                       min="0" 
+                                       max="10" 
+                                       step="0.1" 
+                                       value="{{ criterio2_val }}"
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
+                                       onblur="validarNotaInput(this)">
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right;">
+                                <input type="number" 
+                                       name="aluno_{{ aluno.id }}_criterio3" 
+                                       id="criterio3_{{ aluno.id }}"
+                                       min="0" 
+                                       max="10" 
+                                       step="0.1" 
+                                       value="{{ criterio3_val }}"
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
+                                       onblur="validarNotaInput(this)">
+                            </td>
+                            <td style="padding: 8px 10px; text-align: right;">
+                                <input type="number" 
+                                       name="aluno_{{ aluno.id }}_criterio4" 
+                                       id="criterio4_{{ aluno.id }}"
+                                       min="0" 
+                                       max="10" 
+                                       step="0.1" 
+                                       value="{{ criterio4_val }}"
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
+                                       onblur="validarNotaInput(this)">
+                            </td>
+                            <td style="padding: 8px 10px; text-align: center;">
+                                <span id="media_{{ aluno.id }}" 
+                                      style="font-weight: bold; font-size: 1.2em; color: #6c757d;">
+                                    -
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button type="submit" 
+                        style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; font-weight: bold;">
+                    Salvar Todas as Notas
+                </button>
+            </div>
+        </form>
+        
+        <script>
+        function validarNotaInput(input) {
+            const valor = parseFloat(input.value);
+            
+            if (input.value === '' || isNaN(valor)) {
+                input.style.borderColor = '#ddd';
+                return true; // Campo vazio é permitido
+            }
+            
+            if (valor < 0) {
+                input.value = 0;
+                input.style.borderColor = '#dc3545';
+                alert('A nota não pode ser menor que 0. O valor foi ajustado para 0.');
+                setTimeout(() => { input.style.borderColor = '#ddd'; }, 2000);
+                return false;
+            }
+            
+            if (valor > 10) {
+                input.value = 10;
+                input.style.borderColor = '#dc3545';
+                alert('A nota não pode ser maior que 10. O valor foi ajustado para 10.');
+                setTimeout(() => { input.style.borderColor = '#ddd'; }, 2000);
+                return false;
+            }
+            
+            input.style.borderColor = '#28a745';
+            setTimeout(() => { input.style.borderColor = '#ddd'; }, 1000);
+            return true;
+        }
+        
+        function validarNotas() {
+            const inputs = document.querySelectorAll('input[type="number"][name^="aluno_"][name$="_criterio1"], input[type="number"][name^="aluno_"][name$="_criterio2"], input[type="number"][name^="aluno_"][name$="_criterio3"], input[type="number"][name^="aluno_"][name$="_criterio4"]');
+            let temErro = false;
+            
+            inputs.forEach(input => {
+                const valor = parseFloat(input.value);
+                if (input.value !== '' && !isNaN(valor)) {
+                    if (valor < 0 || valor > 10) {
+                        input.style.borderColor = '#dc3545';
+                        temErro = true;
+                    }
+                }
+            });
+            
+            if (temErro) {
+                alert('Por favor, corrija as notas. Todas as notas devem estar entre 0 e 10.');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        function criarNovaProva() {
+            const selectProva = document.getElementById('numero_prova');
+            const provasExistentes = {% if provas_cadastradas %}[{{ provas_cadastradas|join(',') }}]{% else %}[]{% endif %};
+            
+            // Encontrar a próxima prova disponível (1-8)
+            let proximaProva = null;
+            for (let i = 1; i <= 8; i++) {
+                if (!provasExistentes.includes(i)) {
+                    proximaProva = i;
+                    break;
+                }
+            }
+            
+            if (proximaProva === null) {
+                alert('Todas as 8 provas já foram criadas.');
+                return;
+            }
+            
+            // Selecionar a próxima prova disponível
+            selectProva.value = proximaProva;
+            selectProva.form.submit();
+        }
+        
+        function atualizarDataProva(data) {
+            // Atualizar o campo hidden que será enviado no formulário
+            const dataHidden = document.getElementById('data_avaliacao_hidden');
+            if (dataHidden) {
+                dataHidden.value = data;
+            }
+        }
+        
+        function calcularMedia(alunoId) {
+            const criterio1 = parseFloat(document.getElementById('criterio1_' + alunoId).value) || 0;
+            const criterio2 = parseFloat(document.getElementById('criterio2_' + alunoId).value) || 0;
+            const criterio3 = parseFloat(document.getElementById('criterio3_' + alunoId).value) || 0;
+            const criterio4 = parseFloat(document.getElementById('criterio4_' + alunoId).value) || 0;
+            
+            const criterios = [criterio1, criterio2, criterio3, criterio4].filter(c => c > 0);
+            const media = criterios.length > 0 ? criterios.reduce((a, b) => a + b, 0) / criterios.length : 0;
+            
+            const mediaElement = document.getElementById('media_' + alunoId);
+            mediaElement.textContent = media > 0 ? media.toFixed(1) : '-';
+            mediaElement.style.color = media >= 6 ? '#28a745' : (media > 0 ? '#dc3545' : '#6c757d');
+            
+            return media;
+        }
+        
+        function atualizarMediaTotal(alunoId) {
+            const mediaTotalElement = document.getElementById('media_total_' + alunoId);
+            if (!mediaTotalElement) return;
+            
+            const mediasAnterioresStr = mediaTotalElement.getAttribute('data-medias-anteriores');
+            const mediasAnteriores = mediasAnterioresStr ? mediasAnterioresStr.split(',').map(m => parseFloat(m)).filter(m => !isNaN(m)) : [];
+            
+            const mediaAtual = calcularMedia(alunoId);
+            
+            // Calcular média total: média de todas as provas (anteriores + atual)
+            const todasMedias = [...mediasAnteriores];
+            if (mediaAtual > 0) {
+                todasMedias.push(mediaAtual);
+            }
+            
+            if (todasMedias.length > 0) {
+                const mediaTotal = todasMedias.reduce((a, b) => a + b, 0) / todasMedias.length;
+                const cor = mediaTotal >= 6 ? '#28a745' : '#dc3545';
+                mediaTotalElement.innerHTML = `<span style="color: ${cor}; font-size: 1.3em;">${mediaTotal.toFixed(1)}</span>`;
+            } else {
+                mediaTotalElement.innerHTML = '<span style="color: #6c757d; font-size: 1.3em;">-</span>';
+            }
+        }
+        
+        // Calcular médias iniciais
+        {% for aluno in alunos %}
+        calcularMedia({{ aluno.id }});
+        atualizarMediaTotal({{ aluno.id }});
+        {% endfor %}
+        </script>
+        
+        {% else %}
+        <div class="empty-state">
+            <p>Nenhum aluno matriculado neste curso com este professor.</p>
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="empty-state">
+            <p>Selecione um professor e um curso para visualizar as notas dos alunos.</p>
+        </div>
+    {% endif %}
+{% elif alunos %}
     <div class="table-container">
-    <table class="alunos-table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nome</th>
-                <th>Telefone</th>
-                <th>Responsável</th>
-                <th>Telefone Responsável</th>
-                <th>Idade</th>
-                <th>Cidade/Estado</th>
-                <th>Forma Pagamento</th>
-                <th>Data Vencimento</th>
-                {% if filtro == 'ativos' %}
-                <th>Mensalidade</th>
-                {% endif %}
-                <th>Cursos e Professores</th>
-                <th>Data Cadastro</th>
-                {% if filtro == 'inativos' %}
-                <th>Data Exclusão</th>
-                <th>Motivo Exclusão</th>
-                {% endif %}
-                <th>Ações</th>
-            </tr>
-        </thead>
+        <table class="alunos-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Responsável</th>
+                    <th>Telefone Responsável</th>
+                    <th>Idade</th>
+                    <th>Cidade/Estado</th>
+                    <th>Forma Pagamento</th>
+                    <th>Data Vencimento</th>
+                    {% if filtro == 'ativos' %}
+                    <th>Mensalidade</th>
+                    <th>Cursos e Professores</th>
+                    {% else %}
+                    <th class="col-cursos">Cursos e Professores</th>
+                    {% endif %}
+                    <th>Data Cadastro</th>
+                    {% if filtro == 'inativos' %}
+                    <th>Data Exclusão</th>
+                    <th>Motivo Exclusão</th>
+                    {% endif %}
+                    <th>Ações</th>
+                </tr>
+            </thead>
         <tbody>
             {% for aluno in alunos %}
             <tr>
-                <td data-label="ID">{{ aluno.id }}</td>
-                <td data-label="Nome"><strong>{{ aluno.nome }}</strong></td>
+                <td data-label="ID" class="pinned-left">{{ aluno.id }}</td>
+                <td data-label="Nome" class="col-nome"><strong>{{ aluno.nome|format_name }}</strong></td>
                 <td data-label="Telefone">
                     {% if filtro == 'inativos' and current_user.is_professor() %}
                     <span style="color: #6c757d;">Restrito</span>
@@ -452,7 +1045,7 @@
                     {{ aluno.telefone or '-' }}
                     {% endif %}
                 </td>
-                <td data-label="Responsável">{{ aluno.nome_responsavel or '-' }}</td>
+                <td data-label="Responsável">{% if aluno.nome_responsavel %}{{ aluno.nome_responsavel|format_name }}{% else %}-{% endif %}</td>
                 <td data-label="Tel. Responsável">
                     {% if filtro == 'inativos' and current_user.is_professor() %}
                     <span style="color: #6c757d;">Restrito</span>
@@ -469,7 +1062,7 @@
                     {% endif %}
                 </td>
                 <td data-label="Forma Pagamento">{{ aluno.forma_pagamento or '-' }}</td>
-                <td data-label="Data Vencimento" class="status-cell">
+                <td data-label="Data Vencimento" class="status-cell col-data-venc">
                     {% if filtro == 'ativos' %}
                         {% set status = aluno.get_status_vencimento() %}
                         {% if status == 'vencido' %}
@@ -519,7 +1112,7 @@
                     {% endif %}
                 </td>
                 {% endif %}
-                <td data-label="Cursos e Professores" class="cursos-cell">
+                <td data-label="Cursos e Professores" class="cursos-cell col-cursos">
                     {% if aluno.matriculas %}
                         {% for matricula in aluno.matriculas %}
                             <div style="margin-bottom: 8px;">
@@ -527,8 +1120,6 @@
                                     <span class="badge badge-primary">Dublagem Online</span>
                                 {% elif matricula.tipo_curso == 'dublagem_presencial' %}
                                     <span class="badge badge-success">Dublagem Presencial</span>
-                                {% elif matricula.tipo_curso == 'teatro_online' %}
-                                    <span class="badge badge-info">Teatro Online</span>
                                 {% elif matricula.tipo_curso == 'teatro_presencial' %}
                                     <span class="badge badge-warning">Teatro Presencial</span>
                                 {% elif matricula.tipo_curso == 'locucao' %}
@@ -538,7 +1129,7 @@
                                 {% elif matricula.tipo_curso == 'musical' %}
                                     <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
                                 {% endif %}
-                                <strong style="margin-left: 5px;">{{ matricula.professor.nome if matricula.professor else 'Sem professor' }}</strong>
+                                <strong style="margin-left: 5px;">{% if matricula.professor %}{{ matricula.professor.nome|format_name }}{% else %}Sem professor{% endif %}</strong>
                             </div>
                         {% endfor %}
                     {% else %}
@@ -564,42 +1155,55 @@
                 <td data-label="Motivo Exclusão">{{ aluno.motivo_exclusao or '-' }}</td>
                 {% endif %}
                 <td data-label="Ações">
-                    {% if current_user.is_admin() %}
                     <div class="action-buttons">
-                        {% if filtro == 'pendentes' %}
-                        <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
-                            Editar
+                        {% if aluno.ativo %}
+                        {# Comentado até que a rota seja implementada
+                        <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                            💰 Pagamento
                         </a>
-                        <form method="POST" action="{{ url_for('main.aprovar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
-                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja aprovar o aluno {{ aluno.nome }}?')">
-                                Aprovar
+                        #}
+                        {% endif %}
+                        {% if current_user.is_admin() %}
+                            {% if filtro == 'pendentes' %}
+                            <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                                Editar
+                            </a>
+                            <form method="POST" action="{{ url_for('main.aprovar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                                <button type="submit" class="btn-reativar" onclick="return confirm('Deseja aprovar o aluno {{ aluno.nome|format_name }}?')">
+                                    Aprovar
+                                </button>
+                            </form>
+                            {% elif filtro == 'experimentais' %}
+                            <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id, efetivar='1') }}" class="btn-reativar" style="padding: 5px 10px; background: #17a2b8; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                                ✓ Efetivar
+                            </a>
+                            <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome|format_name }}')">
+                                Excluir
                             </button>
-                        </form>
-                        {% elif aluno.ativo %}
-                        <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome }}')">
-                            Excluir
-                        </button>
-                        {% else %}
-                        <form method="POST" action="{{ url_for('main.reativar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
-                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja reativar o aluno {{ aluno.nome }}?')">
-                                Reativar
+                            {% elif aluno.ativo %}
+                            <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome|format_name }}')">
+                                Excluir
                             </button>
-                        </form>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('main.reativar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                                <button type="submit" class="btn-reativar" onclick="return confirm('Deseja reativar o aluno {{ aluno.nome|format_name }}?')">
+                                    Reativar
+                                </button>
+                            </form>
+                            {% endif %}
                         {% endif %}
                     </div>
-                    {% else %}
-                    <span style="color: #6c757d;">-</span>
-                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </form>
     </div>
 {% else %}
     <div class="empty-state">
-        <h2>Nenhum aluno {% if filtro == 'inativos' %}inativo{% elif filtro == 'pendentes' %}pendente{% else %}ativo{% endif %} encontrado</h2>
-        <p>{% if filtro == 'inativos' %}Não há alunos inativos no momento.{% elif filtro == 'pendentes' %}Não há alunos pendentes de aprovação.{% else %}Comece cadastrando alunos na página de cadastro.{% endif %}</p>
+        <h2>Nenhum aluno {% if filtro == 'inativos' %}inativo{% elif filtro == 'pendentes' %}pendente{% elif filtro == 'experimentais' %}experimental{% else %}ativo{% endif %} encontrado</h2>
+        <p>{% if filtro == 'inativos' %}Não há alunos inativos no momento.{% elif filtro == 'pendentes' %}Não há alunos pendentes de aprovação.{% elif filtro == 'experimentais' %}Não há alunos experimentais no momento.{% else %}Comece cadastrando alunos na página de cadastro.{% endif %}</p>
     </div>
 {% endif %}
 
@@ -675,6 +1279,89 @@ window.onclick = function(event) {
         fecharModalExclusao();
     }
 }
+
+// Função para fixar/desfixar colunas
+let pinnedColumns = {
+    'col-id': true,  // ID sempre fixado por padrão
+    'col-nome': false,
+    'col-data-venc': false,
+    'col-cursos': false
+};
+
+function updatePinnedColumns() {
+    // Mapear classes para seletores CSS (mais confiável que índices)
+    const columnSelectors = {
+        'col-id': 'thead tr th:first-child, tbody tr td:first-child',
+        'col-nome': 'thead tr th:nth-child(2), tbody tr td:nth-child(2)',
+        'col-data-venc': 'thead tr th:nth-child(9), tbody tr td:nth-child(9)',
+        'col-cursos': 'thead tr th.col-cursos, tbody tr td.col-cursos'
+    };
+    
+    // Calcular posição left para cada coluna fixada
+    let leftPosition = 0;
+    const columnOrder = ['col-id', 'col-nome', 'col-data-venc', 'col-cursos'];
+    
+    columnOrder.forEach(col => {
+        if (pinnedColumns[col]) {
+            const selector = columnSelectors[col];
+            const elements = document.querySelectorAll(selector);
+            
+            if (elements.length > 0) {
+                // Primeiro elemento é o th, resto são tds
+                const th = elements[0];
+                const tds = Array.from(elements).slice(1);
+                
+                if (th) {
+                    // Fixar header
+                    th.classList.add('pinned', 'pinned-left');
+                    th.style.left = leftPosition + 'px';
+                    
+                    // Fixar células
+                    tds.forEach(td => {
+                        td.classList.add('pinned', 'pinned-left');
+                        td.style.left = leftPosition + 'px';
+                    });
+                    
+                    // Calcular largura da coluna para próxima posição
+                    const width = th.offsetWidth;
+                    leftPosition += width;
+                }
+            }
+        } else {
+            // Desfixar
+            const selector = columnSelectors[col];
+            const elements = document.querySelectorAll(selector);
+            
+            elements.forEach(el => {
+                el.classList.remove('pinned', 'pinned-left');
+                el.style.left = '';
+            });
+        }
+    });
+}
+
+function togglePin(button, columnClass) {
+    pinnedColumns[columnClass] = !pinnedColumns[columnClass];
+    
+    // Atualizar botão
+    if (pinnedColumns[columnClass]) {
+        button.classList.add('pinned');
+    } else {
+        button.classList.remove('pinned');
+    }
+    
+    // Atualizar todas as colunas fixadas
+    updatePinnedColumns();
+}
+
+// Aplicar pin inicial ao carregar
+document.addEventListener('DOMContentLoaded', function() {
+    const idButton = document.querySelector('button[onclick*="col-id"]');
+    if (idButton) {
+        idButton.classList.add('pinned');
+    }
+    updatePinnedColumns();
+});
 </script>
 {% endblock %}
 

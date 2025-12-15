@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Pagamentos - {{ aluno.nome }} - Controle de Dublagem{% endblock %}
+{% block page_title %}Pagamentos - {{ aluno.nome }}{% endblock %}
+
+{% block extra_css %}
+    .pagamentos-container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .aluno-header {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .aluno-header h3 {
+        margin: 0 0 10px 0;
+        color: #667eea;
+    }
+    
+    .btn-upload {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .btn-upload:hover {
+        background: #218838;
+    }
+    
+    .pagamentos-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    .pagamentos-table th,
+    .pagamentos-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .pagamentos-table th {
+        background: #667eea;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .pagamentos-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 0.9em;
+        font-weight: bold;
+    }
+    
+    .status-pendente {
+        background: #ffc107;
+        color: #000;
+    }
+    
+    .status-aprovado {
+        background: #28a745;
+        color: white;
+    }
+    
+    .status-rejeitado {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-view {
+        padding: 5px 10px;
+        background: #17a2b8;
+        color: white;
+        text-decoration: none;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+    
+    .btn-view:hover {
+        background: #138496;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+    
+    .empty-state p {
+        font-size: 1.1em;
+        margin-bottom: 20px;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="pagamentos-container">
+    <div class="aluno-header">
+        <h3>{{ aluno.nome }}</h3>
+        <p><strong>Total de Mensalidades:</strong> {{ aluno.get_total_mensalidades()|format_currency }}</p>
+    </div>
+    
+    <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" class="btn-upload">
+        + Enviar Novo Comprovante
+    </a>
+    
+    {% if pagamentos %}
+        <table class="pagamentos-table">
+            <thead>
+                <tr>
+                    <th>Mês/Ano</th>
+                    <th>Valor Pago</th>
+                    <th>Data Pagamento</th>
+                    <th>Status</th>
+                    <th>Data Cadastro</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pagamento in pagamentos %}
+                <tr>
+                    <td>{{ pagamento.get_mes_nome() }}/{{ pagamento.ano_referencia }}</td>
+                    <td>{{ pagamento.valor_pago|format_currency }}</td>
+                    <td>{{ pagamento.data_pagamento.strftime('%d/%m/%Y') if pagamento.data_pagamento else '-' }}</td>
+                    <td>
+                        <span class="status-badge status-{{ pagamento.status }}">
+                            {{ pagamento.get_status_label() }}
+                        </span>
+                    </td>
+                    <td>{{ pagamento.data_cadastro.strftime('%d/%m/%Y %H:%M') if pagamento.data_cadastro else '-' }}</td>
+                    <td>
+                        {% if pagamento.url_comprovante %}
+                            <a href="{{ pagamento.url_comprovante }}" target="_blank" class="btn-view">Ver Comprovante</a>
+                        {% else %}
+                            <span style="color: #6c757d;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if pagamento.observacoes_admin %}
+                <tr>
+                    <td colspan="6" style="background: #fff3cd; padding: 10px; font-size: 0.9em;">
+                        <strong>Observação do Admin:</strong> {{ pagamento.observacoes_admin }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <p>Nenhum pagamento registrado ainda.</p>
+            <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" class="btn-upload">
+                Enviar Primeiro Comprovante
+            </a>
+        </div>
+    {% endif %}
+    
+    <div style="margin-top: 20px;">
+        <a href="{{ url_for('main.listar_alunos') }}" style="color: #667eea; text-decoration: none;">
+            ← Voltar para Lista de Alunos
+        </a>
+    </div>
+</div>
+{% endblock %}
+

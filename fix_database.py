@@ -602,8 +602,9 @@ def corrigir_banco():
                         id INTEGER PRIMARY KEY,
                         professor_id INTEGER NOT NULL,
                         dia_semana VARCHAR(20) NOT NULL,
-                        horario_inicio VARCHAR(5) NOT NULL,
-                        horario_termino VARCHAR(5) NOT NULL,
+                        horario_aula VARCHAR(50) NOT NULL,
+                        idade_minima INTEGER,
+                        idade_maxima INTEGER,
                         FOREIGN KEY (professor_id) REFERENCES professores(id)
                     )
                 '''))
@@ -613,13 +614,47 @@ def corrigir_banco():
                 columns = [col['name'] for col in inspector.get_columns('horarios_professor')]
                 print(f"Colunas atuais: {', '.join(columns)}")
                 
-                # Verificar se tem horario_inicio e horario_termino (nova estrutura)
-                if 'horario_inicio' not in columns or 'horario_termino' not in columns:
-                    if 'horario_aula' in columns:
-                        print("Migrando estrutura antiga para nova...")
-                        # Se tem horario_aula antigo, manter por enquanto
-                        # A migração completa pode ser feita depois
-                        print("⚠️  Tabela tem estrutura antiga. Considere migrar os dados.")
+                # Verificar se tem horario_aula (estrutura atual)
+                if 'horario_aula' not in columns:
+                    # Se tem horario_inicio e horario_termino, adicionar horario_aula
+                    if 'horario_inicio' in columns and 'horario_termino' in columns:
+                        print("Adicionando coluna 'horario_aula'...")
+                        try:
+                            db.session.execute(text('ALTER TABLE horarios_professor ADD COLUMN horario_aula VARCHAR(50)'))
+                            # Migrar dados: concatenar horario_inicio e horario_termino
+                            db.session.execute(text('''
+                                UPDATE horarios_professor 
+                                SET horario_aula = horario_inicio || ' às ' || horario_termino
+                                WHERE horario_aula IS NULL
+                            '''))
+                            db.session.commit()
+                            print("✓ Coluna 'horario_aula' adicionada e dados migrados.")
+                            columns = [col['name'] for col in inspector.get_columns('horarios_professor')]
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"✗ Erro ao adicionar coluna 'horario_aula': {e}")
+                
+                # Adicionar colunas de idade se não existirem
+                if 'idade_minima' not in columns:
+                    print("Adicionando coluna 'idade_minima'...")
+                    try:
+                        db.session.execute(text('ALTER TABLE horarios_professor ADD COLUMN idade_minima INTEGER'))
+                        db.session.commit()
+                        print("✓ Coluna 'idade_minima' adicionada.")
+                        columns = [col['name'] for col in inspector.get_columns('horarios_professor')]
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"✗ Erro ao adicionar coluna 'idade_minima': {e}")
+                
+                if 'idade_maxima' not in columns:
+                    print("Adicionando coluna 'idade_maxima'...")
+                    try:
+                        db.session.execute(text('ALTER TABLE horarios_professor ADD COLUMN idade_maxima INTEGER'))
+                        db.session.commit()
+                        print("✓ Coluna 'idade_maxima' adicionada.")
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"✗ Erro ao adicionar coluna 'idade_maxima': {e}")
                 
                 print("✓ Tabela 'horarios_professor' verificada.")
             
@@ -634,10 +669,15 @@ def corrigir_banco():
                         professor_id INTEGER NOT NULL,
                         matricula_id INTEGER,
                         tipo_curso VARCHAR(50) NOT NULL,
-                        valor REAL NOT NULL,
+                        valor REAL,
                         observacao TEXT,
                         data_avaliacao DATE NOT NULL,
                         tipo_avaliacao VARCHAR(100),
+                        criterio1 REAL,
+                        criterio2 REAL,
+                        criterio3 REAL,
+                        criterio4 REAL,
+                        numero_prova INTEGER,
                         data_cadastro DATETIME DEFAULT CURRENT_TIMESTAMP,
                         cadastrado_por INTEGER,
                         FOREIGN KEY (aluno_id) REFERENCES alunos(id),
@@ -651,6 +691,36 @@ def corrigir_banco():
             else:
                 columns = [col['name'] for col in inspector.get_columns('notas')]
                 print(f"Colunas atuais: {', '.join(columns)}")
+                
+                # Verificar e adicionar campos de critérios se não existirem
+                for i in range(1, 5):
+                    campo = f'criterio{i}'
+                    if campo not in columns:
+                        print(f"Adicionando coluna '{campo}'...")
+                        try:
+                            db.session.execute(text(f'ALTER TABLE notas ADD COLUMN {campo} REAL'))
+                            db.session.commit()
+                            print(f"✓ Coluna '{campo}' adicionada.")
+                            columns = [col['name'] for col in inspector.get_columns('notas')]
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"✗ Erro ao adicionar coluna '{campo}': {e}")
+                
+                # Verificar e adicionar campo numero_prova se não existir
+                if 'numero_prova' not in columns:
+                    print("Adicionando coluna 'numero_prova'...")
+                    try:
+                        db.session.execute(text('ALTER TABLE notas ADD COLUMN numero_prova INTEGER'))
+                        db.session.commit()
+                        print("✓ Coluna 'numero_prova' adicionada.")
+                        columns = [col['name'] for col in inspector.get_columns('notas')]
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"✗ Erro ao adicionar coluna 'numero_prova': {e}")
+                
+                # Verificar se valor pode ser NULL (foi alterado para nullable)
+                # SQLite não suporta ALTER COLUMN, então isso é apenas informativo
+                
                 print("✓ Tabela 'notas' verificada.")
             
             print("\n✓ Correção do banco de dados concluída com sucesso!")
