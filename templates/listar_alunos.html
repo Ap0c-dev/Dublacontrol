@@ -511,10 +511,10 @@
     <a href="{{ url_for('main.listar_alunos', filtro='experimentais') }}" class="tab {% if filtro == 'experimentais' %}active{% endif %}">
         Experimentais
     </a>
-    {% endif %}
     <a href="{{ url_for('main.listar_alunos', filtro='inativos') }}" class="tab {% if filtro == 'inativos' %}active{% endif %}">
         Alunos Inativos
     </a>
+    {% endif %}
     <a href="{{ url_for('main.listar_alunos', filtro='notas') }}" class="tab {% if filtro == 'notas' %}active{% endif %}">
         Notas
     </a>
@@ -529,25 +529,18 @@
             <input type="hidden" name="filtro" value="notas">
             <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
                 <div style="flex: 1; min-width: 200px;">
-                    <label for="professor_id" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
-                        Professor <span style="color: #dc3545;">*</span>
-                    </label>
-                    <select name="professor_id" id="professor_id" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" onchange="carregarCursosProfessor()">
-                        <option value="">Selecione um professor</option>
-                        {% for prof in professores %}
-                        <option value="{{ prof.id }}" {% if professor_id == prof.id %}selected{% endif %}>
-                            {{ prof.nome|format_name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div style="flex: 1; min-width: 200px;">
                     <label for="tipo_curso" style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">
                         Curso <span style="color: #dc3545;">*</span>
                     </label>
-                    <select name="tipo_curso" id="tipo_curso" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;" disabled>
-                        <option value="">Primeiro selecione um professor</option>
+                    <select name="tipo_curso" id="tipo_curso" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;">
+                        <option value="">Selecione um curso</option>
+                        <option value="dublagem_online" {% if tipo_curso == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
+                        <option value="dublagem_presencial" {% if tipo_curso == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
+                        <option value="teatro_presencial" {% if tipo_curso == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
+                        <option value="teatro_online" {% if tipo_curso == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
+                        <option value="locucao" {% if tipo_curso == 'locucao' %}selected{% endif %}>Locução</option>
+                        <option value="teatro_tv_cinema" {% if tipo_curso == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV Cinema</option>
+                        <option value="musical" {% if tipo_curso == 'musical' %}selected{% endif %}>Musical</option>
                     </select>
                 </div>
                 
@@ -560,85 +553,30 @@
         </form>
     </div>
     
-    <script>
-    function carregarCursosProfessor() {
-        const professorId = document.getElementById('professor_id').value;
-        const cursoSelect = document.getElementById('tipo_curso');
-        
-        // Limpar e desabilitar o select de cursos
-        cursoSelect.innerHTML = '<option value="">Carregando...</option>';
-        cursoSelect.disabled = true;
-        
-        if (!professorId) {
-            cursoSelect.innerHTML = '<option value="">Primeiro selecione um professor</option>';
-            return;
-        }
-        
-        // Buscar cursos do professor via API
-        fetch(`/api/professor/${professorId}/cursos`)
-            .then(response => response.json())
-            .then(cursos => {
-                cursoSelect.innerHTML = '<option value="">Selecione um curso</option>';
-                
-                if (cursos.length === 0) {
-                    cursoSelect.innerHTML = '<option value="">Este professor não leciona nenhum curso</option>';
-                    return;
-                }
-                
-                // Preencher com os cursos do professor
-                cursos.forEach(curso => {
-                    const option = document.createElement('option');
-                    option.value = curso.key;
-                    option.textContent = curso.nome;
-                    {% if tipo_curso %}
-                    if (curso.key === '{{ tipo_curso }}') {
-                        option.selected = true;
-                    }
-                    {% endif %}
-                    cursoSelect.appendChild(option);
-                });
-                
-                cursoSelect.disabled = false;
-            })
-            .catch(error => {
-                console.error('Erro ao carregar cursos:', error);
-                cursoSelect.innerHTML = '<option value="">Erro ao carregar cursos</option>';
-            });
-    }
-    
-    // Carregar cursos se já houver um professor selecionado
-    {% if professor_id %}
-    document.addEventListener('DOMContentLoaded', function() {
-        carregarCursosProfessor();
-    });
-    {% endif %}
-    </script>
-    
-    {% if professor_id and tipo_curso %}
+    {% if tipo_curso %}
         <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
-                <form method="GET" action="{{ url_for('main.listar_alunos') }}" style="display: flex; align-items: center; gap: 10px;">
-                    <input type="hidden" name="filtro" value="notas">
-                    <input type="hidden" name="professor_id" value="{{ professor_id }}">
-                    <input type="hidden" name="tipo_curso" value="{{ tipo_curso }}">
-                    <label for="numero_prova" style="font-weight: bold; color: #333;">
-                        Prova:
-                    </label>
-                    <select name="numero_prova" id="numero_prova" 
-                            style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;"
-                            onchange="this.form.submit()">
-                        {% for i in range(1, 9) %}
-                        <option value="{{ i }}" {% if numero_prova == i %}selected{% endif %}>
-                            Prova {{ i }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </form>
-                <button type="button" 
-                        onclick="criarNovaProva()" 
-                        style="padding: 8px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;">
-                    + Nova Prova
-                </button>
+            <form method="GET" action="{{ url_for('main.listar_alunos') }}" style="display: flex; align-items: center; gap: 10px;">
+                <input type="hidden" name="filtro" value="notas">
+                <input type="hidden" name="tipo_curso" value="{{ tipo_curso }}">
+                <label for="numero_prova" style="font-weight: bold; color: #333;">
+                    Prova:
+                </label>
+                <select name="numero_prova" id="numero_prova" 
+                        style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 1em;"
+                        onchange="this.form.submit()">
+                    {% for i in range(1, 9) %}
+                    <option value="{{ i }}" {% if numero_prova == i %}selected{% endif %}>
+                        Prova {{ i }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+            <button type="button" 
+                    onclick="criarNovaProva()" 
+                    style="padding: 8px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;">
+                + Nova Prova
+            </button>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <label for="data_prova" style="font-weight: bold; color: #333;">
@@ -662,7 +600,6 @@
         
         {% if alunos %}
         <form method="POST" action="{{ url_for('main.salvar_criterios_notas') }}" id="formNotas" onsubmit="return validarNotas()">
-            <input type="hidden" name="professor_id" value="{{ professor_id }}">
             <input type="hidden" name="tipo_curso" value="{{ tipo_curso }}">
             <input type="hidden" name="numero_prova" value="{{ numero_prova }}">
             <input type="hidden" name="data_avaliacao" id="data_avaliacao_hidden" value="{% if data_prova %}{{ data_prova.strftime('%Y-%m-%d') }}{% else %}{{ data_hoje.strftime('%Y-%m-%d') if data_hoje else '' }}{% endif %}">
@@ -697,9 +634,11 @@
                         {# Calcular média total de todas as provas do aluno (apenas provas salvas) #}
                         {% set medias_provas = [] %}
                         {% for num_prova, nota in notas_aluno.items() %}
-                            {% set media_prova = nota.calcular_media() %}
-                            {% if media_prova is not none %}
-                                {% set _ = medias_provas.append(media_prova) %}
+                            {% if nota %}
+                                {% set media_prova = nota.calcular_media() if nota.calcular_media else None %}
+                                {% if media_prova is not none %}
+                                    {% set _ = medias_provas.append(media_prova) %}
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
                         {% set media_total = (medias_provas|sum / medias_provas|length) if medias_provas|length > 0 else None %}
@@ -717,9 +656,11 @@
                         {% for num_prova in range(1, numero_prova) %}
                             {% if notas_aluno.get(num_prova) %}
                                 {% set nota_ant = notas_aluno.get(num_prova) %}
-                                {% set media_ant = nota_ant.calcular_media() %}
-                                {% if media_ant is not none %}
-                                    {% set _ = medias_anteriores.append(media_ant) %}
+                                {% if nota_ant %}
+                                    {% set media_ant = nota_ant.calcular_media() if nota_ant.calcular_media else None %}
+                                    {% if media_ant is not none %}
+                                        {% set _ = medias_anteriores.append(media_ant) %}
+                                    {% endif %}
                                 {% endif %}
                             {% endif %}
                         {% endfor %}
@@ -749,26 +690,30 @@
                                 {% set nota = notas_aluno.get(num_prova) %}
                             <tr style="background-color: #f8f9fa;">
                                 <td style="padding: 8px 20px 8px 20px; color: #6c757d; font-size: 0.9em;">
-                                    <em>Prova {{ num_prova }}</em>
+                                    <em>Prova {{ num_prova }}{% if nota and nota.data_avaliacao %} - {{ nota.data_avaliacao.strftime('%d/%m/%Y') }}{% endif %}</em>
                                 </td>
                                 <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
-                                    {% if nota.criterio1 is not none %}{{ "%.1f"|format(nota.criterio1) }}{% else %}-{% endif %}
+                                    {% if nota and nota.criterio1 is not none %}{{ "%.1f"|format(nota.criterio1) }}{% else %}-{% endif %}
                                 </td>
                                 <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
-                                    {% if nota.criterio2 is not none %}{{ "%.1f"|format(nota.criterio2) }}{% else %}-{% endif %}
+                                    {% if nota and nota.criterio2 is not none %}{{ "%.1f"|format(nota.criterio2) }}{% else %}-{% endif %}
                                 </td>
                                 <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
-                                    {% if nota.criterio3 is not none %}{{ "%.1f"|format(nota.criterio3) }}{% else %}-{% endif %}
+                                    {% if nota and nota.criterio3 is not none %}{{ "%.1f"|format(nota.criterio3) }}{% else %}-{% endif %}
                                 </td>
                                 <td style="padding: 8px 10px; color: #6c757d; text-align: right;">
-                                    {% if nota.criterio4 is not none %}{{ "%.1f"|format(nota.criterio4) }}{% else %}-{% endif %}
+                                    {% if nota and nota.criterio4 is not none %}{{ "%.1f"|format(nota.criterio4) }}{% else %}-{% endif %}
                                 </td>
                                 <td style="padding: 8px 10px; color: #6c757d; font-weight: bold; text-align: center;">
-                                    {% set media_antiga = nota.calcular_media() %}
-                                    {% if media_antiga is not none %}
-                                        <span style="color: {% if media_antiga >= 6 %}#28a745{% else %}#dc3545{% endif %};">
-                                            {{ "%.1f"|format(media_antiga) }}
-                                        </span>
+                                    {% if nota and nota.calcular_media %}
+                                        {% set media_antiga = nota.calcular_media() %}
+                                        {% if media_antiga is not none %}
+                                            <span style="color: {% if media_antiga >= 6 %}#28a745{% else %}#dc3545{% endif %};">
+                                                {{ "%.1f"|format(media_antiga) }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
                                     {% else %}
                                         -
                                     {% endif %}
@@ -798,7 +743,7 @@
                         {% endif %}
                         <tr style="background-color: #fff;">
                             <td style="padding: 8px 20px 8px 20px; font-weight: bold;">
-                                Prova {{ numero_prova }}
+                                Prova {{ numero_prova }}{% if nota_atual and nota_atual.data_avaliacao %} - {{ nota_atual.data_avaliacao.strftime('%d/%m/%Y') }}{% elif data_prova %} - {{ data_prova.strftime('%d/%m/%Y') }}{% endif %}
                             </td>
                             <td style="padding: 8px 10px; text-align: right;">
                                 <input type="number" 
@@ -808,7 +753,8 @@
                                        max="10" 
                                        step="0.1" 
                                        value="{{ criterio1_val }}"
-                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       {% if nota_atual %}disabled{% endif %}
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;{% if nota_atual %} background-color: #f0f0f0; cursor: not-allowed;{% endif %}"
                                        onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
                                        onblur="validarNotaInput(this)">
                             </td>
@@ -820,7 +766,8 @@
                                        max="10" 
                                        step="0.1" 
                                        value="{{ criterio2_val }}"
-                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       {% if nota_atual %}disabled{% endif %}
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;{% if nota_atual %} background-color: #f0f0f0; cursor: not-allowed;{% endif %}"
                                        onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
                                        onblur="validarNotaInput(this)">
                             </td>
@@ -832,7 +779,8 @@
                                        max="10" 
                                        step="0.1" 
                                        value="{{ criterio3_val }}"
-                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       {% if nota_atual %}disabled{% endif %}
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;{% if nota_atual %} background-color: #f0f0f0; cursor: not-allowed;{% endif %}"
                                        onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
                                        onblur="validarNotaInput(this)">
                             </td>
@@ -844,7 +792,8 @@
                                        max="10" 
                                        step="0.1" 
                                        value="{{ criterio4_val }}"
-                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;"
+                                       {% if nota_atual %}disabled{% endif %}
+                                       style="width: 100%; max-width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: right; margin-left: auto;{% if nota_atual %} background-color: #f0f0f0; cursor: not-allowed;{% endif %}"
                                        onchange="validarNotaInput(this); calcularMedia({{ aluno.id }}); atualizarMediaTotal({{ aluno.id }})"
                                        onblur="validarNotaInput(this)">
                             </td>
@@ -861,10 +810,24 @@
             </div>
             
             <div style="margin-top: 20px; text-align: center;">
+                {% set tem_nota_salva = false %}
+                {% for aluno in alunos %}
+                    {% set notas_aluno = notas_dict.get(aluno.id, {}) %}
+                    {% if notas_aluno.get(numero_prova) %}
+                        {% set tem_nota_salva = true %}
+                    {% endif %}
+                {% endfor %}
                 <button type="submit" 
-                        style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; font-weight: bold;">
-                    Salvar Todas as Notas
+                        id="btnSalvarNotas"
+                        {% if tem_nota_salva %}disabled{% endif %}
+                        style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em; font-weight: bold;{% if tem_nota_salva %} opacity: 0.6; cursor: not-allowed;{% endif %}">
+                    {% if tem_nota_salva %}Notas Já Salvas{% else %}Salvar Todas as Notas{% endif %}
                 </button>
+                {% if tem_nota_salva %}
+                <p style="margin-top: 10px; color: #28a745; font-size: 0.9em;">
+                    ✓ As notas desta prova já foram salvas. Para editar, selecione outra prova ou recarregue a página.
+                </p>
+                {% endif %}
             </div>
         </form>
         
@@ -917,23 +880,41 @@
                 return false;
             }
             
+            // Confirmação antes de salvar
+            if (!confirm('Deseja salvar todas as notas? Após salvar, os campos serão desabilitados.')) {
+                return false;
+            }
+            
+            // Desabilitar o botão de submit (mas NÃO os campos, para que os valores sejam enviados)
+            const submitBtn = document.querySelector('#formNotas button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.6';
+                submitBtn.style.cursor = 'not-allowed';
+                submitBtn.textContent = 'Salvando...';
+            }
+            
+            // Os campos serão desabilitados automaticamente quando a página recarregar após o salvamento
+            // (já implementado no template com {% if nota_atual %}disabled{% endif %})
+            
             return true;
         }
         
         function criarNovaProva() {
             const selectProva = document.getElementById('numero_prova');
-            const provasExistentes = {% if provas_cadastradas %}[{{ provas_cadastradas|join(',') }}]{% else %}[]{% endif %};
-            
-            // Encontrar a próxima prova disponível (1-8)
-            let proximaProva = null;
-            for (let i = 1; i <= 8; i++) {
-                if (!provasExistentes.includes(i)) {
-                    proximaProva = i;
-                    break;
-                }
+            if (!selectProva) {
+                alert('Erro: Select de prova não encontrado.');
+                return;
             }
             
-            if (proximaProva === null) {
+            // Obter o número da prova atual
+            const provaAtual = parseInt(selectProva.value) || 1;
+            
+            // Encontrar a próxima prova disponível (1-8)
+            let proximaProva = provaAtual + 1;
+            
+            // Se já está na última prova (8), não pode criar nova
+            if (provaAtual >= 8) {
                 alert('Todas as 8 provas já foram criadas.');
                 return;
             }
@@ -1005,7 +986,7 @@
         {% endif %}
     {% else %}
         <div class="empty-state">
-            <p>Selecione um professor e um curso para visualizar as notas dos alunos.</p>
+            <p>Selecione um curso para visualizar as notas dos alunos.</p>
         </div>
     {% endif %}
 {% elif filtro == 'pagamentos' %}
@@ -1039,9 +1020,11 @@
                     <td data-label="Ações">
                         <div class="action-buttons">
                             {% if aluno.ativo %}
+                            {% if current_user.is_admin() %}
                             <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
                                 💰 Enviar Pagamento
                             </a>
+                            {% endif %}
                             <a href="{{ url_for('main.listar_pagamentos_aluno', aluno_id=aluno.id) }}" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
                                 Ver Pagamentos
                             </a>
@@ -1205,15 +1188,15 @@
                 <td data-label="Ações">
                     <div class="action-buttons">
                         {% if current_user.is_admin() %}
-                            {% if filtro == 'pendentes' %}
-                            <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
-                                Editar
-                            </a>
-                            <form method="POST" action="{{ url_for('main.aprovar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
-                                <button type="submit" class="btn-reativar" onclick="return confirm('Deseja aprovar o aluno {{ aluno.nome|format_name }}?')">
-                                    Aprovar
-                                </button>
-                            </form>
+                        {% if filtro == 'pendentes' %}
+                        <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id) }}" class="btn-editar" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
+                            Editar
+                        </a>
+                        <form method="POST" action="{{ url_for('main.aprovar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja aprovar o aluno {{ aluno.nome|format_name }}?')">
+                                Aprovar
+                            </button>
+                        </form>
                             {% elif filtro == 'experimentais' %}
                             <a href="{{ url_for('main.editar_aluno', aluno_id=aluno.id, efetivar='1') }}" class="btn-reativar" style="padding: 5px 10px; background: #17a2b8; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85em; margin-right: 5px; display: inline-block;">
                                 ✓ Efetivar
@@ -1221,18 +1204,18 @@
                             <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome|format_name }}')">
                                 Excluir
                             </button>
-                            {% elif aluno.ativo %}
-                            <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome|format_name }}')">
-                                Excluir
+                        {% elif aluno.ativo %}
+                        <button class="btn-excluir" onclick="abrirModalExclusao({{ aluno.id }}, '{{ aluno.nome|format_name }}')">
+                            Excluir
+                        </button>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('main.reativar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
+                            <button type="submit" class="btn-reativar" onclick="return confirm('Deseja reativar o aluno {{ aluno.nome|format_name }}?')">
+                                Reativar
                             </button>
-                            {% else %}
-                            <form method="POST" action="{{ url_for('main.reativar_aluno', aluno_id=aluno.id) }}" style="display: inline;">
-                                <button type="submit" class="btn-reativar" onclick="return confirm('Deseja reativar o aluno {{ aluno.nome|format_name }}?')">
-                                    Reativar
-                                </button>
-                            </form>
-                            {% endif %}
+                        </form>
                         {% endif %}
+                    {% endif %}
                     </div>
                 </td>
             </tr>

@@ -325,7 +325,7 @@
             </div>
             
             <div class="form-group">
-                <label>Horários de Aula</label>
+                <label class="required">Horários de Aula</label>
                 <div id="horarios_container_${professorCount}" style="margin-bottom: 10px;">
                     <!-- Horários serão adicionados aqui -->
                 </div>
@@ -334,62 +334,7 @@
                         style="padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;">
                     + Adicionar Horário
                 </button>
-                <span class="info-text" style="font-size: 0.9em; color: #6c757d; font-style: italic; margin-top: 5px; display: block;">Adicione os horários de aula do professor</span>
-            </div>
-            
-            <div class="form-group">
-                <label class="required">Modalidades</label>
-                <div class="checkbox-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="dublagem_presencial_${professorCount}" 
-                               name="dublagem_presencial_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="dublagem_presencial_${professorCount}">Dublagem Presencial</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="dublagem_online_${professorCount}" 
-                               name="dublagem_online_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="dublagem_online_${professorCount}">Dublagem Online</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="teatro_presencial_${professorCount}" 
-                               name="teatro_presencial_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="teatro_presencial_${professorCount}">Teatro Presencial</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="teatro_tv_cinema_${professorCount}" 
-                               name="teatro_tv_cinema_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="teatro_tv_cinema_${professorCount}">Teatro TV e Cinema</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="musical_${professorCount}" 
-                               name="musical_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="musical_${professorCount}">Musical</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="locucao_${professorCount}" 
-                               name="locucao_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="locucao_${professorCount}">Locução</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="curso_apresentador_${professorCount}" 
-                               name="curso_apresentador_${professorCount}"
-                               onchange="validarCheckboxes(${professorCount})">
-                        <label for="curso_apresentador_${professorCount}">Curso de Apresentador</label>
-                    </div>
-                </div>
+                <span class="info-text" style="font-size: 0.9em; color: #6c757d; font-style: italic; margin-top: 5px; display: block;">Adicione os horários de aula do professor. Cada horário deve ter uma modalidade associada.</span>
             </div>
             
             <button type="button" class="remove-professor-btn" onclick="removerProfessor(${professorCount})">
@@ -420,29 +365,6 @@
         });
     }
     
-    function validarCheckboxes(professorId) {
-        // Verificar se pelo menos uma modalidade está selecionada
-        const modalidades = [
-            `dublagem_presencial_${professorId}`,
-            `dublagem_online_${professorId}`,
-            `teatro_presencial_${professorId}`,
-            `teatro_tv_cinema_${professorId}`,
-            `musical_${professorId}`,
-            `locucao_${professorId}`,
-            `curso_apresentador_${professorId}`
-        ];
-        
-        const temModalidade = modalidades.some(id => {
-            const checkbox = document.getElementById(id);
-            return checkbox && checkbox.checked;
-        });
-        
-        // Remover mensagem de erro anterior se existir
-        const errorMsg = document.getElementById(`error-${professorId}`);
-        if (errorMsg) {
-            errorMsg.remove();
-        }
-    }
     
     let horarioCount = {}; // Contador de horários por professor
     
@@ -465,6 +387,17 @@
         
         const diasSemana = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
         
+        const modalidades = [
+            { value: 'dublagem_presencial', label: 'Dublagem Presencial' },
+            { value: 'dublagem_online', label: 'Dublagem Online' },
+            { value: 'teatro_presencial', label: 'Teatro Presencial' },
+            { value: 'teatro_online', label: 'Teatro Online' },
+            { value: 'locucao', label: 'Locução' },
+            { value: 'teatro_tv_cinema', label: 'Teatro TV e Cinema' },
+            { value: 'musical', label: 'Musical' },
+            { value: 'curso_apresentador', label: 'Curso de Apresentador' }
+        ];
+        
         horarioDiv.innerHTML = `
             <div style="flex: 1;">
                 <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
@@ -473,6 +406,15 @@
                         style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
                     <option value="">Selecione o dia</option>
                     ${diasSemana.map(dia => `<option value="${dia}">${dia}</option>`).join('')}
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Modalidade:</label>
+                <select name="horario_modalidade_${professorIndex}_${horarioIndex}" 
+                        required
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="">Selecione a modalidade</option>
+                    ${modalidades.map(mod => `<option value="${mod.value}">${mod.label}</option>`).join('')}
                 </select>
             </div>
             <div style="flex: 1;">
@@ -593,13 +535,25 @@
                 return;
             }
             
-            // Validar modalidades
-            if (modalidades.length === 0) {
+            // Validar que há pelo menos um horário cadastrado
+            const horarios = prof.querySelectorAll('.horario-item');
+            if (horarios.length === 0) {
                 temErro = true;
-                alert(`Professor ${index + 1} (${nome}): Selecione pelo menos uma modalidade.`);
+                alert(`Professor ${index + 1} (${nome}): Adicione pelo menos um horário de aula.`);
                 e.preventDefault();
                 return;
             }
+            
+            // Validar que cada horário tem modalidade selecionada
+            horarios.forEach((horario, horarioIndex) => {
+                const modalidadeSelect = horario.querySelector('select[name*="horario_modalidade"]');
+                if (!modalidadeSelect || !modalidadeSelect.value) {
+                    temErro = true;
+                    alert(`Professor ${index + 1} (${nome}): O horário ${horarioIndex + 1} deve ter uma modalidade selecionada.`);
+                    e.preventDefault();
+                    return;
+                }
+            });
         });
         
         if (professores.length === 0) {

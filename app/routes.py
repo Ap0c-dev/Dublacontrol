@@ -169,7 +169,7 @@ def login():
     try:
         if current_user.is_authenticated:
             return redirect(url_for('main.index'))
-        
+    
         if request.method == 'POST':
             username = request.form.get('username', '').strip()
             password = request.form.get('password', '')
@@ -177,38 +177,38 @@ def login():
             if not username or not password:
                 flash('Por favor, preencha todos os campos.', 'error')
                 return render_template('login.html')
-            
-            # Buscar usuário por username ou email
-            usuario = Usuario.query.filter(
-                (Usuario.username == username) | (Usuario.email == username)
-            ).first()
-            
-            if usuario and usuario.check_password(password) and usuario.ativo:
-                login_user(usuario)
-                try:
-                    usuario.ultimo_acesso = datetime.now()
-                    db.session.commit()
-                except Exception as e:
-                    db.session.rollback()
-                    import traceback
-                    print(f"Erro ao atualizar ultimo_acesso: {traceback.format_exc()}")
-                    # Continuar mesmo se houver erro ao atualizar ultimo_acesso
-                
-                flash(f'Bem-vindo, {usuario.username}!', 'success')
-                next_page = request.args.get('next')
-                if next_page:
-                    return redirect(next_page)
-                else:
-                    try:
-                        return redirect(url_for('main.index'))
-                    except Exception as e:
-                        import traceback
-                        print(f"Erro ao redirecionar após login: {traceback.format_exc()}")
-                        flash(f'Login realizado com sucesso, mas houve um erro ao redirecionar: {str(e)}', 'warning')
-                        return render_template('login.html')
-            else:
-                flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
         
+        # Buscar usuário por username ou email
+        usuario = Usuario.query.filter(
+            (Usuario.username == username) | (Usuario.email == username)
+        ).first()
+        
+        if usuario and usuario.check_password(password) and usuario.ativo:
+            login_user(usuario)
+            try:
+                usuario.ultimo_acesso = datetime.now()
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                import traceback
+                print(f"Erro ao atualizar ultimo_acesso: {traceback.format_exc()}")
+                # Continuar mesmo se houver erro ao atualizar ultimo_acesso
+            
+            flash(f'Bem-vindo, {usuario.username}!', 'success')
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            else:
+                try:
+                    return redirect(url_for('main.index'))
+                except Exception as e:
+                    import traceback
+                    print(f"Erro ao redirecionar após login: {traceback.format_exc()}")
+                    flash(f'Login realizado com sucesso, mas houve um erro ao redirecionar: {str(e)}', 'warning')
+                    return render_template('login.html')
+        else:
+            flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
+    
         return render_template('login.html')
     except Exception as e:
         import traceback
@@ -315,15 +315,21 @@ def cadastro_professores():
                 for key in horario_keys:
                     horario_index = key.split('_')[-1]
                     dia_semana = request.form.get(f'horario_dia_{i}_{horario_index}', '').strip()
+                    modalidade = request.form.get(f'horario_modalidade_{i}_{horario_index}', '').strip()
                     horario_inicio = request.form.get(f'horario_inicio_{i}_{horario_index}', '').strip()
                     horario_termino = request.form.get(f'horario_termino_{i}_{horario_index}', '').strip()
+                    idade_minima = request.form.get(f'horario_idade_minima_{i}_{horario_index}', '').strip()
+                    idade_maxima = request.form.get(f'horario_idade_maxima_{i}_{horario_index}', '').strip()
                     
-                    if dia_semana and horario_inicio and horario_termino:
+                    if dia_semana and modalidade and horario_inicio and horario_termino:
                         # Formatar horário como "HH:MM às HH:MM"
                         horario_aula = f"{horario_inicio} às {horario_termino}"
                         horarios_professor.append({
                             'dia_semana': dia_semana,
-                            'horario_aula': horario_aula
+                            'modalidade': modalidade,
+                            'horario_aula': horario_aula,
+                            'idade_minima': int(idade_minima) if idade_minima and idade_minima.isdigit() else None,
+                            'idade_maxima': int(idade_maxima) if idade_maxima and idade_maxima.isdigit() else None
                         })
                 
                 # Validação: telefone obrigatório e formato
@@ -339,25 +345,14 @@ def cadastro_professores():
                 
                 telefone = telefone.strip()
                 
-                # Modalidades
-                dublagem_presencial = request.form.get(f'dublagem_presencial_{i}') == 'on'
-                dublagem_online = request.form.get(f'dublagem_online_{i}') == 'on'
-                teatro_presencial = request.form.get(f'teatro_presencial_{i}') == 'on'
-                teatro_online = request.form.get(f'teatro_online_{i}') == 'on'
-                musical = request.form.get(f'musical_{i}') == 'on'
-                locucao = request.form.get(f'locucao_{i}') == 'on'
-                curso_apresentador = request.form.get(f'curso_apresentador_{i}') == 'on'
-                
                 # Validação: nome obrigatório
                 if not nome:
                     erros.append(f'Professor {i+1}: Nome é obrigatório.')
                     continue
                 
-                # Validação: pelo menos uma modalidade obrigatória
-                tem_modalidade = (dublagem_presencial or dublagem_online or teatro_presencial or 
-                                teatro_online or musical or locucao or curso_apresentador)
-                if not tem_modalidade:
-                    erros.append(f'Professor {i+1} ({nome}): Selecione pelo menos uma modalidade.')
+                # Validação: pelo menos um horário com modalidade obrigatório
+                if not horarios_professor:
+                    erros.append(f'Professor {i+1} ({nome}): Adicione pelo menos um horário de aula com modalidade.')
                     continue
                 
                 # Verificar se o professor já existe (mesmo nome e telefone) - apenas ativos
@@ -371,6 +366,18 @@ def cadastro_professores():
                     erros.append(f'Professor {i+1} ({nome}): Já existe um professor cadastrado com este nome e telefone.')
                     continue
                 
+                # Determinar modalidades do professor baseado nos horários cadastrados
+                modalidades_professor = set([h['modalidade'] for h in horarios_professor])
+                dublagem_presencial = 'dublagem_presencial' in modalidades_professor
+                dublagem_online = 'dublagem_online' in modalidades_professor
+                teatro_presencial = 'teatro_presencial' in modalidades_professor
+                teatro_online = 'teatro_online' in modalidades_professor
+                musical = 'musical' in modalidades_professor
+                locucao = 'locucao' in modalidades_professor
+                curso_apresentador = 'curso_apresentador' in modalidades_professor
+                # Teatro TV/Cinema pode ser derivado de teatro_presencial ou teatro_online
+                teatro_tv_cinema = 'teatro_tv_cinema' in modalidades_professor or teatro_presencial or teatro_online
+                
                 # Criar e salvar professor (sempre ativo por padrão)
                 try:
                     professor = Professor(
@@ -383,6 +390,7 @@ def cadastro_professores():
                         musical=musical,
                         locucao=locucao,
                         curso_apresentador=curso_apresentador,
+                        teatro_tv_cinema=teatro_tv_cinema,
                         ativo=True
                     )
                     db.session.add(professor)
@@ -393,7 +401,10 @@ def cadastro_professores():
                         horario = HorarioProfessor(
                             professor_id=professor.id,
                             dia_semana=horario_data['dia_semana'],
-                            horario_aula=horario_data['horario_aula']
+                            modalidade=horario_data['modalidade'],
+                            horario_aula=horario_data['horario_aula'],
+                            idade_minima=horario_data.get('idade_minima'),
+                            idade_maxima=horario_data.get('idade_maxima')
                         )
                         db.session.add(horario)
                     
@@ -441,13 +452,15 @@ def cadastro_professores():
 @bp.route('/professores')
 @admin_required
 def listar_professores():
+    from sqlalchemy.orm import joinedload
+    
     # Por padrão, mostrar apenas professores ativos
     filtro = request.args.get('filtro', 'ativos')
     
     if filtro == 'inativos':
-        professores = Professor.query.filter_by(ativo=False).order_by(Professor.data_exclusao.desc(), Professor.nome).all()
+        professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=False).order_by(Professor.data_exclusao.desc(), Professor.nome).all()
     else:
-        professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
+        professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=True).order_by(Professor.nome).all()
     
     # Verificar quais professores já têm usuário cadastrado
     professores_com_usuario = {}
@@ -485,6 +498,125 @@ def excluir_professor(professor_id):
         flash(f'Erro ao excluir professor: {str(e)}', 'error')
     
     return redirect(url_for('main.listar_professores'))
+
+@bp.route('/professores/<int:professor_id>/editar', methods=['GET', 'POST'])
+@admin_required
+def editar_professor(professor_id):
+    """Editar professor existente"""
+    professor = Professor.query.get_or_404(professor_id)
+    
+    if request.method == 'POST':
+        try:
+            nome = normalizar_texto(request.form.get('nome', '').strip())
+            telefone = request.form.get('telefone', '').strip()
+            
+            # Validação: telefone obrigatório e formato
+            if not telefone:
+                flash('Telefone é obrigatório.', 'error')
+                return render_template('editar_professor.html', professor=professor)
+            
+            # Validar formato do telefone internacional
+            valido, msg = validar_telefone(telefone)
+            if not valido:
+                flash(msg, 'error')
+                return render_template('editar_professor.html', professor=professor)
+            
+            telefone = telefone.strip()
+            
+            # Validação: nome obrigatório
+            if not nome:
+                flash('Nome é obrigatório.', 'error')
+                return render_template('editar_professor.html', professor=professor)
+            
+            # Processar horários
+            # Primeiro, remover todos os horários existentes
+            HorarioProfessor.query.filter_by(professor_id=professor.id).delete()
+            
+            # Adicionar novos horários
+            horario_keys = [key for key in request.form.keys() if key.startswith('horario_dia_')]
+            horarios_adicionados = set()
+            
+            for key in horario_keys:
+                horario_index = key.split('_')[-1]
+                dia_semana = request.form.get(f'horario_dia_{horario_index}', '').strip()
+                modalidade = request.form.get(f'horario_modalidade_{horario_index}', '').strip()
+                horario_inicio = request.form.get(f'horario_inicio_{horario_index}', '').strip()
+                horario_termino = request.form.get(f'horario_termino_{horario_index}', '').strip()
+                idade_minima = request.form.get(f'horario_idade_minima_{horario_index}', '').strip()
+                idade_maxima = request.form.get(f'horario_idade_maxima_{horario_index}', '').strip()
+                
+                if dia_semana and modalidade and horario_inicio and horario_termino:
+                    # Formatar horário como "HH:MM às HH:MM"
+                    horario_aula = f"{horario_inicio} às {horario_termino}"
+                    
+                    # Criar chave única para evitar duplicatas
+                    chave_horario = f"{dia_semana}_{modalidade}_{horario_aula}"
+                    if chave_horario not in horarios_adicionados:
+                        horario = HorarioProfessor(
+                            professor_id=professor.id,
+                            dia_semana=dia_semana,
+                            modalidade=modalidade,
+                            horario_aula=horario_aula,
+                            idade_minima=int(idade_minima) if idade_minima and idade_minima.isdigit() else None,
+                            idade_maxima=int(idade_maxima) if idade_maxima and idade_maxima.isdigit() else None
+                        )
+                        db.session.add(horario)
+                        horarios_adicionados.add(chave_horario)
+            
+            # Determinar modalidades do professor baseado nos horários que serão cadastrados
+            modalidades_professor = set()
+            for key in horario_keys:
+                horario_index = key.split('_')[-1]
+                modalidade = request.form.get(f'horario_modalidade_{horario_index}', '').strip()
+                if modalidade:
+                    modalidades_professor.add(modalidade)
+            
+            dublagem_presencial = 'dublagem_presencial' in modalidades_professor
+            dublagem_online = 'dublagem_online' in modalidades_professor
+            teatro_presencial = 'teatro_presencial' in modalidades_professor
+            teatro_online = 'teatro_online' in modalidades_professor
+            musical = 'musical' in modalidades_professor
+            locucao = 'locucao' in modalidades_professor
+            curso_apresentador = 'curso_apresentador' in modalidades_professor
+            teatro_tv_cinema = 'teatro_tv_cinema' in modalidades_professor or teatro_presencial or teatro_online
+            
+            # Atualizar dados do professor
+            professor.nome = nome
+            professor.telefone = telefone
+            professor.dublagem_presencial = dublagem_presencial
+            professor.dublagem_online = dublagem_online
+            professor.teatro_presencial = teatro_presencial
+            professor.teatro_online = teatro_online
+            professor.musical = musical
+            professor.locucao = locucao
+            professor.curso_apresentador = curso_apresentador
+            professor.teatro_tv_cinema = teatro_tv_cinema
+            
+            # Validação: pelo menos um horário com modalidade obrigatório
+            if not horarios_adicionados:
+                flash('Adicione pelo menos um horário de aula com modalidade.', 'error')
+                return render_template('editar_professor.html', professor=professor)
+            
+            try:
+                db.session.commit()
+                flash(f'Professor {professor.nome} atualizado com sucesso!', 'success')
+                return redirect(url_for('main.listar_professores'))
+            except Exception as e:
+                db.session.rollback()
+                import traceback
+                error_details = traceback.format_exc()
+                print(f"Erro ao atualizar professor: {error_details}")
+                flash(f'Erro ao atualizar professor: {str(e)}', 'error')
+        
+        except Exception as e:
+            db.session.rollback()
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Erro geral na edição de professor: {error_details}")
+            flash(f'Erro interno ao processar edição: {str(e)}', 'error')
+    
+    # GET - mostrar formulário de edição
+    return render_template('editar_professor.html', professor=professor)
 
 @bp.route('/professores/<int:professor_id>/reativar', methods=['POST'])
 @admin_required
@@ -596,84 +728,81 @@ def cadastro_usuario_professor():
                          professor_id_pre_selecionado=professor_id_pre_selecionado)
 
 @bp.route('/api/professores', methods=['GET'])
+@login_required
 def api_professores():
     """API para buscar professores baseado nas modalidades selecionadas"""
-    tipo_curso = request.args.get('tipo_curso', '').strip()
-    
-    if not tipo_curso:
-        return jsonify([])
-    
-    # Filtrar apenas professores ativos
-    query = Professor.query.filter_by(ativo=True)
-    
-    # Filtrar professores baseado no tipo de curso
-    # SQLite armazena booleanos como INTEGER (0 ou 1), então comparamos com 1
-    from sqlalchemy import or_
-    
-    if tipo_curso == 'dublagem_online':
-        query = query.filter(Professor.dublagem_online == 1)
-    elif tipo_curso == 'dublagem_presencial':
-        query = query.filter(Professor.dublagem_presencial == 1)
-    elif tipo_curso == 'teatro_online':
-        query = query.filter(Professor.teatro_online == 1)
-    elif tipo_curso == 'teatro_presencial':
-        query = query.filter(Professor.teatro_presencial == 1)
-    elif tipo_curso == 'locucao':
-        query = query.filter(Professor.locucao == 1)
-    elif tipo_curso == 'musical':
-        query = query.filter(Professor.musical == 1)
-    elif tipo_curso == 'teatro_tv_cinema':
-        # Teatro TV/Cinema pode ser com professor de teatro presencial ou online
-        query = query.filter(or_(Professor.teatro_presencial == 1, Professor.teatro_online == 1))
-    else:
-        # Se nenhum tipo foi especificado, retornar vazio
-        return jsonify([])
-    
-    professores = query.order_by(Professor.nome).all()
-    
-    # Debug: verificar quantos professores foram encontrados
-    total_professores = Professor.query.count()
-    print(f"DEBUG API: tipo_curso={tipo_curso}, total_professores_no_banco={total_professores}, encontrados={len(professores)}")
-    
-    # Se não encontrou nenhum, listar todos os professores para debug
-    if len(professores) == 0 and total_professores > 0:
-        todos_profs = Professor.query.limit(3).all()
-        print(f"  DEBUG: Listando primeiros professores do banco:")
-        for p in todos_profs:
-            print(f"    - {p.nome}: dublagem_online={p.dublagem_online} (type: {type(p.dublagem_online)}), dublagem_presencial={p.dublagem_presencial}")
-            # Testar query manual
-            if tipo_curso == 'dublagem_online':
-                print(f"      Teste: dublagem_online == 1: {p.dublagem_online == 1}, dublagem_online == True: {p.dublagem_online == True}")
-    
-    resultado = [{
-        'id': p.id,
-        'nome': p.nome,
-        'dublagem_presencial': p.dublagem_presencial,
-        'dublagem_online': p.dublagem_online,
-        'teatro_presencial': p.teatro_presencial,
-        'teatro_online': p.teatro_online,
-        'musical': p.musical,
-        'locucao': p.locucao,
-        'curso_apresentador': p.curso_apresentador
-    } for p in professores]
-    
-    print(f"DEBUG API: Retornando {len(resultado)} professores")
-    return jsonify(resultado)
+    try:
+        tipo_curso = request.args.get('tipo_curso', '').strip()
+        
+        if not tipo_curso:
+            return jsonify([])
+        
+        # Filtrar apenas professores ativos
+        query = Professor.query.filter_by(ativo=True)
+        
+        # Filtrar professores baseado no tipo de curso
+        # Usar == True para compatibilidade com SQLite e PostgreSQL
+        from sqlalchemy import or_
+        
+        if tipo_curso == 'dublagem_online':
+            query = query.filter(Professor.dublagem_online == True)
+        elif tipo_curso == 'dublagem_presencial':
+            query = query.filter(Professor.dublagem_presencial == True)
+        elif tipo_curso == 'teatro_online':
+            query = query.filter(Professor.teatro_online == True)
+        elif tipo_curso == 'teatro_presencial':
+            query = query.filter(Professor.teatro_presencial == True)
+        elif tipo_curso == 'locucao':
+            query = query.filter(Professor.locucao == True)
+        elif tipo_curso == 'musical':
+            query = query.filter(Professor.musical == True)
+        elif tipo_curso == 'teatro_tv_cinema':
+            # Teatro TV/Cinema pode ser com professor de teatro presencial ou online
+            query = query.filter(or_(Professor.teatro_presencial == True, Professor.teatro_online == True))
+        else:
+            # Se nenhum tipo foi especificado, retornar vazio
+            return jsonify([])
+        
+        professores = query.order_by(Professor.nome).all()
+        
+        resultado = [{
+            'id': p.id,
+            'nome': p.nome,
+            'dublagem_presencial': bool(p.dublagem_presencial),
+            'dublagem_online': bool(p.dublagem_online),
+            'teatro_presencial': bool(p.teatro_presencial),
+            'teatro_online': bool(p.teatro_online),
+            'musical': bool(p.musical),
+            'locucao': bool(p.locucao),
+            'curso_apresentador': bool(p.curso_apresentador)
+        } for p in professores]
+        
+        return jsonify(resultado)
+    except Exception as e:
+        import traceback
+        print(f"Erro na API de professores: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/api/professor/<int:professor_id>/horarios', methods=['GET'])
+@login_required
 def api_horarios_professor(professor_id):
     """API para buscar horários de um professor específico"""
-    professor = Professor.query.get_or_404(professor_id)
-    
-    horarios = []
-    for horario in professor.horarios:
-        horarios.append({
-            'id': horario.id,
-            'dia_semana': horario.dia_semana,
-            'horario_aula': horario.horario_aula
-        })
-    
-    return jsonify(horarios)
+    try:
+        professor = Professor.query.get_or_404(professor_id)
+        
+        horarios = []
+        for horario in professor.horarios:
+            horarios.append({
+                'id': horario.id,
+                'dia_semana': horario.dia_semana,
+                'horario_aula': horario.horario_aula
+            })
+        
+        return jsonify(horarios)
+    except Exception as e:
+        import traceback
+        print(f"Erro na API de horários: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/cadastro-alunos', methods=['GET', 'POST'])
 @login_required
@@ -1049,18 +1178,39 @@ def listar_alunos():
             flash('Erro: Usuário professor não está vinculado a um registro de professor.', 'error')
             return redirect(url_for('main.index'))
         
-        # Buscar alunos através de matrículas - carregar todas as matrículas do aluno, não apenas as do professor
+        # Professores não podem ver alunos inativos - redirecionar para ativos
         if filtro == 'inativos':
-            alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).join(Matricula).filter(
-                Matricula.professor_id == professor.id,
-                Aluno.ativo == False
-            ).order_by(Aluno.data_exclusao.desc(), Aluno.nome).distinct().all()
-        elif filtro == 'pagamentos':
+            flash('Acesso negado. Apenas administradores podem visualizar alunos inativos.', 'error')
+            return redirect(url_for('main.listar_alunos', filtro='ativos'))
+        
+        # Buscar alunos através de matrículas - carregar todas as matrículas do aluno, não apenas as do professor
+        if filtro == 'pagamentos':
             # Para a aba de pagamentos, mostrar alunos ativos do professor
             alunos = Aluno.query.options(subqueryload(Aluno.matriculas), subqueryload(Aluno.pagamentos)).join(Matricula).filter(
                 Matricula.professor_id == professor.id,
                 Aluno.ativo == True
             ).order_by(Aluno.nome).distinct().all()
+        elif filtro == 'notas':
+            # Para a aba de notas, filtrar por tipo_curso se fornecido
+            tipo_curso = request.args.get('tipo_curso', '').strip()
+            if tipo_curso:
+                try:
+                    # Filtrar alunos apenas do curso selecionado
+                    alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).join(Matricula).filter(
+                        Matricula.professor_id == professor.id,
+                        Matricula.tipo_curso == tipo_curso,
+                        Aluno.ativo == True
+                    ).order_by(Aluno.nome).distinct().all()
+                except Exception as e:
+                    import traceback
+                    print(f"Erro ao buscar alunos para notas: {e}")
+                    print(traceback.format_exc())
+                    alunos = []
+                    flash(f'Erro ao buscar alunos: {str(e)}', 'error')
+            else:
+                # Se não há tipo_curso, não mostrar alunos
+                alunos = []
+                tipo_curso = None
         else:
             alunos = Aluno.query.options(subqueryload(Aluno.matriculas)).join(Matricula).filter(
                 Matricula.professor_id == professor.id,
@@ -1071,7 +1221,89 @@ def listar_alunos():
         flash('Acesso negado. Apenas administradores e professores podem ver a lista de alunos.', 'error')
         return redirect(url_for('main.index'))
     
-    return render_template('listar_alunos.html', alunos=alunos, filtro=filtro, motivos_exclusao=MOTIVOS_EXCLUSAO, data_hoje=date.today())
+    # Variáveis adicionais para a aba de notas
+    # Nota: tipo_curso já foi definido acima quando filtro == 'notas' e é professor
+    if filtro == 'notas':
+        if not current_user.is_professor():
+            # Para admin, buscar tipo_curso da URL
+            tipo_curso = request.args.get('tipo_curso', '').strip() or None
+        # Se for professor, tipo_curso já foi definido acima (linha 1195)
+    else:
+        tipo_curso = None
+    
+    numero_prova = request.args.get('numero_prova', type=int) if filtro == 'notas' else None
+    data_prova_str = request.args.get('data_prova', '').strip() if filtro == 'notas' else None
+    
+    # Processar data_prova de forma segura
+    data_prova = None
+    if data_prova_str:
+        try:
+            data_prova = datetime.strptime(data_prova_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            data_prova = None
+    
+    # Se for professor e filtro for notas, buscar notas dos alunos
+    notas_dict = {}
+    if filtro == 'notas' and current_user.is_professor() and tipo_curso and alunos:
+        from app.models.nota import Nota
+        professor = current_user.get_professor()
+        if professor:
+            # Buscar TODAS as notas dos alunos para este curso (não apenas da prova atual)
+            # Isso é necessário para calcular a média total de todas as provas
+            try:
+                alunos_ids = [aluno.id for aluno in alunos]
+                if alunos_ids:
+                    # Buscar todas as notas dos alunos para este curso e professor
+                    notas = Nota.query.filter(
+                        Nota.aluno_id.in_(alunos_ids),
+                        Nota.professor_id == professor.id,
+                        Nota.tipo_curso == tipo_curso
+                    ).all()
+                    
+                    # Organizar notas por aluno e número da prova
+                    for nota in notas:
+                        try:
+                            if nota and hasattr(nota, 'aluno_id') and hasattr(nota, 'numero_prova'):
+                                if nota.aluno_id and nota.numero_prova:
+                                    if nota.aluno_id not in notas_dict:
+                                        notas_dict[nota.aluno_id] = {}
+                                    notas_dict[nota.aluno_id][nota.numero_prova] = nota
+                        except Exception as e:
+                            # Continuar processando outras notas mesmo se uma falhar
+                            print(f"Erro ao processar nota {nota.id if nota else 'None'}: {e}")
+                            continue
+            except Exception as e:
+                # Em caso de erro, continuar com notas_dict vazio
+                import traceback
+                print(f"Erro ao buscar notas: {e}")
+                print(traceback.format_exc())
+                notas_dict = {}
+    
+    try:
+        return render_template('listar_alunos.html', 
+                             alunos=alunos, 
+                             filtro=filtro, 
+                             tipo_curso=tipo_curso,
+                             numero_prova=numero_prova or 1,
+                             data_prova=data_prova,
+                             notas_dict=notas_dict,
+                             motivos_exclusao=MOTIVOS_EXCLUSAO, 
+                             data_hoje=date.today())
+    except Exception as e:
+        import traceback
+        error_msg = f"Erro ao renderizar template: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        flash(f'Erro ao carregar página: {str(e)}', 'error')
+        # Retornar uma versão simplificada sem notas
+        return render_template('listar_alunos.html', 
+                             alunos=alunos if alunos else [], 
+                             filtro=filtro, 
+                             tipo_curso=tipo_curso,
+                             numero_prova=1,
+                             data_prova=None,
+                             notas_dict={},
+                             motivos_exclusao=MOTIVOS_EXCLUSAO, 
+                             data_hoje=date.today())
 
 @bp.route('/alunos/<int:aluno_id>/excluir', methods=['POST'])
 @admin_required
@@ -1333,7 +1565,7 @@ def editar_aluno(aluno_id):
                 else:
                     flash(f'Aluno {aluno.nome} atualizado com sucesso!', 'success')
                     filtro_redirect = 'pendentes' if not aluno.aprovado else 'ativos'
-                
+            
                 db.session.commit()
                 return redirect(url_for('main.listar_alunos', filtro=filtro_redirect))
             except Exception as e:
@@ -1426,6 +1658,59 @@ def aprovar_aluno(aluno_id):
 
 # ==================== ROTAS DE NOTAS ====================
 
+def obter_modalidades_professor(professor):
+    """Função auxiliar para obter modalidades de um professor"""
+    from sqlalchemy.orm import joinedload
+    
+    modalidades_professor = []
+    professor_com_horarios = Professor.query.options(joinedload(Professor.horarios)).filter_by(id=professor.id).first()
+    
+    if professor_com_horarios and professor_com_horarios.horarios:
+        modalidades_unicas = set()
+        for horario in professor_com_horarios.horarios:
+            try:
+                if horario.modalidade:
+                    modalidades_unicas.add(horario.modalidade)
+            except AttributeError:
+                pass
+        
+        # Se não encontrou modalidades nos horários, usar as modalidades do professor
+        if not modalidades_unicas:
+            if professor_com_horarios.dublagem_presencial:
+                modalidades_unicas.add('dublagem_presencial')
+            if professor_com_horarios.dublagem_online:
+                modalidades_unicas.add('dublagem_online')
+            if professor_com_horarios.teatro_presencial:
+                modalidades_unicas.add('teatro_presencial')
+            if professor_com_horarios.teatro_online:
+                modalidades_unicas.add('teatro_online')
+            if professor_com_horarios.locucao:
+                modalidades_unicas.add('locucao')
+            if professor_com_horarios.musical:
+                modalidades_unicas.add('musical')
+            if professor_com_horarios.teatro_tv_cinema:
+                modalidades_unicas.add('teatro_tv_cinema')
+            if professor_com_horarios.curso_apresentador:
+                modalidades_unicas.add('curso_apresentador')
+        
+        tipos_cursos_map = {
+            'dublagem_online': 'Dublagem Online',
+            'dublagem_presencial': 'Dublagem Presencial',
+            'teatro_presencial': 'Teatro Presencial',
+            'teatro_online': 'Teatro Online',
+            'locucao': 'Locução',
+            'teatro_tv_cinema': 'Teatro TV e Cinema',
+            'musical': 'Musical',
+            'curso_apresentador': 'Curso de Apresentador'
+        }
+        
+        modalidades_professor = [
+            {'value': mod, 'label': tipos_cursos_map.get(mod, mod.replace('_', ' ').title())}
+            for mod in sorted(modalidades_unicas)
+        ]
+    
+    return modalidades_professor
+
 @bp.route('/notas', methods=['GET'])
 @login_required
 def listar_notas():
@@ -1434,7 +1719,6 @@ def listar_notas():
     
     # Filtros
     aluno_id = request.args.get('aluno_id', type=int)
-    professor_id = request.args.get('professor_id', type=int)
     tipo_curso = request.args.get('tipo_curso', '')
     
     # Base query com eager loading
@@ -1444,6 +1728,9 @@ def listar_notas():
         joinedload(Nota.matricula)
     )
     
+    # Variável para armazenar alunos (será usada tanto para professores quanto admins)
+    alunos = []
+    
     # Se for professor, só pode ver notas dos seus alunos
     if current_user.is_professor():
         professor = current_user.get_professor()
@@ -1451,39 +1738,10 @@ def listar_notas():
             flash('Professor não encontrado.', 'error')
             return redirect(url_for('main.index'))
         
-        # Buscar IDs dos alunos deste professor através das matrículas
-        alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
-            professor_id=professor.id
-        ).distinct().all()
-        alunos_ids = [row[0] for row in alunos_ids]
-        
-        if not alunos_ids:
-            # Professor sem alunos
-            return render_template('listar_notas.html', notas=[], alunos=[], professores=[])
-        
-        query = query.filter(Nota.aluno_id.in_(alunos_ids))
-        query = query.filter(Nota.professor_id == professor.id)
-    
-    # Aplicar filtros adicionais
-    if aluno_id:
-        query = query.filter(Nota.aluno_id == aluno_id)
-    if professor_id and current_user.is_admin():
-        query = query.filter(Nota.professor_id == professor_id)
-    if tipo_curso:
-        query = query.filter(Nota.tipo_curso == tipo_curso)
-    
-    notas = query.order_by(Nota.data_avaliacao.desc(), Nota.data_cadastro.desc()).all()
-    
-    # Buscar alunos e professores para filtros (apenas admin)
-    alunos = []
-    professores = []
-    if current_user.is_admin():
-        alunos = Aluno.query.filter_by(ativo=True).order_by(Aluno.nome).all()
-        professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
-    elif current_user.is_professor():
-        # Professor só vê seus próprios alunos
-        professor = current_user.get_professor()
-        if professor:
+        # Para professor, tipo_curso é obrigatório
+        if not tipo_curso:
+            modalidades_professor = obter_modalidades_professor(professor)
+            
             alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
                 professor_id=professor.id
             ).distinct().all()
@@ -1493,14 +1751,87 @@ def listar_notas():
                     Aluno.id.in_(alunos_ids),
                     Aluno.ativo == True
                 ).order_by(Aluno.nome).all()
+            
+            return render_template('listar_notas.html', 
+                                 notas=[], 
+                                 alunos=alunos, 
+                                 aluno_id=None,
+                                 tipo_curso='',
+                                 modalidades_professor=modalidades_professor)
+        
+        # Buscar IDs dos alunos deste professor através das matrículas
+        alunos_ids_query = db.session.query(Matricula.aluno_id).filter_by(
+            professor_id=professor.id,
+            tipo_curso=tipo_curso
+        ).distinct()
+        alunos_ids = [row[0] for row in alunos_ids_query.all()]
+        
+        if not alunos_ids:
+            # Professor sem alunos nesta modalidade
+            modalidades_professor = obter_modalidades_professor(professor)
+            alunos = []
+            return render_template('listar_notas.html', 
+                                 notas=[], 
+                                 alunos=alunos, 
+                                 aluno_id=None,
+                                 tipo_curso=tipo_curso,
+                                 modalidades_professor=modalidades_professor)
+        
+        # Buscar os alunos completos para exibir na lista
+        alunos = Aluno.query.filter(
+            Aluno.id.in_(alunos_ids),
+            Aluno.ativo == True
+        ).order_by(Aluno.nome).all()
+        
+        query = query.filter(Nota.aluno_id.in_(alunos_ids))
+        query = query.filter(Nota.professor_id == professor.id)
+        query = query.filter(Nota.tipo_curso == tipo_curso)  # Já aplicar filtro de curso aqui
+    
+    # Aplicar filtros adicionais (apenas para admin)
+    if aluno_id:
+        query = query.filter(Nota.aluno_id == aluno_id)
+    if tipo_curso and current_user.is_admin():
+        query = query.filter(Nota.tipo_curso == tipo_curso)
+    
+    notas = query.order_by(Nota.data_avaliacao.desc(), Nota.data_cadastro.desc()).all()
+    
+    # Buscar alunos para filtros e exibição
+    modalidades_professor = []
+    
+    if current_user.is_admin():
+        alunos = Aluno.query.filter_by(ativo=True).order_by(Aluno.nome).all()
+    elif current_user.is_professor():
+        # Professor só vê seus próprios alunos
+        professor = current_user.get_professor()
+        if professor:
+            modalidades_professor = obter_modalidades_professor(professor)
+            
+            # Se tipo_curso foi selecionado, os alunos já foram buscados acima (linhas 1675-1679)
+            # Se não, buscar todos os alunos do professor (sem filtro de curso)
+            if not tipo_curso:
+                # Buscar todos os alunos do professor (sem filtro de curso)
+                query_matriculas = db.session.query(Matricula.aluno_id).filter_by(
+                    professor_id=professor.id
+                )
+                
+                alunos_ids = query_matriculas.distinct().all()
+                alunos_ids = [row[0] for row in alunos_ids]
+                if alunos_ids:
+                    alunos = Aluno.query.filter(
+                        Aluno.id.in_(alunos_ids),
+                        Aluno.ativo == True
+                    ).order_by(Aluno.nome).all()
+                else:
+                    alunos = []
+            # Se tipo_curso foi selecionado, a variável 'alunos' já foi definida acima (linhas 1675-1679)
+            # e não precisa ser redefinida aqui
     
     return render_template('listar_notas.html', 
                          notas=notas, 
                          alunos=alunos, 
-                         professores=professores,
                          aluno_id=aluno_id,
-                         professor_id=professor_id,
-                         tipo_curso=tipo_curso)
+                         tipo_curso=tipo_curso,
+                         modalidades_professor=modalidades_professor)
 
 @bp.route('/notas/cadastrar', methods=['GET', 'POST'])
 @login_required
@@ -1605,6 +1936,7 @@ def cadastrar_nota():
     # GET - mostrar formulário
     aluno_id = request.args.get('aluno_id', type=int)
     professor_id = request.args.get('professor_id', type=int)
+    filtro_modalidade = request.args.get('filtro_modalidade', '').strip()
     
     # Buscar alunos e professores disponíveis
     alunos = []
@@ -1623,9 +1955,15 @@ def cadastrar_nota():
         professor = current_user.get_professor()
         if professor:
             # Buscar alunos deste professor
-            alunos_ids = db.session.query(Matricula.aluno_id).filter_by(
+            query_matriculas = db.session.query(Matricula.aluno_id).filter_by(
                 professor_id=professor.id
-            ).distinct().all()
+            )
+            
+            # Aplicar filtro de modalidade se fornecido
+            if filtro_modalidade:
+                query_matriculas = query_matriculas.filter_by(tipo_curso=filtro_modalidade)
+            
+            alunos_ids = query_matriculas.distinct().all()
             alunos_ids = [row[0] for row in alunos_ids]
             
             if alunos_ids:
@@ -1637,10 +1975,13 @@ def cadastrar_nota():
             professores = [professor]  # Professor só pode cadastrar para si mesmo
             
             if aluno_id:
-                matriculas = Matricula.query.filter_by(
+                query_matriculas_aluno = Matricula.query.filter_by(
                     aluno_id=aluno_id,
                     professor_id=professor.id
-                ).all()
+                )
+                if filtro_modalidade:
+                    query_matriculas_aluno = query_matriculas_aluno.filter_by(tipo_curso=filtro_modalidade)
+                matriculas = query_matriculas_aluno.all()
     
     tipos_cursos = {
         'dublagem_online': 'Dublagem Online',
@@ -1661,6 +2002,7 @@ def cadastrar_nota():
                          tipos_cursos=tipos_cursos,
                          aluno_id=aluno_id,
                          professor_id=professor_id,
+                         filtro_modalidade=filtro_modalidade,
                          data_hoje=data_hoje)
 
 @bp.route('/notas/<int:nota_id>/editar', methods=['GET', 'POST'])
@@ -1753,6 +2095,171 @@ def excluir_nota(nota_id):
     
     return redirect(url_for('main.listar_notas'))
 
+@bp.route('/notas/salvar-criterios', methods=['POST'])
+@login_required
+def salvar_criterios_notas():
+    """Salvar notas com critérios para múltiplos alunos de uma vez"""
+    if not current_user.is_professor():
+        flash('Acesso negado. Apenas professores podem salvar notas com critérios.', 'error')
+        return redirect(url_for('main.listar_alunos'))
+    
+    professor = current_user.get_professor()
+    if not professor:
+        flash('Professor não encontrado.', 'error')
+        return redirect(url_for('main.listar_alunos'))
+    
+    # Obter dados do formulário
+    tipo_curso = request.form.get('tipo_curso', '').strip()
+    numero_prova = request.form.get('numero_prova', type=int)
+    data_avaliacao_str = request.form.get('data_avaliacao', '').strip()
+    
+    if not tipo_curso:
+        flash('Tipo de curso é obrigatório.', 'error')
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso))
+    
+    if not numero_prova:
+        flash('Número da prova é obrigatório.', 'error')
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso))
+    
+    if not data_avaliacao_str:
+        flash('Data da avaliação é obrigatória.', 'error')
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso))
+    
+    try:
+        data_avaliacao = datetime.strptime(data_avaliacao_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Data da avaliação inválida.', 'error')
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso))
+    
+    # Processar notas de cada aluno
+    notas_salvas = 0
+    notas_atualizadas = 0
+    erros = []
+    
+    try:
+        # Buscar todos os campos do formulário que começam com "aluno_"
+        alunos_processados = set()
+        for key in request.form.keys():
+            if key.startswith('aluno_') and key.endswith('_criterio1'):
+                # Extrair ID do aluno do nome do campo (formato: aluno_{id}_criterio1)
+                try:
+                    aluno_id = int(key.split('_')[1])
+                    alunos_processados.add(aluno_id)
+                except (ValueError, IndexError):
+                    continue
+        
+        for aluno_id in alunos_processados:
+            try:
+                # Buscar aluno
+                aluno = Aluno.query.get(aluno_id)
+                if not aluno:
+                    erros.append(f'Aluno ID {aluno_id} não encontrado.')
+                    continue
+                
+                # Verificar se o aluno está matriculado com este professor neste curso
+                matricula = Matricula.query.filter_by(
+                    aluno_id=aluno_id,
+                    professor_id=professor.id,
+                    tipo_curso=tipo_curso
+                ).first()
+                
+                if not matricula:
+                    erros.append(f'Aluno {aluno.nome} não está matriculado neste curso com este professor.')
+                    continue
+                
+                # Obter valores dos critérios
+                criterio1_str = request.form.get(f'aluno_{aluno_id}_criterio1', '').strip()
+                criterio2_str = request.form.get(f'aluno_{aluno_id}_criterio2', '').strip()
+                criterio3_str = request.form.get(f'aluno_{aluno_id}_criterio3', '').strip()
+                criterio4_str = request.form.get(f'aluno_{aluno_id}_criterio4', '').strip()
+                
+                # Converter para float (None se vazio)
+                criterio1 = float(criterio1_str) if criterio1_str else None
+                criterio2 = float(criterio2_str) if criterio2_str else None
+                criterio3 = float(criterio3_str) if criterio3_str else None
+                criterio4 = float(criterio4_str) if criterio4_str else None
+                
+                # Validar que pelo menos um critério foi preenchido
+                if criterio1 is None and criterio2 is None and criterio3 is None and criterio4 is None:
+                    continue  # Pular se nenhum critério foi preenchido
+                
+                # Validar valores (0 a 10)
+                for i, criterio in enumerate([criterio1, criterio2, criterio3, criterio4], 1):
+                    if criterio is not None and (criterio < 0 or criterio > 10):
+                        erros.append(f'Aluno {aluno.nome}: Critério {i} deve estar entre 0 e 10.')
+                        continue
+                
+                # Calcular valor (média dos critérios preenchidos)
+                criterios_preenchidos = [c for c in [criterio1, criterio2, criterio3, criterio4] if c is not None]
+                valor = 0.0  # Valor padrão
+                if criterios_preenchidos:
+                    valor = sum(criterios_preenchidos) / len(criterios_preenchidos)
+                
+                # Verificar se já existe nota para este aluno, professor, curso e prova
+                nota_existente = Nota.query.filter_by(
+                    aluno_id=aluno_id,
+                    professor_id=professor.id,
+                    tipo_curso=tipo_curso,
+                    numero_prova=numero_prova
+                ).first()
+                
+                if nota_existente:
+                    # Atualizar nota existente
+                    nota_existente.criterio1 = criterio1
+                    nota_existente.criterio2 = criterio2
+                    nota_existente.criterio3 = criterio3
+                    nota_existente.criterio4 = criterio4
+                    nota_existente.valor = valor  # Atualizar valor calculado
+                    nota_existente.data_avaliacao = data_avaliacao
+                    nota_existente.matricula_id = matricula.id
+                    notas_atualizadas += 1
+                else:
+                    # Criar nova nota
+                    nota = Nota(
+                        aluno_id=aluno_id,
+                        professor_id=professor.id,
+                        matricula_id=matricula.id,
+                        tipo_curso=tipo_curso,
+                        numero_prova=numero_prova,
+                        criterio1=criterio1,
+                        criterio2=criterio2,
+                        criterio3=criterio3,
+                        criterio4=criterio4,
+                        valor=valor,  # Preencher valor calculado
+                        data_avaliacao=data_avaliacao,
+                        tipo_avaliacao=f'Prova {numero_prova}',
+                        cadastrado_por=current_user.id
+                    )
+                    db.session.add(nota)
+                    notas_salvas += 1
+                    
+            except Exception as e:
+                erros.append(f'Erro ao processar aluno ID {aluno_id}: {str(e)}')
+                continue
+        
+        # Commit de todas as alterações
+        db.session.commit()
+        
+        # Mensagens de sucesso
+        if notas_salvas > 0:
+            flash(f'{notas_salvas} nota(s) cadastrada(s) com sucesso!', 'success')
+        if notas_atualizadas > 0:
+            flash(f'{notas_atualizadas} nota(s) atualizada(s) com sucesso!', 'success')
+        if erros:
+            for erro in erros:
+                flash(erro, 'error')
+        
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso, numero_prova=numero_prova, data_prova=data_avaliacao_str))
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"Erro ao salvar critérios de notas: {e}")
+        print(traceback.format_exc())
+        flash(f'Erro ao salvar notas: {str(e)}', 'error')
+        data_avaliacao_str = request.form.get('data_avaliacao', '').strip()
+        return redirect(url_for('main.listar_alunos', filtro='notas', tipo_curso=tipo_curso, numero_prova=numero_prova, data_prova=data_avaliacao_str))
+
 # ==================== ROTAS DE PAGAMENTO ====================
 
 @bp.route('/alunos/<int:aluno_id>/pagamento/upload', methods=['GET', 'POST'])
@@ -1761,10 +2268,9 @@ def upload_comprovante(aluno_id):
     """Upload de comprovante de pagamento"""
     aluno = Aluno.query.get_or_404(aluno_id)
     
-    # Verificar permissão: admin ou professor podem acessar qualquer aluno
-    # Alunos podem acessar apenas se houver uma relação (por enquanto, apenas admin e professor)
-    if not current_user.is_admin() and not current_user.is_professor():
-        flash('Acesso negado. Apenas administradores e professores podem enviar comprovantes.', 'error')
+    # Verificar permissão: apenas administradores podem enviar comprovantes
+    if not current_user.is_admin():
+        flash('Acesso negado. Apenas administradores podem enviar comprovantes.', 'error')
         return redirect(url_for('main.index'))
     
     if request.method == 'POST':
@@ -1787,7 +2293,7 @@ def upload_comprovante(aluno_id):
             valor_pago = request.form.get('valor_pago', '').strip()
             data_pagamento_str = request.form.get('data_pagamento', '').strip()
             observacoes = request.form.get('observacoes', '').strip()
-            
+    
             # Validações
             erros = []
             
@@ -1888,7 +2394,7 @@ def upload_comprovante(aluno_id):
             
             # Criar registro de pagamento
             pagamento = Pagamento(
-                aluno_id=aluno_id,
+                    aluno_id=aluno_id,
                 mes_referencia=mes_referencia,
                 ano_referencia=ano_referencia,
                 valor_pago=valor_pago,

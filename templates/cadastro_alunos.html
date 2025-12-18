@@ -534,7 +534,8 @@
                     <label for="forma_pagamento_${alunoCount}" class="required">Forma de Pagamento</label>
                     <select id="forma_pagamento_${alunoCount}" 
                             name="forma_pagamento_${alunoCount}" 
-                            required>
+                            required
+                            onchange="exibirDadosPagamento(${alunoCount}, this.value)">
                         <option value="">Selecione a forma de pagamento</option>
                         <option value="PIX">PIX</option>
                         <option value="Boleto">Boleto</option>
@@ -544,6 +545,10 @@
                         <option value="Dinheiro">Dinheiro</option>
                         <option value="Outro">Outro</option>
                     </select>
+                    <div id="dados_pagamento_${alunoCount}" style="margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 5px; border: 2px solid #2196F3; display: none;">
+                        <strong style="color: #1976D2; display: block; margin-bottom: 10px;">Dados para Pagamento:</strong>
+                        <div id="conteudo_dados_pagamento_${alunoCount}" style="color: #333; line-height: 1.6;"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="data_vencimento_${alunoCount}" class="required">Data de Vencimento</label>
@@ -1048,6 +1053,34 @@
         dataVencimentoInput.setAttribute('max', dataMaxStr);
     }
     
+    function exibirDadosPagamento(index, formaPagamento) {
+        const dadosPagamentoDiv = document.getElementById(`dados_pagamento_${index}`);
+        const conteudoDadosDiv = document.getElementById(`conteudo_dados_pagamento_${index}`);
+        
+        if (!dadosPagamentoDiv || !conteudoDadosDiv) return;
+        
+        // Esconder por padrão
+        dadosPagamentoDiv.style.display = 'none';
+        conteudoDadosDiv.innerHTML = '';
+        
+        // Exibir dados conforme a forma de pagamento selecionada
+        if (formaPagamento === 'Transferência Bancária') {
+            conteudoDadosDiv.innerHTML = `
+                <div style="margin-bottom: 8px;"><strong>Banco:</strong> ITAÚ</div>
+                <div style="margin-bottom: 8px;"><strong>Agência:</strong> 0308</div>
+                <div style="margin-bottom: 8px;"><strong>Conta Corrente:</strong> 98743-7</div>
+                <div><strong>Titular:</strong> OFICINA DE ATORES CURSO DE PREPARAÇÃO EM ARTES CENICAS</div>
+            `;
+            dadosPagamentoDiv.style.display = 'block';
+        } else if (formaPagamento === 'PIX') {
+            conteudoDadosDiv.innerHTML = `
+                <div><strong>Chave PIX:</strong> 12.624.494/0001-64</div>
+                <div style="margin-top: 8px;"><strong>Beneficiário:</strong> OFICINA DE ATORES CURSO DE PREPARAÇÃO EM ARTES CENICAS</div>
+            `;
+            dadosPagamentoDiv.style.display = 'block';
+        }
+    }
+    
     function validarDataNascimento(index) {
         const dataNascimentoInput = document.getElementById(`data_nascimento_${index}`);
         if (!dataNascimentoInput) return;
@@ -1356,27 +1389,56 @@
     }
     
     function buscarProfessores(url, selectElement) {
-        fetch(url)
-            .then(response => response.json())
-            .then(professores => {
+        // Mostrar estado de carregamento
+        selectElement.innerHTML = '<option value="">Carregando professores...</option>';
+        selectElement.disabled = true;
+        
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin' // Incluir cookies de autenticação
+        })
+            .then(response => {
+                if (!response.ok) {
+                    // Se a resposta não for OK, verificar se é erro de autenticação
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+                    }
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Verificar se há erro na resposta
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Verificar se é array
+                const professores = Array.isArray(data) ? data : [];
                 selectElement.innerHTML = '<option value="">Selecione o professor</option>';
                 
                 if (professores.length === 0) {
-                    selectElement.innerHTML = '<option value="">Nenhum professor disponível</option>';
+                    selectElement.innerHTML = '<option value="">Nenhum professor disponível para este curso</option>';
                     selectElement.disabled = true;
                 } else {
                     professores.forEach(professor => {
-                        const option = document.createElement('option');
-                        option.value = professor.id;
-                        option.textContent = formatarNome(professor.nome);
-                        selectElement.appendChild(option);
+                        if (professor && professor.id && professor.nome) {
+                            const option = document.createElement('option');
+                            option.value = professor.id;
+                            option.textContent = formatarNome(professor.nome);
+                            selectElement.appendChild(option);
+                        }
                     });
                     selectElement.disabled = false;
                 }
             })
             .catch(error => {
                 console.error('Erro ao buscar professores:', error);
-                selectElement.innerHTML = '<option value="">Erro ao carregar professores</option>';
+                const errorMessage = error.message || 'Erro ao carregar professores';
+                selectElement.innerHTML = `<option value="">${errorMessage}</option>`;
                 selectElement.disabled = true;
             });
     }
@@ -1408,9 +1470,31 @@
         }
         
         // Buscar horários do professor
-        fetch(apiUrl)
-            .then(response => response.json())
-            .then(horarios => {
+        fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin' // Incluir cookies de autenticação
+        })
+            .then(response => {
+                if (!response.ok) {
+                    // Se a resposta não for OK, verificar se é erro de autenticação
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+                    }
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Verificar se há erro na resposta
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Verificar se é array
+                const horarios = Array.isArray(data) ? data : [];
                 const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
                 const horarioSelect = document.getElementById(`horario_${tipoCurso}_${alunoIndex}`);
                 
@@ -1483,8 +1567,9 @@
                 console.error('Erro ao buscar horários:', error);
                 const diaSelect = document.getElementById(`dia_semana_${tipoCurso}_${alunoIndex}`);
                 const horarioSelect = document.getElementById(`horario_${tipoCurso}_${alunoIndex}`);
+                const errorMessage = error.message || 'Erro ao carregar horários';
                 if (diaSelect) {
-                    diaSelect.innerHTML = '<option value="">Erro ao carregar horários</option>';
+                    diaSelect.innerHTML = `<option value="">${errorMessage}</option>`;
                     diaSelect.disabled = true;
                 }
                 if (horarioSelect) {
@@ -1716,7 +1801,7 @@
             try {
                 const container = document.getElementById('alunosContainer');
                 if (container) {
-                    adicionarAluno();
+        adicionarAluno();
                 } else {
                     console.warn('Container de alunos ainda não está disponível, tentando novamente...');
                     setTimeout(init, 100);

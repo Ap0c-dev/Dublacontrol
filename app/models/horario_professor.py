@@ -8,6 +8,7 @@ class HorarioProfessor(db.Model):
     professor_id = db.Column(db.Integer, db.ForeignKey('professores.id'), nullable=False)
     dia_semana = db.Column(db.String(20), nullable=False)  # Ex: "Segunda-feira", "Terça-feira", etc.
     horario_aula = db.Column(db.String(50), nullable=False)  # Ex: "17:00 às 19:00", "20:00 às 22:00"
+    modalidade = db.Column(db.String(50), nullable=False)  # dublagem_online, dublagem_presencial, teatro_presencial, teatro_online, locucao, teatro_tv_cinema, musical, curso_apresentador
     
     # Faixa etária permitida para este horário
     idade_minima = db.Column(db.Integer, nullable=True)  # Idade mínima permitida (ex: 8 anos)
@@ -25,6 +26,7 @@ class HorarioProfessor(db.Model):
             'professor_id': self.professor_id,
             'dia_semana': self.dia_semana,
             'horario_aula': self.horario_aula,
+            'modalidade': self.modalidade,
             'idade_minima': self.idade_minima,
             'idade_maxima': self.idade_maxima
         }

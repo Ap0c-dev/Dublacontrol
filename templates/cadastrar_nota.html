@@ -96,6 +96,23 @@
 {% block content %}
 <div class="form-container">
     <form method="POST" action="{{ url_for('main.cadastrar_nota') }}">
+        {% if not current_user.is_admin() %}
+        <div class="form-group">
+            <label for="filtro_modalidade">Filtrar por Modalidade</label>
+            <select name="filtro_modalidade" id="filtro_modalidade" onchange="filtrarAlunosPorModalidade()">
+                <option value="">Todas as modalidades</option>
+                <option value="dublagem_online" {% if filtro_modalidade == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
+                <option value="dublagem_presencial" {% if filtro_modalidade == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
+                <option value="teatro_presencial" {% if filtro_modalidade == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
+                <option value="teatro_online" {% if filtro_modalidade == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
+                <option value="locucao" {% if filtro_modalidade == 'locucao' %}selected{% endif %}>Locução</option>
+                <option value="teatro_tv_cinema" {% if filtro_modalidade == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV e Cinema</option>
+                <option value="musical" {% if filtro_modalidade == 'musical' %}selected{% endif %}>Musical</option>
+            </select>
+            <small>Filtre os alunos por modalidade</small>
+        </div>
+        {% endif %}
+        
         <div class="form-group">
             <label for="aluno_id">Aluno <span class="required">*</span></label>
             <select name="aluno_id" id="aluno_id" required onchange="carregarMatriculas()">
@@ -108,26 +125,21 @@
             </select>
         </div>
         
+        {% if current_user.is_admin() %}
         <div class="form-group">
             <label for="professor_id">Professor <span class="required">*</span></label>
-            <select name="professor_id" id="professor_id" required onchange="carregarMatriculas()" {% if not current_user.is_admin() %}disabled{% endif %}>
-                {% if current_user.is_admin() %}
-                    <option value="">Selecione um professor</option>
-                    {% for professor in professores %}
-                    <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
-                        {{ professor.nome|format_name }}
-                    </option>
-                    {% endfor %}
-                {% else %}
-                    {% for professor in professores %}
-                    <option value="{{ professor.id }}" selected>{{ professor.nome|format_name }}</option>
-                    {% endfor %}
-                {% endif %}
+            <select name="professor_id" id="professor_id" required onchange="carregarMatriculas()">
+                <option value="">Selecione um professor</option>
+                {% for professor in professores %}
+                <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
+                    {{ professor.nome|format_name }}
+                </option>
+                {% endfor %}
             </select>
-            {% if not current_user.is_admin() %}
-            <input type="hidden" name="professor_id" value="{{ professores[0].id if professores else '' }}">
-            {% endif %}
         </div>
+        {% else %}
+        <input type="hidden" name="professor_id" id="professor_id" value="{{ professores[0].id if professores else '' }}">
+        {% endif %}
         
         <div class="form-group">
             <label for="matricula_id">Matrícula (Opcional)</label>
@@ -211,9 +223,25 @@ function carregarMatriculas() {
     // Redirecionar para recarregar com os parâmetros
     const url = new URL(window.location.href);
     url.searchParams.set('aluno_id', alunoId);
+    {% if current_user.is_admin() %}
     url.searchParams.set('professor_id', professorId);
+    {% endif %}
     window.location.href = url.toString();
 }
+
+{% if not current_user.is_admin() %}
+function filtrarAlunosPorModalidade() {
+    const modalidade = document.getElementById('filtro_modalidade').value;
+    const url = new URL(window.location.href);
+    if (modalidade) {
+        url.searchParams.set('filtro_modalidade', modalidade);
+    } else {
+        url.searchParams.delete('filtro_modalidade');
+    }
+    url.searchParams.delete('aluno_id'); // Limpar seleção de aluno ao filtrar
+    window.location.href = url.toString();
+}
+{% endif %}
 </script>
 {% endblock %}
 

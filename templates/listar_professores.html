@@ -175,29 +175,85 @@
                 <td data-label="ID">{{ professor.id }}</td>
                 <td data-label="Nome"><strong>{{ professor.nome|format_name }}</strong></td>
                 <td data-label="Telefone">{{ professor.telefone or '-' }}</td>
-                <td data-label="Dia da Semana">{{ professor.dia_semana or '-' }}</td>
-                <td data-label="Horário">{{ professor.horario_aula or '-' }}</td>
+                <td data-label="Dia da Semana">
+                    {% if professor.horarios %}
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            {% for horario in professor.horarios %}
+                                <div style="font-size: 0.9em; min-height: 1.5em;">
+                                    {{ horario.dia_semana }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span style="color: #6c757d;">-</span>
+                    {% endif %}
+                </td>
+                <td data-label="Horário">
+                    {% if professor.horarios %}
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            {% for horario in professor.horarios %}
+                                <div style="font-size: 0.9em; min-height: 1.5em;">
+                                    <strong>{{ horario.horario_aula }}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span style="color: #6c757d;">-</span>
+                    {% endif %}
+                </td>
                 <td data-label="Modalidades">
-                    {% if professor.dublagem_presencial %}
-                        <span class="badge badge-success">Dublagem Presencial</span>
-                    {% endif %}
-                    {% if professor.dublagem_online %}
-                        <span class="badge badge-success">Dublagem Online</span>
-                    {% endif %}
-                    {% if professor.teatro_presencial %}
-                        <span class="badge badge-info">Teatro Presencial</span>
-                    {% endif %}
-                    {% if professor.musical %}
-                        <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
-                    {% endif %}
-                    {% if professor.locucao %}
-                        <span class="badge" style="background: #dc3545; color: white;">Locução</span>
-                    {% endif %}
-                    {% if professor.curso_apresentador %}
-                        <span class="badge" style="background: #6c757d; color: white;">Curso de Apresentador</span>
-                    {% endif %}
-                    {% if not professor.dublagem_presencial and not professor.dublagem_online and not professor.teatro_presencial and not professor.musical and not professor.locucao and not professor.curso_apresentador %}
-                        <span>-</span>
+                    {% if professor.horarios %}
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            {% for horario in professor.horarios %}
+                                <div style="min-height: 1.5em; display: flex; align-items: center;">
+                                    {% if horario.modalidade %}
+                                        {% if horario.modalidade == 'dublagem_presencial' %}
+                                            <span class="badge badge-success">Dublagem Presencial</span>
+                                        {% elif horario.modalidade == 'dublagem_online' %}
+                                            <span class="badge badge-success">Dublagem Online</span>
+                                        {% elif horario.modalidade == 'teatro_presencial' %}
+                                            <span class="badge badge-info">Teatro Presencial</span>
+                                        {% elif horario.modalidade == 'teatro_online' %}
+                                            <span class="badge badge-info">Teatro Online</span>
+                                        {% elif horario.modalidade == 'musical' %}
+                                            <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
+                                        {% elif horario.modalidade == 'locucao' %}
+                                            <span class="badge" style="background: #dc3545; color: white;">Locução</span>
+                                        {% elif horario.modalidade == 'teatro_tv_cinema' %}
+                                            <span class="badge badge-info">Teatro TV e Cinema</span>
+                                        {% elif horario.modalidade == 'curso_apresentador' %}
+                                            <span class="badge" style="background: #6c757d; color: white;">Curso de Apresentador</span>
+                                        {% else %}
+                                            <span class="badge" style="background: #6c757d; color: white;">{{ horario.modalidade|replace('_', ' ')|title }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span style="color: #6c757d;">-</span>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        {% if professor.dublagem_presencial %}
+                            <span class="badge badge-success">Dublagem Presencial</span>
+                        {% endif %}
+                        {% if professor.dublagem_online %}
+                            <span class="badge badge-success">Dublagem Online</span>
+                        {% endif %}
+                        {% if professor.teatro_presencial %}
+                            <span class="badge badge-info">Teatro Presencial</span>
+                        {% endif %}
+                        {% if professor.musical %}
+                            <span class="badge" style="background: #ffc107; color: #333;">Musical</span>
+                        {% endif %}
+                        {% if professor.locucao %}
+                            <span class="badge" style="background: #dc3545; color: white;">Locução</span>
+                        {% endif %}
+                        {% if professor.curso_apresentador %}
+                            <span class="badge" style="background: #6c757d; color: white;">Curso de Apresentador</span>
+                        {% endif %}
+                        {% if not professor.dublagem_presencial and not professor.dublagem_online and not professor.teatro_presencial and not professor.musical and not professor.locucao and not professor.curso_apresentador %}
+                            <span>-</span>
+                        {% endif %}
                     {% endif %}
                 </td>
                 <td data-label="Usuário">
@@ -210,14 +266,20 @@
                 <td data-label="Data Cadastro">{{ professor.data_cadastro.strftime('%d/%m/%Y %H:%M') if professor.data_cadastro else '-' }}</td>
                 {% if current_user.is_admin() %}
                 <td data-label="Ações">
-                    {% if not professores_com_usuario[professor.id] %}
-                    <a href="{{ url_for('main.cadastro_usuario_professor') }}?professor_id={{ professor.id }}" 
-                       class="btn-criar-usuario">
-                        Criar Usuário
-                    </a>
-                    {% else %}
-                    <span style="color: #6c757d;">-</span>
-                    {% endif %}
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <a href="{{ url_for('main.editar_professor', professor_id=professor.id) }}" 
+                           style="display: inline-block; padding: 6px 12px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; font-size: 0.9em; font-weight: bold; transition: all 0.3s;"
+                           onmouseover="this.style.background='#5568d3'"
+                           onmouseout="this.style.background='#667eea'">
+                            Editar
+                        </a>
+                        {% if not professores_com_usuario[professor.id] %}
+                        <a href="{{ url_for('main.cadastro_usuario_professor') }}?professor_id={{ professor.id }}" 
+                           class="btn-criar-usuario">
+                            Criar Usuário
+                        </a>
+                        {% endif %}
+                    </div>
                 </td>
                 {% endif %}
             </tr>

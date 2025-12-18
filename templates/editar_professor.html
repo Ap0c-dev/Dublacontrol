@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Professor - Controle de Dublagem{% endblock %}
+{% block page_title %}Editar Professor{% endblock %}
+
+{% block extra_css %}
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group label.required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="tel"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+    
+    .form-group input[type="text"]:focus,
+    .form-group input[type="tel"]:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+    
+    .checkbox-item label {
+        margin: 0;
+        font-weight: normal;
+        cursor: pointer;
+    }
+    
+    .horario-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .horario-item > div {
+        flex: 1;
+    }
+    
+    .horario-item select,
+    .horario-item input[type="time"],
+    .horario-item input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    
+    .buttons {
+        margin-top: 30px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .btn {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1em;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    
+    .info-text {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    
+    .remove-horario-btn {
+        background: #dc3545;
+        color: white;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+        height: fit-content;
+    }
+    
+    .remove-horario-btn:hover {
+        background: #c82333;
+    }
+    
+    .add-horario-btn {
+        background: #667eea;
+        color: white;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+        margin-top: 10px;
+    }
+    
+    .add-horario-btn:hover {
+        background: #5568d3;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <form method="POST" action="{{ url_for('main.editar_professor', professor_id=professor.id) }}">
+        <div class="form-group">
+            <label for="nome" class="required">Nome</label>
+            <input type="text" 
+                   id="nome" 
+                   name="nome" 
+                   value="{{ professor.nome }}" 
+                   required 
+                   placeholder="Digite o nome do professor">
+        </div>
+        
+        <div class="form-group">
+            <label for="telefone" class="required">Telefone</label>
+            <input type="tel" 
+                   id="telefone" 
+                   name="telefone" 
+                   value="{{ professor.telefone }}" 
+                   required
+                   pattern="\+[0-9]{1,3} [0-9]{2} [0-9]{8,9}"
+                   placeholder="+55 11 987654321"
+                   title="Formato: +DDI DDD Número (ex: +55 11 987654321)"
+                   oninput="formatarTelefoneProfessor(this)">
+            <span class="info-text">Formato: +DDI DDD Número (ex: +55 11 987654321)</span>
+        </div>
+        
+        <div class="form-group">
+            <label class="required">Horários de Aula</label>
+            <div id="horarios_container" style="margin-bottom: 10px;">
+                {% for horario in professor.horarios %}
+                <div class="horario-item" id="horario_{{ loop.index0 }}">
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                        <select name="horario_dia_{{ loop.index0 }}" required>
+                            <option value="">Selecione o dia</option>
+                            <option value="Segunda-feira" {% if horario.dia_semana == 'Segunda-feira' %}selected{% endif %}>Segunda-feira</option>
+                            <option value="Terça-feira" {% if horario.dia_semana == 'Terça-feira' %}selected{% endif %}>Terça-feira</option>
+                            <option value="Quarta-feira" {% if horario.dia_semana == 'Quarta-feira' %}selected{% endif %}>Quarta-feira</option>
+                            <option value="Quinta-feira" {% if horario.dia_semana == 'Quinta-feira' %}selected{% endif %}>Quinta-feira</option>
+                            <option value="Sexta-feira" {% if horario.dia_semana == 'Sexta-feira' %}selected{% endif %}>Sexta-feira</option>
+                            <option value="Sábado" {% if horario.dia_semana == 'Sábado' %}selected{% endif %}>Sábado</option>
+                            <option value="Domingo" {% if horario.dia_semana == 'Domingo' %}selected{% endif %}>Domingo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Modalidade:</label>
+                        <select name="horario_modalidade_{{ loop.index0 }}" required>
+                            <option value="">Selecione a modalidade</option>
+                            <option value="dublagem_presencial" {% if horario.modalidade == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
+                            <option value="dublagem_online" {% if horario.modalidade == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
+                            <option value="teatro_presencial" {% if horario.modalidade == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
+                            <option value="teatro_online" {% if horario.modalidade == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
+                            <option value="locucao" {% if horario.modalidade == 'locucao' %}selected{% endif %}>Locução</option>
+                            <option value="teatro_tv_cinema" {% if horario.modalidade == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV e Cinema</option>
+                            <option value="musical" {% if horario.modalidade == 'musical' %}selected{% endif %}>Musical</option>
+                            <option value="curso_apresentador" {% if horario.modalidade == 'curso_apresentador' %}selected{% endif %}>Curso de Apresentador</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Hora Início:</label>
+                        {% set horario_parts = horario.horario_aula.split(' às ') %}
+                        {% set hora_inicio = horario_parts[0] if horario_parts|length > 0 else '' %}
+                        <input type="time" 
+                               name="horario_inicio_{{ loop.index0 }}" 
+                               value="{{ hora_inicio }}"
+                               required
+                               onchange="validarHorario({{ loop.index0 }})">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Hora Término:</label>
+                        {% set hora_termino = horario_parts[1] if horario_parts|length > 1 else '' %}
+                        <input type="time" 
+                               name="horario_termino_{{ loop.index0 }}" 
+                               value="{{ hora_termino }}"
+                               required
+                               onchange="validarHorario({{ loop.index0 }})">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Mínima:</label>
+                        <input type="number" 
+                               name="horario_idade_minima_{{ loop.index0 }}" 
+                               value="{{ horario.idade_minima if horario.idade_minima else '' }}"
+                               min="0"
+                               max="100"
+                               placeholder="Ex: 8">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Máxima:</label>
+                        <input type="number" 
+                               name="horario_idade_maxima_{{ loop.index0 }}" 
+                               value="{{ horario.idade_maxima if horario.idade_maxima else '' }}"
+                               min="0"
+                               max="100"
+                               placeholder="Ex: 15">
+                    </div>
+                    <button type="button" 
+                            class="remove-horario-btn" 
+                            onclick="removerHorario({{ loop.index0 }})">
+                        Remover
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="add-horario-btn" onclick="adicionarHorario()">
+                + Adicionar Horário
+            </button>
+            <span class="info-text">Adicione os horários de aula do professor. Cada horário deve ter uma modalidade associada.</span>
+        </div>
+        
+        <div class="buttons">
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+            <a href="{{ url_for('main.listar_professores') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    let horarioCount = {{ professor.horarios|length }};
+    
+    function formatarTelefoneProfessor(input) {
+        let valor = input.value;
+        
+        // Remover tudo exceto números e +
+        valor = valor.replace(/[^\d+]/g, '');
+        
+        // Garantir que começa com +
+        if (!valor.startsWith('+')) {
+            if (valor.length > 0 && valor[0] !== '+') {
+                valor = '+' + valor.replace(/\+/g, '');
+            } else if (valor.length === 0) {
+                valor = '+';
+            }
+        }
+        
+        // Limitar DDI a 3 dígitos
+        let match = valor.match(/^\+(\d{0,3})(\d{0,2})(\d{0,9})$/);
+        if (match) {
+            let ddi = match[1];
+            let ddd = match[2];
+            let numero = match[3];
+            
+            // Formatar: +DDI DDD Número
+            let formatado = '+' + ddi;
+            if (ddd.length > 0) {
+                formatado += ' ' + ddd;
+            }
+            if (numero.length > 0) {
+                formatado += ' ' + numero;
+            }
+            
+            input.value = formatado;
+        } else if (valor.startsWith('+')) {
+            input.value = valor;
+        }
+    }
+    
+    function adicionarHorario() {
+        const container = document.getElementById('horarios_container');
+        const horarioIndex = horarioCount++;
+        
+        const horarioDiv = document.createElement('div');
+        horarioDiv.className = 'horario-item';
+        horarioDiv.id = `horario_${horarioIndex}`;
+        
+        const diasSemana = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+        const modalidades = [
+            { value: 'dublagem_presencial', label: 'Dublagem Presencial' },
+            { value: 'dublagem_online', label: 'Dublagem Online' },
+            { value: 'teatro_presencial', label: 'Teatro Presencial' },
+            { value: 'teatro_online', label: 'Teatro Online' },
+            { value: 'locucao', label: 'Locução' },
+            { value: 'teatro_tv_cinema', label: 'Teatro TV e Cinema' },
+            { value: 'musical', label: 'Musical' },
+            { value: 'curso_apresentador', label: 'Curso de Apresentador' }
+        ];
+        
+        horarioDiv.innerHTML = `
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Dia da Semana:</label>
+                <select name="horario_dia_${horarioIndex}" required>
+                    <option value="">Selecione o dia</option>
+                    ${diasSemana.map(dia => `<option value="${dia}">${dia}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Modalidade:</label>
+                <select name="horario_modalidade_${horarioIndex}" required>
+                    <option value="">Selecione a modalidade</option>
+                    ${modalidades.map(mod => `<option value="${mod.value}">${mod.label}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Hora Início:</label>
+                <input type="time" 
+                       name="horario_inicio_${horarioIndex}" 
+                       required
+                       onchange="validarHorario(${horarioIndex})">
+            </div>
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Hora Término:</label>
+                <input type="time" 
+                       name="horario_termino_${horarioIndex}" 
+                       required
+                       onchange="validarHorario(${horarioIndex})">
+            </div>
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Mínima:</label>
+                <input type="number" 
+                       name="horario_idade_minima_${horarioIndex}" 
+                       min="0"
+                       max="100"
+                       placeholder="Ex: 8">
+            </div>
+            <div>
+                <label style="font-size: 0.9em; margin-bottom: 5px; display: block;">Idade Máxima:</label>
+                <input type="number" 
+                       name="horario_idade_maxima_${horarioIndex}" 
+                       min="0"
+                       max="100"
+                       placeholder="Ex: 15">
+            </div>
+            <button type="button" 
+                    class="remove-horario-btn" 
+                    onclick="removerHorario(${horarioIndex})">
+                Remover
+            </button>
+        `;
+        
+        container.appendChild(horarioDiv);
+    }
+    
+    function validarHorario(horarioIndex) {
+        const inicioInput = document.querySelector(`input[name="horario_inicio_${horarioIndex}"]`);
+        const terminoInput = document.querySelector(`input[name="horario_termino_${horarioIndex}"]`);
+        
+        if (inicioInput && terminoInput && inicioInput.value && terminoInput.value) {
+            const inicio = inicioInput.value;
+            const termino = terminoInput.value;
+            
+            // Converter para minutos para comparação
+            const [inicioH, inicioM] = inicio.split(':').map(Number);
+            const [terminoH, terminoM] = termino.split(':').map(Number);
+            const inicioMinutos = inicioH * 60 + inicioM;
+            const terminoMinutos = terminoH * 60 + terminoM;
+            
+            // Validar que término seja maior que início
+            if (terminoMinutos <= inicioMinutos) {
+                alert('A hora de término deve ser maior que a hora de início.');
+                terminoInput.value = '';
+                terminoInput.focus();
+            }
+        }
+    }
+    
+    function removerHorario(horarioIndex) {
+        const horarioDiv = document.getElementById(`horario_${horarioIndex}`);
+        if (horarioDiv) {
+            horarioDiv.remove();
+        }
+    }
+</script>
+{% endblock %}
+

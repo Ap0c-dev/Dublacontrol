@@ -114,9 +114,11 @@
         <p><strong>Total de Mensalidades:</strong> {{ aluno.get_total_mensalidades()|format_currency }}</p>
     </div>
     
+    {% if current_user.is_admin() %}
     <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" class="btn-upload">
         + Enviar Novo Comprovante
     </a>
+    {% endif %}
     
     {% if pagamentos %}
         <table class="pagamentos-table">
@@ -163,9 +165,11 @@
     {% else %}
         <div class="empty-state">
             <p>Nenhum pagamento registrado ainda.</p>
+            {% if current_user.is_admin() %}
             <a href="{{ url_for('main.upload_comprovante', aluno_id=aluno.id) }}" class="btn-upload">
                 Enviar Primeiro Comprovante
             </a>
+            {% endif %}
         </div>
     {% endif %}
     

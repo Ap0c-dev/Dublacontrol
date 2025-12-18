@@ -30,6 +30,10 @@
         color: #333;
     }
     
+    .filter-group label .required {
+        color: #dc3545;
+    }
+    
     .filter-group select,
     .filter-group input {
         width: 100%;
@@ -152,44 +156,41 @@
 {% block content %}
 <div class="filters">
     <form method="GET" action="{{ url_for('main.listar_notas') }}">
-        {% if alunos %}
-        <div class="filter-group">
-            <label for="aluno_id">Aluno:</label>
-            <select name="aluno_id" id="aluno_id">
-                <option value="">Todos</option>
-                {% for aluno in alunos %}
-                <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
-                    {{ aluno.nome|format_name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-        
-        {% if professores and current_user.is_admin() %}
-        <div class="filter-group">
-            <label for="professor_id">Professor:</label>
-            <select name="professor_id" id="professor_id">
-                <option value="">Todos</option>
-                {% for professor in professores %}
-                <option value="{{ professor.id }}" {% if professor_id == professor.id %}selected{% endif %}>
-                    {{ professor.nome|format_name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
+        {% if current_user.is_admin() %}
+            {% if alunos and alunos|length > 0 %}
+            <div class="filter-group">
+                <label for="aluno_id">Aluno:</label>
+                <select name="aluno_id" id="aluno_id">
+                    <option value="">Todos</option>
+                    {% for aluno in alunos %}
+                    <option value="{{ aluno.id }}" {% if aluno_id == aluno.id %}selected{% endif %}>
+                        {{ aluno.nome|format_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
         {% endif %}
         
         <div class="filter-group">
-            <label for="tipo_curso">Curso:</label>
-            <select name="tipo_curso" id="tipo_curso">
-                <option value="">Todos</option>
-                <option value="dublagem_online" {% if tipo_curso == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
-                <option value="dublagem_presencial" {% if tipo_curso == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
-                <option value="teatro_presencial" {% if tipo_curso == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
-                <option value="locucao" {% if tipo_curso == 'locucao' %}selected{% endif %}>Locução</option>
-                <option value="teatro_tv_cinema" {% if tipo_curso == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV Cinema</option>
-                <option value="musical" {% if tipo_curso == 'musical' %}selected{% endif %}>Musical</option>
+            <label for="tipo_curso">Curso{% if current_user.is_professor() %} <span class="required">*</span>{% endif %}</label>
+            <select name="tipo_curso" id="tipo_curso" {% if current_user.is_professor() %}required{% endif %} {% if current_user.is_professor() and not modalidades_professor %}disabled{% endif %}>
+                <option value="">{% if current_user.is_professor() and not modalidades_professor %}Nenhuma modalidade cadastrada{% elif current_user.is_professor() %}Selecione um curso{% else %}Todos{% endif %}</option>
+                {% if current_user.is_professor() %}
+                    {% for modalidade in modalidades_professor %}
+                    <option value="{{ modalidade.value }}" {% if tipo_curso == modalidade.value %}selected{% endif %}>
+                        {{ modalidade.label }}
+                    </option>
+                    {% endfor %}
+                {% else %}
+                    <option value="dublagem_online" {% if tipo_curso == 'dublagem_online' %}selected{% endif %}>Dublagem Online</option>
+                    <option value="dublagem_presencial" {% if tipo_curso == 'dublagem_presencial' %}selected{% endif %}>Dublagem Presencial</option>
+                    <option value="teatro_presencial" {% if tipo_curso == 'teatro_presencial' %}selected{% endif %}>Teatro Presencial</option>
+                    <option value="teatro_online" {% if tipo_curso == 'teatro_online' %}selected{% endif %}>Teatro Online</option>
+                    <option value="locucao" {% if tipo_curso == 'locucao' %}selected{% endif %}>Locução</option>
+                    <option value="teatro_tv_cinema" {% if tipo_curso == 'teatro_tv_cinema' %}selected{% endif %}>Teatro TV Cinema</option>
+                    <option value="musical" {% if tipo_curso == 'musical' %}selected{% endif %}>Musical</option>
+                {% endif %}
             </select>
         </div>
         
@@ -198,9 +199,36 @@
             <a href="{{ url_for('main.listar_notas') }}" class="btn-filter" style="text-decoration: none; display: inline-block; margin-left: 10px;">Limpar</a>
         </div>
     </form>
+    {% if current_user.is_professor() %}
+    <p style="margin-top: 15px; color: #6c757d; font-size: 0.9em;">
+        {% if not tipo_curso %}
+        Selecione um curso para visualizar os alunos matriculados e suas notas.
+        {% elif alunos and alunos|length > 0 %}
+        Exibindo {{ alunos|length }} aluno(s) matriculado(s) neste curso.
+        {% else %}
+        Nenhum aluno matriculado neste curso.
+        {% endif %}
+    </p>
+    {% endif %}
 </div>
 
 <a href="{{ url_for('main.cadastrar_nota') }}" class="btn-add">+ Cadastrar Nota</a>
+
+{% if current_user.is_professor() and tipo_curso and alunos %}
+<div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+    <h3 style="margin: 0 0 10px 0; color: #333;">Alunos Matriculados no Curso</h3>
+    <p style="margin: 0; color: #666; font-size: 0.9em;">
+        Total de alunos: <strong>{{ alunos|length }}</strong>
+    </p>
+    <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
+        {% for aluno in alunos %}
+        <span style="background: white; padding: 5px 12px; border-radius: 15px; font-size: 0.9em; border: 1px solid #667eea;">
+            {{ aluno.nome|format_name }}
+        </span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <div class="table-container">
     {% if notas %}
