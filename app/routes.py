@@ -668,15 +668,149 @@ def editar_professor(professor_id):
 def migrar_horarios_professor():
     """Rota temporária para executar migração da tabela horarios_professor"""
     try:
-        import sys
-        import os
-        # Adicionar o diretório raiz ao path para importar o script
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from criar_tabela_horarios_professor import criar_tabela_horarios_professor
+        from sqlalchemy import inspect
+        from sqlalchemy import text
         
-        criar_tabela_horarios_professor()
-        flash('✓ Migração executada com sucesso! Tabela horarios_professor criada/atualizada.', 'success')
+        # Detectar tipo de banco de dados
+        inspector = inspect(db.engine)
+        is_postgresql = db.engine.dialect.name == 'postgresql'
+        
+        # Verificar se a tabela já existe
+        tabela_existe = 'horarios_professor' in inspector.get_table_names()
+        
+        if tabela_existe:
+            # Verificar se a coluna modalidade existe
+            colunas = [col['name'] for col in inspector.get_columns('horarios_professor')]
+            coluna_modalidade_existe = 'modalidade' in colunas
+            
+            if coluna_modalidade_existe:
+                flash('✓ Tabela e coluna já existem. Nada a fazer.', 'info')
+            else:
+                # Adicionar coluna modalidade
+                if is_postgresql:
+                    db.session.execute(text("""
+                        ALTER TABLE horarios_professor 
+                        ADD COLUMN modalidade VARCHAR(50) DEFAULT 'dublagem_presencial' NOT NULL
+                    """))
+                else:
+                    db.session.execute(text("""
+                        ALTER TABLE horarios_professor 
+                        ADD COLUMN modalidade VARCHAR(50) DEFAULT 'dublagem_presencial' NOT NULL
+                    """))
+                
+                # Atualizar horários existentes
+                if is_postgresql:
+                    db.session.execute(text("""
+                        UPDATE horarios_professor 
+                        SET modalidade = CASE
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.dublagem_presencial = true
+                            ) THEN 'dublagem_presencial'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.dublagem_online = true
+                            ) THEN 'dublagem_online'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.teatro_presencial = true
+                            ) THEN 'teatro_presencial'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.teatro_online = true
+                            ) THEN 'teatro_online'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.locucao = true
+                            ) THEN 'locucao'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.musical = true
+                            ) THEN 'musical'
+                            ELSE 'dublagem_presencial'
+                        END
+                    """))
+                else:
+                    db.session.execute(text("""
+                        UPDATE horarios_professor 
+                        SET modalidade = CASE
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.dublagem_presencial = 1
+                            ) THEN 'dublagem_presencial'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.dublagem_online = 1
+                            ) THEN 'dublagem_online'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.teatro_presencial = 1
+                            ) THEN 'teatro_presencial'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.teatro_online = 1
+                            ) THEN 'teatro_online'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.locucao = 1
+                            ) THEN 'locucao'
+                            WHEN EXISTS (
+                                SELECT 1 FROM professores p 
+                                WHERE p.id = horarios_professor.professor_id 
+                                AND p.musical = 1
+                            ) THEN 'musical'
+                            ELSE 'dublagem_presencial'
+                        END
+                    """))
+                
+                db.session.commit()
+                flash('✓ Coluna modalidade adicionada com sucesso!', 'success')
+        else:
+            # Criar a tabela completa
+            if is_postgresql:
+                db.session.execute(text("""
+                    CREATE TABLE horarios_professor (
+                        id SERIAL PRIMARY KEY,
+                        professor_id INTEGER NOT NULL,
+                        dia_semana VARCHAR(20) NOT NULL,
+                        horario_aula VARCHAR(50) NOT NULL,
+                        modalidade VARCHAR(50) NOT NULL DEFAULT 'dublagem_presencial',
+                        idade_minima INTEGER,
+                        idade_maxima INTEGER,
+                        CONSTRAINT fk_professor FOREIGN KEY (professor_id) 
+                            REFERENCES professores(id) ON DELETE CASCADE
+                    )
+                """))
+            else:
+                db.session.execute(text("""
+                    CREATE TABLE horarios_professor (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        professor_id INTEGER NOT NULL,
+                        dia_semana VARCHAR(20) NOT NULL,
+                        horario_aula VARCHAR(50) NOT NULL,
+                        modalidade VARCHAR(50) NOT NULL DEFAULT 'dublagem_presencial',
+                        idade_minima INTEGER,
+                        idade_maxima INTEGER,
+                        FOREIGN KEY (professor_id) REFERENCES professores(id) ON DELETE CASCADE
+                    )
+                """))
+            
+            db.session.commit()
+            flash('✓ Tabela horarios_professor criada com sucesso!', 'success')
+            
     except Exception as e:
+        db.session.rollback()
         import traceback
         error_msg = f"Erro na migração: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
