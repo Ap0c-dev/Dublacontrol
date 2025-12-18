@@ -453,26 +453,71 @@ def cadastro_professores():
 @admin_required
 def listar_professores():
     from sqlalchemy.orm import joinedload
+    from sqlalchemy import nullslast
     
-    # Por padrão, mostrar apenas professores ativos
-    filtro = request.args.get('filtro', 'ativos')
-    
-    if filtro == 'inativos':
-        professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=False).order_by(Professor.data_exclusao.desc(), Professor.nome).all()
-    else:
-        professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=True).order_by(Professor.nome).all()
-    
-    # Verificar quais professores já têm usuário cadastrado
-    professores_com_usuario = {}
-    for professor in professores:
-        usuario = Usuario.query.filter_by(professor_id=professor.id).first()
-        professores_com_usuario[professor.id] = usuario is not None
-    
-    return render_template('listar_professores.html', 
-                         professores=professores, 
-                         filtro=filtro, 
-                         motivos_exclusao=MOTIVOS_EXCLUSAO,
-                         professores_com_usuario=professores_com_usuario)
+    try:
+        # Por padrão, mostrar apenas professores ativos
+        filtro = request.args.get('filtro', 'ativos')
+        
+        # Tentar carregar com joinedload, mas se falhar, tentar sem
+        try:
+            if filtro == 'inativos':
+                # Usar nullslast() para compatibilidade com PostgreSQL quando data_exclusao é NULL
+                # Tentar ordenar por data_exclusao, mas se falhar, ordenar apenas por nome
+                try:
+                    professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=False).order_by(nullslast(Professor.data_exclusao.desc()), Professor.nome).all()
+                except Exception:
+                    # Se a ordenação por data_exclusao falhar, ordenar apenas por nome
+                    professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=False).order_by(Professor.nome).all()
+            else:
+                professores = Professor.query.options(joinedload(Professor.horarios)).filter_by(ativo=True).order_by(Professor.nome).all()
+        except Exception as load_error:
+            # Se joinedload falhar (pode ser que a tabela horarios_professor não exista), tentar sem eager loading
+            print(f"Erro ao carregar horários com joinedload: {load_error}. Tentando sem eager loading...")
+            if filtro == 'inativos':
+                try:
+                    professores = Professor.query.filter_by(ativo=False).order_by(nullslast(Professor.data_exclusao.desc()), Professor.nome).all()
+                except Exception:
+                    professores = Professor.query.filter_by(ativo=False).order_by(Professor.nome).all()
+            else:
+                professores = Professor.query.filter_by(ativo=True).order_by(Professor.nome).all()
+            
+            # Carregar horários manualmente para cada professor
+            for professor in professores:
+                try:
+                    professor.horarios = HorarioProfessor.query.filter_by(professor_id=professor.id).all()
+                except Exception as horario_error:
+                    # Se não conseguir carregar horários, usar lista vazia
+                    professor.horarios = []
+                    print(f"Erro ao carregar horários do professor {professor.id}: {horario_error}")
+        
+        # Verificar quais professores já têm usuário cadastrado
+        professores_com_usuario = {}
+        for professor in professores:
+            try:
+                usuario = Usuario.query.filter_by(professor_id=professor.id).first()
+                professores_com_usuario[professor.id] = usuario is not None
+            except Exception as e:
+                # Se houver erro ao buscar usuário, considerar como não tendo usuário
+                professores_com_usuario[professor.id] = False
+                print(f"Erro ao verificar usuário do professor {professor.id}: {e}")
+        
+        return render_template('listar_professores.html', 
+                             professores=professores, 
+                             filtro=filtro, 
+                             motivos_exclusao=MOTIVOS_EXCLUSAO,
+                             professores_com_usuario=professores_com_usuario)
+    except Exception as e:
+        import traceback
+        error_msg = f"Erro ao listar professores: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        flash(f'Erro ao carregar lista de professores: {str(e)}', 'error')
+        # Retornar lista vazia em caso de erro
+        return render_template('listar_professores.html', 
+                             professores=[], 
+                             filtro=filtro if 'filtro' in locals() else 'ativos', 
+                             motivos_exclusao=MOTIVOS_EXCLUSAO,
+                             professores_com_usuario={})
 
 @bp.route('/professores/<int:professor_id>/excluir', methods=['POST'])
 @admin_required
@@ -617,6 +662,27 @@ def editar_professor(professor_id):
     
     # GET - mostrar formulário de edição
     return render_template('editar_professor.html', professor=professor)
+
+@bp.route('/migrar-horarios-professor', methods=['GET'])
+@admin_required
+def migrar_horarios_professor():
+    """Rota temporária para executar migração da tabela horarios_professor"""
+    try:
+        import sys
+        import os
+        # Adicionar o diretório raiz ao path para importar o script
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from criar_tabela_horarios_professor import criar_tabela_horarios_professor
+        
+        criar_tabela_horarios_professor()
+        flash('✓ Migração executada com sucesso! Tabela horarios_professor criada/atualizada.', 'success')
+    except Exception as e:
+        import traceback
+        error_msg = f"Erro na migração: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        flash(f'Erro na migração: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_professores'))
 
 @bp.route('/professores/<int:professor_id>/reativar', methods=['POST'])
 @admin_required
