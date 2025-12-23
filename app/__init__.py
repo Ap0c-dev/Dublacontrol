@@ -170,6 +170,35 @@ def create_app():
             
             db.create_all()
             
+            # Migração: Adicionar coluna aluno_id se não existir
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                columns = [col['name'] for col in inspector.get_columns('usuarios')]
+                
+                if 'aluno_id' not in columns:
+                    print("🔄 Migração: Adicionando coluna 'aluno_id' na tabela 'usuarios'...")
+                    db_uri = str(db.engine.url)
+                    is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                    
+                    if is_postgres:
+                        db.session.execute(text("""
+                            ALTER TABLE usuarios 
+                            ADD COLUMN IF NOT EXISTS aluno_id INTEGER REFERENCES alunos(id)
+                        """))
+                    else:
+                        db.session.execute(text("""
+                            ALTER TABLE usuarios 
+                            ADD COLUMN aluno_id INTEGER REFERENCES alunos(id)
+                        """))
+                    db.session.commit()
+                    print("✅ Migração concluída: coluna 'aluno_id' adicionada")
+            except Exception as e:
+                # Se a coluna já existe ou outro erro, continuar
+                db.session.rollback()
+                if 'already exists' not in str(e).lower() and 'duplicate column' not in str(e).lower():
+                    print(f"⚠️  Aviso na migração: {e}")
+            
             # Verificar e criar usuário admin se não existir (apenas em produção)
             env = app.config.get('ENVIRONMENT', 'dev')
             if env == 'prd':
