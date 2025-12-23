@@ -589,20 +589,42 @@ class ApiClient {
 
   async editarProfessor(id: number, professor: Partial<Professor>): Promise<ApiResponse<Professor>> {
     try {
+      const headers = this.getHeaders();
+      console.log('🔍 Editando professor:', id);
+      console.log('🔑 Headers:', headers);
+      
       const response = await fetch(`${API_BASE_URL}/professores/${id}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers: headers,
         body: JSON.stringify(professor),
       });
+      
+      console.log('📡 Resposta do servidor:', response.status, response.statusText);
+      
+      if (response.status === 401) {
+        console.error('❌ Erro 401: Não autenticado. Token pode estar inválido ou expirado.');
+        // Limpar token inválido
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Tentar verificar token novamente
+        const meResult = await this.getMe();
+        if (!meResult.success) {
+          // Redirecionar para login se token realmente inválido
+          window.location.href = '/login';
+        }
+        throw new Error('Não autenticado. Por favor, faça login novamente.');
+      }
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
       }
       return response.json();
     } catch (error) {
       console.error('Erro ao editar professor:', error);
       return {
         success: false,
-        error: 'Erro ao editar professor',
+        error: error instanceof Error ? error.message : 'Erro ao editar professor',
         data: {} as Professor
       };
     }
