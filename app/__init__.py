@@ -168,12 +168,14 @@ def create_app():
                     os.makedirs(db_dir, exist_ok=True)
                     print(f"✓ Diretório do banco criado: {db_dir}")
             
-            # Migração: Adicionar coluna aluno_id se não existir (ANTES de db.create_all())
+            # Migração: Adicionar coluna aluno_id se não existir (ANTES de qualquer query)
+            # Esta migração deve ser executada antes de db.create_all() e antes de qualquer uso do modelo Usuario
             try:
                 from sqlalchemy import inspect, text
                 inspector = inspect(db.engine)
                 # Verificar se a tabela usuarios existe
-                if 'usuarios' in inspector.get_table_names():
+                table_names = inspector.get_table_names()
+                if 'usuarios' in table_names:
                     columns = [col['name'] for col in inspector.get_columns('usuarios')]
                     
                     if 'aluno_id' not in columns:
@@ -181,23 +183,33 @@ def create_app():
                         db_uri = str(db.engine.url)
                         is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
                         
-                        if is_postgres:
-                            db.session.execute(text("""
-                                ALTER TABLE usuarios 
-                                ADD COLUMN IF NOT EXISTS aluno_id INTEGER REFERENCES alunos(id)
-                            """))
-                        else:
-                            db.session.execute(text("""
-                                ALTER TABLE usuarios 
-                                ADD COLUMN aluno_id INTEGER REFERENCES alunos(id)
-                            """))
-                        db.session.commit()
-                        print("✅ Migração concluída: coluna 'aluno_id' adicionada")
+                        try:
+                            if is_postgres:
+                                # PostgreSQL suporta IF NOT EXISTS
+                                db.session.execute(text("""
+                                    ALTER TABLE usuarios 
+                                    ADD COLUMN IF NOT EXISTS aluno_id INTEGER REFERENCES alunos(id)
+                                """))
+                            else:
+                                # SQLite não suporta IF NOT EXISTS, mas já verificamos acima
+                                db.session.execute(text("""
+                                    ALTER TABLE usuarios 
+                                    ADD COLUMN aluno_id INTEGER REFERENCES alunos(id)
+                                """))
+                            db.session.commit()
+                            print("✅ Migração concluída: coluna 'aluno_id' adicionada")
+                        except Exception as alter_error:
+                            db.session.rollback()
+                            error_str = str(alter_error).lower()
+                            if 'already exists' in error_str or 'duplicate column' in error_str:
+                                print("✅ Coluna 'aluno_id' já existe")
+                            else:
+                                raise
             except Exception as e:
-                # Se a coluna já existe ou outro erro, continuar
+                # Se a tabela não existe ainda, db.create_all() vai criá-la com a coluna
                 db.session.rollback()
                 error_str = str(e).lower()
-                if 'already exists' not in error_str and 'duplicate column' not in error_str and 'does not exist' not in error_str:
+                if 'does not exist' not in error_str and 'no such table' not in error_str:
                     print(f"⚠️  Aviso na migração: {e}")
             
             db.create_all()
