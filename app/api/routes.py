@@ -1203,10 +1203,49 @@ def api_listar_pagamentos():
 def api_dashboard_stats():
     """Estatísticas gerais para dashboard"""
     try:
-        total_alunos = Aluno.query.filter_by(ativo=True).count()
+        # Contar apenas alunos ativos que têm pelo menos uma matrícula ativa (sem data_encerramento)
+        # Isso garante que estamos contando alunos que realmente se matricularam
+        hoje = date.today()
+        
+        # Alunos com matrícula ativa (sem data_encerramento ou data_encerramento no futuro)
+        alunos_com_matricula = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).subquery()
+        
+        total_alunos = db.session.query(db.func.count()).select_from(alunos_com_matricula).scalar() or 0
+        
+        # Para alunos aprovados e pendentes, também considerar apenas os com matrícula ativa
+        alunos_aprovados_com_matricula = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            Aluno.aprovado == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).count()
+        
+        alunos_pendentes_com_matricula = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            Aluno.aprovado == False,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).count()
+        
         total_professores = Professor.query.filter_by(ativo=True).count()
-        alunos_aprovados = Aluno.query.filter_by(ativo=True, aprovado=True).count()
-        alunos_pendentes = Aluno.query.filter_by(ativo=True, aprovado=False).count()
+        alunos_aprovados = alunos_aprovados_com_matricula
+        alunos_pendentes = alunos_pendentes_com_matricula
         
         # Alunos com vencimento hoje
         hoje = date.today()
