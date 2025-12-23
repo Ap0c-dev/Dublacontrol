@@ -71,9 +71,9 @@ No Render Static Site:
 1. Vá em **Settings** → **Environment Variables**
 2. Adicione ou edite:
    ```
-   VITE_API_BASE_URL=https://voxen-pi4v.onrender.com/api/v1
+   VITE_API_BASE_URL=https://SEU_BACKEND.onrender.com/api/v1
    ```
-   (Substitua `voxen-pi4v.onrender.com` pela URL real do seu backend)
+   (Substitua `SEU_BACKEND` pela URL real do seu backend)
 
 ### Passo 2: Fazer Rebuild
 

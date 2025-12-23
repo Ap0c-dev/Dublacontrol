@@ -23,9 +23,9 @@ Se você está vendo a interface antiga (templates HTML do Flask), significa que
 
 4. **Environment Variables** (adicionar):
    ```
-   VITE_API_BASE_URL=https://voxen-pi4v.onrender.com/api/v1
+   VITE_API_BASE_URL=https://SEU_BACKEND.onrender.com/api/v1
    ```
-   ⚠️ **IMPORTANTE**: Substitua `voxen-pi4v.onrender.com` pela URL real do seu backend
+   ⚠️ **IMPORTANTE**: Substitua `SEU_BACKEND` pela URL real do seu backend
 
 5. **Clique em "Create Static Site"**
 
