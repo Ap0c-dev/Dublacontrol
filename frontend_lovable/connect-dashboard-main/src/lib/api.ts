@@ -606,13 +606,11 @@ class ApiClient {
         // Limpar token inválido
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // Tentar verificar token novamente
-        const meResult = await this.getMe();
-        if (!meResult.success) {
-          // Redirecionar para login se token realmente inválido
+        // Redirecionar para login
+        setTimeout(() => {
           window.location.href = '/login';
-        }
-        throw new Error('Não autenticado. Por favor, faça login novamente.');
+        }, 1000);
+        throw new Error('Sessão expirada. Redirecionando para login...');
       }
       
       if (!response.ok) {
