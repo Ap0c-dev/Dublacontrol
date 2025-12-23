@@ -129,16 +129,13 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border space-y-3">
+          <div className="mt-6 pt-6 border-t border-border">
             <Link
               to="/recuperar-senha"
               className="block text-center text-sm text-primary hover:text-primary/80 transition-colors"
             >
               Esqueci minha senha
             </Link>
-            <p className="text-xs text-center text-muted-foreground">
-              Credenciais de teste: <strong>admin</strong> / <strong>admin123</strong>
-            </p>
           </div>
         </div>
       </div>
