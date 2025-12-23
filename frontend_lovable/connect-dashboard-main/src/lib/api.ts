@@ -1,5 +1,7 @@
 // Usa variável de ambiente ou localhost por padrão
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+// Remove barra final se existir para evitar barras duplas
+const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
 
 // Log para debug
 console.log('🔧 API_BASE_URL:', API_BASE_URL);
