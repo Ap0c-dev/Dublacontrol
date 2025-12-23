@@ -189,7 +189,23 @@ def api_login():
         
         usuario = Usuario.query.filter_by(username=username).first()
         
-        if not usuario or not usuario.check_password(password):
+        # Verificar se usuário existe
+        if not usuario:
+            print(f"❌ Tentativa de login com usuário inexistente: {username}")
+            response = jsonify({'error': 'Credenciais inválidas', 'success': False})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 401
+        
+        # Verificar se usuário está ativo
+        if not usuario.ativo:
+            print(f"❌ Tentativa de login com usuário inativo: {username}")
+            response = jsonify({'error': 'Usuário inativo. Entre em contato com o administrador.', 'success': False})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 403
+        
+        # Verificar senha
+        if not usuario.check_password(password):
+            print(f"❌ Tentativa de login com senha incorreta para usuário: {username}")
             response = jsonify({'error': 'Credenciais inválidas', 'success': False})
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response, 401
