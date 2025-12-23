@@ -28,6 +28,28 @@ api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 # Formato: {token: user_id}
 valid_tokens = {}
 
+# Rota raiz da API
+@api_bp.route('/', methods=['GET'])
+def api_root():
+    """Rota raiz da API - retorna informações sobre a API"""
+    return jsonify({
+        'success': True,
+        'message': 'API Voxen está funcionando!',
+        'version': '1.0',
+        'endpoints': {
+            'test': '/api/v1/test',
+            'auth': {
+                'login': '/api/v1/auth/login',
+                'me': '/api/v1/auth/me'
+            },
+            'alunos': '/api/v1/alunos',
+            'professores': '/api/v1/professores',
+            'pagamentos': '/api/v1/pagamentos',
+            'notas': '/api/v1/notas',
+            'dashboard': '/api/v1/dashboard/stats'
+        }
+    })
+
 # Rota de teste simples
 @api_bp.route('/test', methods=['GET'])
 def api_test():
