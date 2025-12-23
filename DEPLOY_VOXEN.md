@@ -37,6 +37,8 @@ Este documento explica como fazer o deploy da aplicação Voxen no Render com o 
      ```bash
      gunicorn wsgi:app
      ```
+     - **OU** deixe em branco para usar o `Procfile` automaticamente
+     - **OU** use: `gunicorn app:app` (se criou o arquivo `app.py` na raiz)
    - **Plan**: Escolha o plano (Free tier disponível)
 
 4. **Environment Variables** (adicionar):
