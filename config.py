@@ -51,6 +51,12 @@ class Config:
     CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
     CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
     
+    # Configurações do WhatsApp (Twilio)
+    TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID') or ''
+    TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN') or ''
+    TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM') or 'whatsapp:+14155238886'
+    WHATSAPP_ENABLED = os.environ.get('WHATSAPP_ENABLED', 'true').lower() == 'true'
+    
     # Tamanho máximo de upload (10MB)
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB
     

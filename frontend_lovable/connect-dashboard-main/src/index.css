@@ -1,0 +1,475 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 🌌 Tema Dark Cyberpunk/Anime - Gradientes Neon */
+    --background: 240 30% 8%;
+    --foreground: 240 10% 95%;
+
+    --card: 240 25% 12%;
+    --card-foreground: 240 10% 95%;
+
+    --popover: 240 25% 12%;
+    --popover-foreground: 240 10% 95%;
+
+    /* Primary: Azul Neon Cyberpunk */
+    --primary: 200 100% 55%;
+    --primary-foreground: 240 30% 8%;
+
+    --secondary: 270 50% 20%;
+    --secondary-foreground: 240 10% 95%;
+
+    --muted: 240 25% 15%;
+    --muted-foreground: 240 10% 70%;
+
+    /* Accent: Rosa Neon */
+    --accent: 320 80% 60%;
+    --accent-foreground: 240 10% 95%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 240 10% 95%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 240 10% 95%;
+
+    --warning: 38 90% 55%;
+    --warning-foreground: 240 30% 8%;
+
+    --border: 240 25% 20%;
+    --input: 240 25% 20%;
+    --ring: 200 100% 55%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar dark cyberpunk */
+    --sidebar-background: 240 35% 6%;
+    --sidebar-foreground: 240 10% 95%;
+    --sidebar-primary: 200 100% 55%;
+    --sidebar-primary-foreground: 240 35% 6%;
+    --sidebar-accent: 270 50% 20%;
+    --sidebar-accent-foreground: 240 10% 95%;
+    --sidebar-border: 240 25% 20%;
+    --sidebar-ring: 200 100% 55%;
+
+    /* Gradientes neon cyberpunk (roxo, azul, rosa) */
+    --gradient-primary: linear-gradient(135deg, hsl(270, 80%, 60%) 0%, hsl(200, 100%, 55%) 50%, hsl(320, 80%, 60%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(240, 25%, 12%) 0%, hsl(240, 30%, 8%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(270, 80%, 60%) 0%, hsl(200, 100%, 55%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(320, 80%, 60%) 0%, hsl(270, 80%, 60%) 100%);
+    --gradient-neon-blue: linear-gradient(135deg, hsl(200, 100%, 55%) 0%, hsl(220, 100%, 60%) 100%);
+    --gradient-neon-purple: linear-gradient(135deg, hsl(270, 80%, 60%) 0%, hsl(280, 80%, 65%) 100%);
+    --gradient-neon-pink: linear-gradient(135deg, hsl(320, 80%, 60%) 0%, hsl(330, 80%, 65%) 100%);
+    
+    /* Sombras neon glow intensas */
+    --shadow-sm: 0 1px 2px 0 hsl(270 80% 60% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(270 80% 60% / 0.15), 0 2px 4px -2px hsl(200 100% 55% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(270 80% 60% / 0.2), 0 4px 6px -4px hsl(200 100% 55% / 0.15);
+    --shadow-glow: 0 0 40px hsl(200 100% 55% / 0.5), 0 0 80px hsl(270 80% 60% / 0.3);
+    --shadow-glow-accent: 0 0 30px hsl(320 80% 60% / 0.6), 0 0 60px hsl(270 80% 60% / 0.4);
+    --shadow-glow-success: 0 0 25px hsl(142 70% 45% / 0.5);
+    --shadow-glow-purple: 0 0 35px hsl(270 80% 60% / 0.6);
+    --shadow-glow-blue: 0 0 35px hsl(200 100% 55% / 0.6);
+    --shadow-glow-pink: 0 0 35px hsl(320 80% 60% / 0.6);
+  }
+
+  .light {
+    /* Tema claro */
+    --background: 0 0% 98%;
+    --foreground: 240 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    /* Primary: Azul mais suave para tema claro */
+    --primary: 200 80% 45%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 270 30% 85%;
+    --secondary-foreground: 240 10% 10%;
+
+    --muted: 240 10% 95%;
+    --muted-foreground: 240 10% 40%;
+
+    /* Accent: Rosa mais suave */
+    --accent: 320 60% 50%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 80% 50%;
+    --warning-foreground: 0 0% 98%;
+
+    --border: 240 10% 85%;
+    --input: 240 10% 95%;
+    --ring: 200 80% 45%;
+
+    /* Sidebar claro */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 10% 10%;
+    --sidebar-primary: 200 80% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 270 30% 90%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 10% 85%;
+    --sidebar-ring: 200 80% 45%;
+
+    /* Gradientes mais suaves para tema claro */
+    --gradient-primary: linear-gradient(135deg, hsl(270, 50%, 50%) 0%, hsl(200, 80%, 45%) 50%, hsl(320, 60%, 50%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(240, 10%, 98%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(270, 50%, 50%) 0%, hsl(200, 80%, 45%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(320, 60%, 50%) 0%, hsl(270, 50%, 50%) 100%);
+    --gradient-neon-blue: linear-gradient(135deg, hsl(200, 80%, 45%) 0%, hsl(220, 80%, 50%) 100%);
+    --gradient-neon-purple: linear-gradient(135deg, hsl(270, 50%, 50%) 0%, hsl(280, 50%, 55%) 100%);
+    --gradient-neon-pink: linear-gradient(135deg, hsl(320, 60%, 50%) 0%, hsl(330, 60%, 55%) 100%);
+    
+    /* Sombras mais suaves para tema claro */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.05);
+    --shadow-glow: 0 0 20px hsl(200 80% 45% / 0.2), 0 0 40px hsl(270 50% 50% / 0.15);
+    --shadow-glow-accent: 0 0 15px hsl(320 60% 50% / 0.3), 0 0 30px hsl(270 50% 50% / 0.2);
+    --shadow-glow-success: 0 0 15px hsl(142 60% 40% / 0.3);
+    --shadow-glow-purple: 0 0 20px hsl(270 50% 50% / 0.3);
+    --shadow-glow-blue: 0 0 20px hsl(200 80% 45% / 0.3);
+    --shadow-glow-pink: 0 0 20px hsl(320 60% 50% / 0.3);
+  }
+
+  .dark {
+    /* Usar as mesmas variáveis do root (já é dark por padrão) */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Rajdhani', 'Orbitron', system-ui, sans-serif;
+    font-weight: 500;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  /* Garantir que elementos fixos não bloqueiem a interação com o navegador */
+  html, body {
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-md);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-lg);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-glow-accent {
+    box-shadow: var(--shadow-glow-accent);
+  }
+
+  .shadow-glow-success {
+    box-shadow: var(--shadow-glow-success);
+  }
+
+  .shadow-glow-purple {
+    box-shadow: var(--shadow-glow-purple);
+  }
+
+  .shadow-glow-blue {
+    box-shadow: var(--shadow-glow-blue);
+  }
+
+  .shadow-glow-pink {
+    box-shadow: var(--shadow-glow-pink);
+  }
+
+  /* Efeito neon em hover */
+  .hover-glow:hover {
+    box-shadow: var(--shadow-glow);
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Texto com gradiente neon */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 20px hsl(200 100% 55% / 0.5);
+  }
+
+  .text-gradient-blue {
+    background: var(--gradient-neon-blue);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-purple {
+    background: var(--gradient-neon-purple);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-pink {
+    background: var(--gradient-neon-pink);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Borda com gradiente neon */
+  .border-gradient {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--card), var(--card)) padding-box,
+                var(--gradient-primary) border-box;
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Botão com efeito neon */
+  .btn-neon {
+    background: var(--gradient-primary);
+    box-shadow: var(--shadow-glow);
+    transition: all 0.3s ease;
+  }
+
+  .btn-neon:hover {
+    box-shadow: var(--shadow-glow-accent);
+    transform: translateY(-2px);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-glow-pulse {
+    animation: glowPulse 2s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 3s linear infinite;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(200 100% 55% / 0.2),
+      transparent
+    );
+    background-size: 200% 100%;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(200 100% 55% / 0.5), 0 0 40px hsl(270 80% 60% / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(200 100% 55% / 0.8), 0 0 80px hsl(270 80% 60% / 0.5);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.8;
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 🌌 Background Cyberpunk com estrelas e padrões geométricos - Tema Escuro */
+body.dark::before,
+.dark body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    /* Estrelas */
+    radial-gradient(2px 2px at 20% 30%, hsl(200 100% 55% / 0.8), transparent),
+    radial-gradient(2px 2px at 60% 70%, hsl(270 80% 60% / 0.8), transparent),
+    radial-gradient(1px 1px at 50% 50%, hsl(320 80% 60% / 0.6), transparent),
+    radial-gradient(1px 1px at 80% 10%, hsl(200 100% 55% / 0.6), transparent),
+    radial-gradient(2px 2px at 90% 40%, hsl(270 80% 60% / 0.7), transparent),
+    radial-gradient(1px 1px at 33% 60%, hsl(320 80% 60% / 0.5), transparent),
+    radial-gradient(1px 1px at 10% 80%, hsl(200 100% 55% / 0.5), transparent),
+    /* Gradientes neon */
+    radial-gradient(circle at 20% 50%, hsl(270 80% 60% / 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, hsl(200 100% 55% / 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, hsl(320 80% 60% / 0.06) 0%, transparent 50%),
+    /* Padrão geométrico */
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      hsl(270 80% 60% / 0.02) 2px,
+      hsl(270 80% 60% / 0.02) 4px
+    );
+  background-size: 
+    200% 200%,
+    200% 200%,
+    200% 200%,
+    200% 200%,
+    200% 200%,
+    200% 200%,
+    200% 200%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    40px 40px;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  animation: starfield 20s linear infinite;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+/* Background mais sutil para tema claro */
+body.light::before,
+.light body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    /* Padrão sutil */
+    radial-gradient(circle at 20% 50%, hsl(200 80% 45% / 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, hsl(270 50% 50% / 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, hsl(320 60% 50% / 0.02) 0%, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+@keyframes starfield {
+  0% {
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  }
+  100% {
+    background-position: 200% 200%, -200% -200%, 150% -150%, -150% 150%, 100% 100%, -100% -100%, 50% -50%, 0 0, 0 0, 0 0, 40px 40px;
+  }
+}
+
+/* Grid pattern sutil */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(hsl(270 80% 60% / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(270 80% 60% / 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none !important;
+  z-index: -1 !important;
+  opacity: 0.5;
+}

@@ -28,8 +28,15 @@ except ImportError:
         print("⚠️  Arquivo .env não encontrado. Usando variáveis de ambiente do sistema")
 
 # Agora importar Config (que vai ler as variáveis de ambiente já carregadas)
-from flask import Flask
+from flask import Flask, request
 from flask_login import LoginManager
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+    print("⚠️  Flask-CORS não instalado. API REST pode não funcionar com frontend externo.")
+    print("⚠️  Instale com: pip install Flask-CORS")
 from config import Config
 from app.models.professor import db
 
@@ -50,6 +57,38 @@ def create_app():
                 static_folder=static_dir,
                 instance_relative_config=True)
     app.config.from_object(Config)
+    
+    # Configurar CORS para API (permitir frontend externo)
+    # Em produção, permitir apenas domínios específicos via variável de ambiente
+    allowed_origins = os.environ.get('CORS_ORIGINS', '*')
+    if allowed_origins != '*':
+        # Se CORS_ORIGINS for uma string com múltiplos domínios separados por vírgula
+        allowed_origins = [origin.strip() for origin in allowed_origins.split(',')]
+    
+    if CORS_AVAILABLE:
+        CORS(app, resources={
+            r"/api/*": {
+                "origins": allowed_origins,  # Domínios permitidos (ou '*' para todos)
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "supports_credentials": True
+            }
+        })
+    else:
+        # CORS não disponível - adicionar headers manualmente para API
+        @app.after_request
+        def after_request(response):
+            if request.path.startswith('/api/'):
+                # Usar origem da requisição ou domínios permitidos
+                origin = request.headers.get('Origin')
+                if allowed_origins == '*' or (isinstance(allowed_origins, list) and origin and origin in allowed_origins):
+                    response.headers.add('Access-Control-Allow-Origin', origin if origin else '*')
+                elif allowed_origins == '*':
+                    response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+                response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+            return response
     
     db.init_app(app)
     
@@ -104,7 +143,7 @@ def create_app():
         return dict(range=range_func)
     
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento
+    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento, senha_reset
     
     # Configurar Cloudinary
     import cloudinary
@@ -162,9 +201,13 @@ def create_app():
             traceback.print_exc()
             # Não levantar exceção para não quebrar a aplicação, mas logar o erro
     
-    # Registrar blueprint
+    # Registrar blueprints
     from app.routes import bp
     app.register_blueprint(bp)
+    
+    # Registrar API blueprint (para frontend moderno)
+    from app.api.routes import api_bp
+    app.register_blueprint(api_bp)
     
     # Rota de health check para o Render
     @app.route('/health')

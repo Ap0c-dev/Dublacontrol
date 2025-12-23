@@ -56,11 +56,16 @@ def normalizar_texto(texto):
     Normaliza texto: primeira letra de cada palavra maiúscula, resto minúscula.
     Retorna string vazia se o texto for None ou vazio.
     """
-    if not texto or not texto.strip():
-        return texto.strip() if texto else ''
+    if not texto:
+        return ''
+    
+    # Converter para string e remover espaços extras
+    texto_str = str(texto).strip()
+    if not texto_str:
+        return ''
     
     # Dividir em palavras, normalizar cada uma e juntar novamente
-    palavras = texto.strip().split()
+    palavras = texto_str.split()
     palavras_normalizadas = []
     
     for palavra in palavras:
@@ -91,6 +96,11 @@ def index():
         else:
             return redirect(url_for('main.cadastro_alunos'))
     return redirect(url_for('main.login'))
+
+@bp.route('/test-api')
+def test_api_page():
+    """Página de teste da API REST"""
+    return render_template('test_api.html')
 
 @bp.route('/criar-admin-inicial', methods=['GET', 'POST'])
 def criar_admin_inicial():
@@ -177,37 +187,38 @@ def login():
             if not username or not password:
                 flash('Por favor, preencha todos os campos.', 'error')
                 return render_template('login.html')
-        
-        # Buscar usuário por username ou email
-        usuario = Usuario.query.filter(
-            (Usuario.username == username) | (Usuario.email == username)
-        ).first()
-        
-        if usuario and usuario.check_password(password) and usuario.ativo:
-            login_user(usuario)
-            try:
-                usuario.ultimo_acesso = datetime.now()
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                import traceback
-                print(f"Erro ao atualizar ultimo_acesso: {traceback.format_exc()}")
-                # Continuar mesmo se houver erro ao atualizar ultimo_acesso
             
-            flash(f'Bem-vindo, {usuario.username}!', 'success')
-            next_page = request.args.get('next')
-            if next_page:
-                return redirect(next_page)
-            else:
+            # Buscar usuário por username ou email
+            usuario = Usuario.query.filter(
+                (Usuario.username == username) | (Usuario.email == username)
+            ).first()
+            
+            if usuario and usuario.check_password(password) and usuario.ativo:
+                login_user(usuario)
                 try:
-                    return redirect(url_for('main.index'))
+                    usuario.ultimo_acesso = datetime.now()
+                    db.session.commit()
                 except Exception as e:
+                    db.session.rollback()
                     import traceback
-                    print(f"Erro ao redirecionar após login: {traceback.format_exc()}")
-                    flash(f'Login realizado com sucesso, mas houve um erro ao redirecionar: {str(e)}', 'warning')
-                    return render_template('login.html')
-        else:
-            flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
+                    print(f"Erro ao atualizar ultimo_acesso: {traceback.format_exc()}")
+                    # Continuar mesmo se houver erro ao atualizar ultimo_acesso
+                
+                flash(f'Bem-vindo, {usuario.username}!', 'success')
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                else:
+                    try:
+                        return redirect(url_for('main.index'))
+                    except Exception as e:
+                        import traceback
+                        print(f"Erro ao redirecionar após login: {traceback.format_exc()}")
+                        flash(f'Login realizado com sucesso, mas houve um erro ao redirecionar: {str(e)}', 'warning')
+                        return render_template('login.html')
+            else:
+                flash('Usuário ou senha incorretos, ou conta inativa.', 'error')
+                return render_template('login.html')
     
         return render_template('login.html')
     except Exception as e:
@@ -2808,5 +2819,119 @@ def deletar_pagamento(pagamento_id):
         flash(f'Erro ao deletar pagamento: {str(e)}', 'error')
     
     return redirect(url_for('main.listar_pagamentos'))
+
+# ==================== ROTAS DE NOTIFICAÇÕES WHATSAPP ====================
+
+@bp.route('/notificacoes/enviar-vencimentos', methods=['POST'])
+@admin_required
+def enviar_notificacoes_vencimentos():
+    """Envia notificações WhatsApp para alunos com vencimento hoje"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    from app.services.whatsapp_service import WhatsAppService
+    
+    try:
+        # Verificar se WhatsApp está habilitado
+        if not current_app.config.get('WHATSAPP_ENABLED', False):
+            flash('WhatsApp não está habilitado. Configure as variáveis de ambiente.', 'error')
+            return redirect(url_for('main.listar_alunos'))
+        
+        # Inicializar serviço WhatsApp
+        whatsapp = WhatsAppService(
+            account_sid=current_app.config.get('TWILIO_ACCOUNT_SID'),
+            auth_token=current_app.config.get('TWILIO_AUTH_TOKEN'),
+            from_number=current_app.config.get('TWILIO_WHATSAPP_FROM')
+        )
+        
+        # Enviar notificações
+        resultados = whatsapp.notificar_vencimentos_hoje()
+        
+        # Exibir resultados
+        if resultados['enviadas'] > 0:
+            flash(f'✅ {resultados["enviadas"]} notificação(ões) enviada(s) com sucesso!', 'success')
+        
+        if resultados['erros'] > 0:
+            flash(f'⚠️ {resultados["erros"]} erro(s) ao enviar notificação(ões).', 'error')
+        
+        if resultados['enviadas'] == 0 and resultados['erros'] == 0:
+            flash('Nenhum aluno com vencimento hoje encontrado.', 'info')
+        
+        # Log detalhado
+        if resultados['detalhes']:
+            for detalhe in resultados['detalhes']:
+                if detalhe['status'] == 'erro':
+                    logger.warning(f"Erro ao notificar {detalhe['aluno']}: {detalhe.get('mensagem', 'Erro desconhecido')}")
+        
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erro ao enviar notificações: {e}")
+        flash(f'Erro ao enviar notificações: {str(e)}', 'error')
+    
+    return redirect(url_for('main.listar_alunos'))
+
+@bp.route('/notificacoes/testar', methods=['GET', 'POST'])
+@admin_required
+def testar_notificacao_whatsapp():
+    """Página para testar envio de notificação WhatsApp"""
+    import traceback
+    
+    try:
+        from app.services.whatsapp_service import WhatsAppService
+    except ImportError as e:
+        flash(f'Erro ao importar serviço WhatsApp: {str(e)}. Verifique se o twilio está instalado (pip install twilio).', 'error')
+        import traceback
+        traceback.print_exc()
+        # Preparar informações básicas para o template mesmo com erro
+        config_info = {
+            'whatsapp_from': 'Erro na configuração',
+            'whatsapp_enabled': False
+        }
+        return render_template('testar_notificacao.html', config_info=config_info)
+    
+    # Preparar informações para o template
+    config_info = {
+        'whatsapp_from': current_app.config.get('TWILIO_WHATSAPP_FROM', 'Não configurado'),
+        'whatsapp_enabled': current_app.config.get('WHATSAPP_ENABLED', False)
+    }
+    
+    if request.method == 'POST':
+        telefone = request.form.get('telefone', '').strip()
+        mensagem = request.form.get('mensagem', '').strip()
+        
+        if not telefone or not mensagem:
+            flash('Telefone e mensagem são obrigatórios.', 'error')
+            return render_template('testar_notificacao.html', config_info=config_info)
+        
+        try:
+            whatsapp = WhatsAppService(
+                account_sid=current_app.config.get('TWILIO_ACCOUNT_SID'),
+                auth_token=current_app.config.get('TWILIO_AUTH_TOKEN'),
+                from_number=current_app.config.get('TWILIO_WHATSAPP_FROM')
+            )
+            
+            sucesso, resultado = whatsapp.enviar_mensagem(telefone, mensagem)
+            
+            if sucesso:
+                status_info = f", Status: {resultado.get('status', 'N/A')}" if isinstance(resultado, dict) else ""
+                flash(f'✅ Mensagem enviada! ID: {resultado.get("sid", resultado) if isinstance(resultado, dict) else resultado}{status_info}', 'success')
+            else:
+                if isinstance(resultado, dict):
+                    erro_msg = resultado.get('erro', 'Erro desconhecido')
+                    status_info = f" (Status: {resultado.get('status', 'N/A')})" if resultado.get('status') else ""
+                    flash(f'❌ Erro: {erro_msg}{status_info}', 'error')
+                else:
+                    flash(f'❌ Erro ao enviar mensagem: {resultado}', 'error')
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            flash(f'Erro: {str(e)}', 'error')
+            # Log do erro completo para debug
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Erro ao enviar mensagem de teste: {error_trace}")
+    
+    return render_template('testar_notificacao.html', config_info=config_info)
 
 

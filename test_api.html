@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste API REST</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #d00;
+        }
+        .success {
+            background: #e6ffe6;
+            color: #0a0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste API REST - Controle de Dublagem</h1>
+    
+    <div class="section">
+        <h2>1. Login</h2>
+        <input type="text" id="username" placeholder="Username" value="admin">
+        <input type="password" id="password" placeholder="Password" value="admin123">
+        <button onclick="fazerLogin()">Fazer Login</button>
+        <div id="loginResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Listar Alunos</h2>
+        <button onclick="listarAlunos()">Listar Alunos</button>
+        <div id="alunosResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Dashboard Stats</h2>
+        <button onclick="dashboardStats()">Buscar Estatísticas</button>
+        <div id="statsResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. Listar Professores</h2>
+        <button onclick="listarProfessores()">Listar Professores</button>
+        <div id="professoresResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>5. Buscar Aluno Específico</h2>
+        <input type="number" id="alunoId" placeholder="ID do Aluno" value="1">
+        <button onclick="buscarAluno()">Buscar Aluno</button>
+        <div id="alunoResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/v1';
+        let authToken = null;
+
+        function mostrarResultado(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = 'result ' + (isError ? 'error' : 'success');
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function fazerLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include', // Incluir cookies
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    mostrarResultado('loginResult', data);
+                } else {
+                    mostrarResultado('loginResult', data, true);
+                }
+            } catch (error) {
+                mostrarResultado('loginResult', { error: error.message }, true);
+            }
+        }
+
+        async function listarAlunos() {
+            try {
+                const response = await fetch(`${API_BASE}/alunos`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                const data = await response.json();
+                mostrarResultado('alunosResult', data, !response.ok);
+            } catch (error) {
+                mostrarResultado('alunosResult', { error: error.message }, true);
+            }
+        }
+
+        async function dashboardStats() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/stats`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                const data = await response.json();
+                mostrarResultado('statsResult', data, !response.ok);
+            } catch (error) {
+                mostrarResultado('statsResult', { error: error.message }, true);
+            }
+        }
+
+        async function listarProfessores() {
+            try {
+                const response = await fetch(`${API_BASE}/professores`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                const data = await response.json();
+                mostrarResultado('professoresResult', data, !response.ok);
+            } catch (error) {
+                mostrarResultado('professoresResult', { error: error.message }, true);
+            }
+        }
+
+        async function buscarAluno() {
+            const alunoId = document.getElementById('alunoId').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/alunos/${alunoId}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: authToken ? {
+                        'Authorization': `Bearer ${authToken}`
+                    } : {}
+                });
+                
+                const data = await response.json();
+                mostrarResultado('alunoResult', data, !response.ok);
+            } catch (error) {
+                mostrarResultado('alunoResult', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Testar Notificação WhatsApp{% endblock %}
+
+{% block content %}
+<h2>Testar Notificação WhatsApp</h2>
+
+<div style="max-width: 600px; margin: 20px 0;">
+    <form method="POST">
+        <div style="margin-bottom: 15px;">
+            <label for="telefone" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Telefone (formato: +55 11 987654321 ou whatsapp:+5511987654321):
+            </label>
+            <input type="text" 
+                   id="telefone" 
+                   name="telefone" 
+                   value="{{ request.form.get('telefone', '') }}"
+                   placeholder="+55 11 987654321"
+                   required
+                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="mensagem" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Mensagem:
+            </label>
+            <textarea id="mensagem" 
+                      name="mensagem" 
+                      rows="6"
+                      required
+                      placeholder="Digite a mensagem de teste aqui..."
+                      style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">{{ request.form.get('mensagem', '') }}</textarea>
+        </div>
+        
+        <button type="submit" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
+            Enviar Mensagem de Teste
+        </button>
+        
+        <a href="{{ url_for('main.listar_alunos') }}" style="margin-left: 10px; padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Voltar
+        </a>
+    </form>
+</div>
+
+<div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+    <h3>Informações:</h3>
+    <ul>
+        <li><strong>Número de origem:</strong> {{ config_info.whatsapp_from if config_info else 'Não configurado' }}</li>
+        <li><strong>WhatsApp habilitado:</strong> {{ 'Sim' if (config_info and config_info.whatsapp_enabled) else 'Não' }}</li>
+    </ul>
+</div>
+{% endblock %}
+
