@@ -190,7 +190,7 @@ Deve retornar:
 ```bash
 curl -X POST https://sua-url-ngrok.ngrok-free.app/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"SUA_SENHA_AQUI"}'
 ```
 
 ### 3. Usar no Lovable

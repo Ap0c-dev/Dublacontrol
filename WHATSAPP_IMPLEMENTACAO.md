@@ -49,7 +49,7 @@ WHATSAPP_ENABLED=true
 
 No painel do Render, adicione as variáveis de ambiente:
 - `TWILIO_ACCOUNT_SID`: `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-- `TWILIO_AUTH_TOKEN`: `6ae18b228e7cf6cc36271f45f80df07d`
+- `TWILIO_AUTH_TOKEN`: `[SEU_TOKEN_DO_TWILIO]`
 - `TWILIO_WHATSAPP_FROM`: `whatsapp:+14155238886`
 - `WHATSAPP_ENABLED`: `true`
 

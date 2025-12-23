@@ -13,15 +13,15 @@ O frontend está carregando a interface, mas provavelmente não está conseguind
 3. Clique em **Settings** → **Environment Variables**
 4. Verifique se existe:
    ```
-   VITE_API_BASE_URL=https://voxen-pi4v.onrender.com/api/v1
+   VITE_API_BASE_URL=https://SEU_BACKEND.onrender.com/api/v1
    ```
 
 ### 2. Se não existir, adicione:
 
 1. Clique em **Add Environment Variable**
 2. **Key**: `VITE_API_BASE_URL`
-3. **Value**: `https://voxen-pi4v.onrender.com/api/v1`
-   ⚠️ **IMPORTANTE**: Substitua `voxen-pi4v.onrender.com` pela URL real do seu backend
+3. **Value**: `https://SEU_BACKEND.onrender.com/api/v1`
+   ⚠️ **IMPORTANTE**: Substitua `SEU_BACKEND` pela URL real do seu backend
 4. Clique em **Save Changes**
 
 ### 3. Fazer Rebuild (OBRIGATÓRIO)
@@ -39,14 +39,14 @@ O frontend está carregando a interface, mas provavelmente não está conseguind
 3. Vá na aba **Console**
 4. Procure por:
    ```
-   🔧 API_BASE_URL: https://voxen-pi4v.onrender.com/api/v1
+   🔧 API_BASE_URL: https://SEU_BACKEND.onrender.com/api/v1
    ```
 
 **Se aparecer `http://localhost:5000/api/v1`**, significa que a variável não foi configurada corretamente.
 
 ### 5. Testar Login
 
-1. Tente fazer login com: `admin` / `admin123`
+1. Tente fazer login com as credenciais que você configurou
 2. Se der erro, verifique no console qual é a mensagem de erro
 3. Verifique na aba **Network** se a requisição está sendo feita para a URL correta
 
@@ -54,10 +54,10 @@ O frontend está carregando a interface, mas provavelmente não está conseguind
 
 Certifique-se de que o backend está funcionando:
 
-1. Acesse: `https://voxen-pi4v.onrender.com/health`
+1. Acesse: `https://SEU_BACKEND.onrender.com/health`
    - Deve retornar: `{"status": "ok"}`
 
-2. Acesse: `https://voxen-pi4v.onrender.com/api/v1/test`
+2. Acesse: `https://SEU_BACKEND.onrender.com/api/v1/test`
    - Deve retornar: `{"success": true, "message": "API está funcionando!"}`
 
 ## 🐛 Erros Comuns

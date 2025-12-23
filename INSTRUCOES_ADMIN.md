@@ -33,15 +33,17 @@ Após criar o admin, **IMEDIATAMENTE**:
 O sistema agora cria automaticamente um usuário admin padrão quando detecta que está em produção e não existe nenhum admin:
 
 - **Username**: `admin`
-- **Senha**: `admin123`
+- **Senha**: `[SENHA_GERADA_AUTOMATICAMENTE]`
 
-⚠️ **IMPORTANTE**: Altere a senha após o primeiro login!
+⚠️ **IMPORTANTE**: 
+- A senha padrão é gerada automaticamente
+- Consulte os logs do servidor para obter a senha
+- Altere a senha imediatamente após o primeiro login!
 
 ### Como verificar se foi criado:
 
-1. Tente fazer login com:
-   - Username: `admin`
-   - Senha: `admin123`
+1. Consulte os logs do servidor para obter a senha gerada
+2. Tente fazer login com as credenciais obtidas dos logs
 
 2. Se funcionar, altere a senha imediatamente através do sistema.
 
@@ -60,5 +62,5 @@ python criar_admin.py admin minhasenha123
 - ✅ A rota `/criar-admin-inicial` só funciona se `ENABLE_ADMIN_CREATION` estiver configurado
 - ✅ Você pode adicionar um token adicional via `ADMIN_CREATION_TOKEN`
 - ✅ **SEMPRE** desative `ENABLE_ADMIN_CREATION` após criar o admin
-- ✅ Altere a senha padrão `admin123` imediatamente após o primeiro login
+- ✅ Altere a senha padrão imediatamente após o primeiro login
 

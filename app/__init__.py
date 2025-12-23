@@ -222,8 +222,12 @@ def create_app():
                 admin_exists = Usuario.query.filter_by(role='admin').first()
                 if not admin_exists:
                     # Criar admin padrão apenas se não existir nenhum admin
-                    # A senha padrão deve ser alterada após o primeiro login
-                    admin_password = generate_password_hash('admin123')
+                    # Gerar senha aleatória segura
+                    import secrets
+                    import string
+                    caracteres = string.ascii_letters + string.digits + "!@#$%&*"
+                    senha_temp = ''.join(secrets.choice(caracteres) for _ in range(12))
+                    admin_password = generate_password_hash(senha_temp)
                     admin = Usuario(
                         username='admin',
                         email='admin@controle-dublagem.com',
@@ -233,8 +237,10 @@ def create_app():
                     )
                     db.session.add(admin)
                     db.session.commit()
-                    print("⚠️  Usuário admin padrão criado (username: admin, senha: admin123)")
-                    print("⚠️  IMPORTANTE: Altere a senha após o primeiro login!")
+                    print("⚠️  Usuário admin padrão criado (username: admin)")
+                    print(f"⚠️  SENHA TEMPORÁRIA: {senha_temp}")
+                    print("⚠️  IMPORTANTE: Anote esta senha e altere-a após o primeiro login!")
+                    print("⚠️  Esta senha não será exibida novamente!")
             
             print(f"✓ Ambiente: {env.upper()}")
             print(f"✓ Banco de dados: {db_uri}")

@@ -10,13 +10,13 @@ Após o deploy, o usuário admin padrão pode não estar funcionando porque o ba
 ### Opção 1: Fornecer username e senha como argumentos
 
 ```bash
-python criar_admin.py admin minhasenha123
+python criar_admin.py admin SUA_SENHA_SEGURA_AQUI
 ```
 
 ### Opção 2: Usar variáveis de ambiente (RECOMENDADO para produção)
 
 ```bash
-ADMIN_USERNAME=admin ADMIN_PASSWORD=minhasenha123 python criar_admin.py
+ADMIN_USERNAME=admin ADMIN_PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_admin.py
 ```
 
 ### Opção 3: Gerar senha aleatória automaticamente
@@ -40,7 +40,7 @@ Se você está usando Render:
    - Vá em "Shell" do seu serviço
    - Execute com variáveis de ambiente:
      ```bash
-     ADMIN_USERNAME=admin ADMIN_PASSWORD=suasenha123 python criar_admin.py
+     ADMIN_USERNAME=admin ADMIN_PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_admin.py
      ```
 
 2. **Via variáveis de ambiente do Render**:
@@ -49,13 +49,13 @@ Se você está usando Render:
 
 ### Opção 5: Executar fix_database.py
 
-O script `fix_database.py` também cria o usuário admin automaticamente se não existir (com senha padrão `admin123`):
+O script `fix_database.py` também cria o usuário admin automaticamente se não existir (com senha padrão temporária):
 
 ```bash
 python fix_database.py
 ```
 
-**⚠️ NOTA**: O `fix_database.py` ainda usa a senha padrão `admin123` por compatibilidade, mas é recomendado alterá-la após a primeira execução usando `criar_admin.py`.
+**⚠️ NOTA**: O `fix_database.py` usa uma senha padrão temporária por compatibilidade. Consulte os logs para obter a senha e altere-a imediatamente após a primeira execução usando `criar_admin.py`.
 
 ## Verificar usuários existentes
 

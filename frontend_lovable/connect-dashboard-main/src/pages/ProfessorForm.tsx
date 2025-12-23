@@ -201,7 +201,7 @@ export default function ProfessorForm() {
         nome: formData.nome,
         telefone: formData.telefone,
         ativo: formData.ativo,
-        senha_usuario: senhaUsuario || 'voxen123',
+        senha_usuario: senhaUsuario || '', // Backend gerará senha aleatória se vazio
         horarios: horariosValidos.map((h) => ({
           dia_semana: h.dia_semana,
           modalidade: h.modalidade,
@@ -332,7 +332,7 @@ export default function ProfessorForm() {
                       minLength={6}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Senha padrão: voxen123 (se não preenchida)
+                      Senha será gerada automaticamente se não preenchida
                     </p>
                   </div>
                 </div>

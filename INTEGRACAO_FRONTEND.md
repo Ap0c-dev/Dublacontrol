@@ -128,7 +128,7 @@ A API foi ajustada para retornar os campos esperados pelo frontend:
 
 3. **Acesse o frontend:**
    - Abra `http://localhost:8080`
-   - Faça login com: `admin` / `admin123`
+   - Faça login com as credenciais que você configurou
 
 4. **Verifique as páginas:**
    - Dashboard: Deve mostrar estatísticas

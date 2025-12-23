@@ -65,7 +65,7 @@ set DATABASE_URL=postgresql://controle_user:sua_senha_segura@IP_DO_SERVIDOR:5432
 
 **Exemplo:**
 ```bash
-export DATABASE_URL="postgresql://controle_user:minhasenha123@192.168.1.100:5432/controle_dublagem"
+export DATABASE_URL="postgresql://usuario:SUA_SENHA@IP_DO_SERVIDOR:5432/nome_do_banco"
 ```
 
 #### 4. Instalar driver PostgreSQL no Python

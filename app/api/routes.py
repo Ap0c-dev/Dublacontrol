@@ -1627,8 +1627,12 @@ def api_criar_aluno():
         # Criar usuário automaticamente para o aluno
         senha_usuario = data.get('senha_usuario', '').strip()
         if not senha_usuario:
-            # Gerar senha padrão se não fornecida
-            senha_usuario = 'voxen123'
+            # Gerar senha aleatória segura se não fornecida
+            import secrets
+            import string
+            caracteres = string.ascii_letters + string.digits + "!@#$%&*"
+            senha_usuario = ''.join(secrets.choice(caracteres) for _ in range(12))
+            print(f"⚠️  Senha gerada automaticamente para usuário (não será exibida novamente)")
         
         if len(senha_usuario) < 6:
             response = jsonify({'error': 'A senha deve ter pelo menos 6 caracteres'})
@@ -1997,8 +2001,12 @@ def api_criar_professor():
         # Criar usuário automaticamente para o professor
         senha_usuario = data.get('senha_usuario', '').strip()
         if not senha_usuario:
-            # Gerar senha padrão se não fornecida
-            senha_usuario = 'voxen123'
+            # Gerar senha aleatória segura se não fornecida
+            import secrets
+            import string
+            caracteres = string.ascii_letters + string.digits + "!@#$%&*"
+            senha_usuario = ''.join(secrets.choice(caracteres) for _ in range(12))
+            print(f"⚠️  Senha gerada automaticamente para usuário (não será exibida novamente)")
         
         if len(senha_usuario) < 6:
             db.session.rollback()

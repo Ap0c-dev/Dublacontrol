@@ -54,7 +54,7 @@ Se preferir servir tudo pelo mesmo domínio, você pode configurar o backend par
 
 ## 🔧 Verificar Configuração Atual
 
-### Backend (voxen-pi4v.onrender.com)
+### Backend (SEU_BACKEND.onrender.com)
 - ✅ Serve a API REST em `/api/v1/*`
 - ✅ Serve templates HTML antigos em `/`, `/login`, etc.
 - ❌ **NÃO serve o frontend React**

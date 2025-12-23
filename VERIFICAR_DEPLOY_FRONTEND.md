@@ -33,7 +33,7 @@ VITE_API_BASE_URL=https://voxen-pi4v.onrender.com/api/v1
 
 **Se aparecer:**
 - `API_BASE_URL: http://localhost:5000/api/v1` → ❌ Variável de ambiente não configurada
-- `API_BASE_URL: https://voxen-pi4v.onrender.com/api/v1` → ✅ Configurado corretamente
+- `API_BASE_URL: https://SEU_BACKEND.onrender.com/api/v1` → ✅ Configurado corretamente
 
 ### 3. Verificar Erros de CORS
 
@@ -86,7 +86,7 @@ No Render Static Site:
 1. Acesse: `https://voxen-frontend.onrender.com/login`
 2. Abra o console (F12)
 3. Verifique se `API_BASE_URL` está correto
-4. Tente fazer login com: `admin` / `admin123`
+4. Tente fazer login com as credenciais que você configurou
 
 ## 🐛 Troubleshooting
 
@@ -95,7 +95,7 @@ No Render Static Site:
 **Causa**: Backend não está acessível ou CORS bloqueado
 
 **Solução**:
-1. Verifique se o backend está rodando: `https://voxen-pi4v.onrender.com/health`
+1. Verifique se o backend está rodando: `https://SEU_BACKEND.onrender.com/health`
 2. Verifique se o CORS está configurado no backend
 
 ### Erro: "401 Unauthorized"

@@ -84,7 +84,7 @@ Este documento explica como fazer o deploy da aplicação Voxen no Render com o 
 
 7. **Acesse o frontend pela URL do Static Site**, não pela URL do backend!
    - ✅ **Correto**: `https://voxen-frontend.onrender.com` (frontend React)
-   - ❌ **Errado**: `https://voxen-pi4v.onrender.com` (backend Flask com templates antigos)
+   - ❌ **Errado**: `https://SEU_BACKEND.onrender.com` (backend Flask com templates antigos)
 
 ### 4. Configurar CORS no Backend
 
@@ -128,10 +128,10 @@ with app.app_context():
             role='admin',
             ativo=True
         )
-        admin.set_password('admin123')  # ALTERE ESTA SENHA!
+        admin.set_password('[SENHA_TEMPORARIA]')  # ALTERE ESTA SENHA!
         db.session.add(admin)
         db.session.commit()
-        print("✅ Admin criado: username=admin, password=admin123")
+        print("✅ Admin criado: username=admin, password=[CONSULTE_OS_LOGS]")
     else:
         print("⚠️ Admin já existe")
 ```

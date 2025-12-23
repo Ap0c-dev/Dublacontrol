@@ -17,10 +17,10 @@ Este guia explica como criar usuários com diferentes roles (admin, gerente, pro
 
 ```bash
 # Opção 1: Com username e senha
-python criar_usuario.py admin admin minhasenha123
+python criar_usuario.py admin admin SUA_SENHA_SEGURA_AQUI
 
 # Opção 2: Com variáveis de ambiente
-ROLE=admin USERNAME=admin PASSWORD=minhasenha123 python criar_usuario.py
+ROLE=admin USERNAME=admin PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_usuario.py
 
 # Opção 3: Gerar senha aleatória automaticamente
 python criar_usuario.py admin admin
@@ -30,10 +30,10 @@ python criar_usuario.py admin admin
 
 ```bash
 # Opção 1: Com username e senha
-python criar_usuario.py gerente gerente minhasenha123
+python criar_usuario.py gerente gerente SUA_SENHA_SEGURA_AQUI
 
 # Opção 2: Com variáveis de ambiente
-ROLE=gerente USERNAME=gerente PASSWORD=minhasenha123 python criar_usuario.py
+ROLE=gerente USERNAME=gerente PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_usuario.py
 
 # Opção 3: Gerar senha aleatória automaticamente
 python criar_usuario.py gerente gerente
@@ -42,13 +42,13 @@ python criar_usuario.py gerente gerente
 #### Criar Usuário Professor
 
 ```bash
-python criar_usuario.py professor professor1 minhasenha123
+python criar_usuario.py professor professor1 SUA_SENHA_SEGURA_AQUI
 ```
 
 #### Criar Usuário Aluno
 
 ```bash
-python criar_usuario.py aluno aluno1 minhasenha123
+python criar_usuario.py aluno aluno1 SUA_SENHA_SEGURA_AQUI
 ```
 
 ### Método 2: Via Interface Web (Render)
@@ -61,8 +61,9 @@ Se você está usando Render e não tem acesso ao shell:
 
 2. **Acesse a URL:**
    ```
-   https://voxen-pi4v.onrender.com/criar-admin-inicial
+   https://SEU_BACKEND.onrender.com/criar-admin-inicial
    ```
+   (Substitua `SEU_BACKEND` pela URL real do seu backend)
 
 3. **Preencha o formulário:**
    - Username: `admin` (ou o que preferir)
@@ -77,10 +78,10 @@ Se você tem acesso ao Shell do Render:
 
 ```bash
 # Criar admin
-ROLE=admin USERNAME=admin PASSWORD=minhasenha123 python criar_usuario.py
+ROLE=admin USERNAME=admin PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_usuario.py
 
 # Criar gerente
-ROLE=gerente USERNAME=gerente PASSWORD=minhasenha123 python criar_usuario.py
+ROLE=gerente USERNAME=gerente PASSWORD=SUA_SENHA_SEGURA_AQUI python criar_usuario.py
 ```
 
 ### Método 4: Criação Automática na Inicialização
@@ -91,9 +92,11 @@ O sistema cria automaticamente um usuário admin padrão quando:
 
 **Credenciais padrão:**
 - Username: `admin`
-- Senha: `admin123`
+- Senha: `[SENHA_PADRAO_TEMPORARIA]`
 
-⚠️ **IMPORTANTE**: Altere a senha após o primeiro login!
+⚠️ **IMPORTANTE**: 
+- A senha padrão é gerada automaticamente e deve ser alterada imediatamente após o primeiro login
+- Consulte os logs do servidor para obter a senha padrão gerada
 
 ## 🔐 Exemplos Práticos
 
@@ -101,13 +104,13 @@ O sistema cria automaticamente um usuário admin padrão quando:
 
 ```bash
 # Admin principal
-python criar_usuario.py admin admin senha_admin_123
+python criar_usuario.py admin admin SUA_SENHA_ADMIN_SEGURA
 
 # Gerente
-python criar_usuario.py gerente gerente senha_gerente_123
+python criar_usuario.py gerente gerente SUA_SENHA_GERENTE_SEGURA
 
 # Segundo admin (backup)
-python criar_usuario.py admin admin2 senha_admin2_123
+python criar_usuario.py admin admin2 SUA_SENHA_ADMIN2_SEGURA
 ```
 
 ### Criar com senha aleatória

@@ -337,7 +337,7 @@ export default function AlunoForm() {
         ativo: formData.ativo,
         aprovado: formData.aprovado,
         experimental: formData.experimental,
-        senha_usuario: senhaUsuario || 'voxen123',
+        senha_usuario: senhaUsuario || '', // Backend gerará senha aleatória se vazio
         matriculas: matriculasValidas.map((m) => {
           // Converter valor_mensalidade para número, tratando strings vazias
           let valor_mensalidade = null;
@@ -632,7 +632,7 @@ export default function AlunoForm() {
                       minLength={6}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Senha padrão: voxen123 (se não preenchida)
+                      Senha será gerada automaticamente se não preenchida
                     </p>
                   </div>
                 </div>
