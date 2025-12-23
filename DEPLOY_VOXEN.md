@@ -59,8 +59,10 @@ Este documento explica como fazer o deploy da aplicação Voxen no Render com o 
 
 ### 3. Criar Static Site (Frontend React)
 
+⚠️ **IMPORTANTE**: O frontend React precisa ser configurado como um **Static Site separado**. Se você acessar o backend diretamente (`voxen.onrender.com`), verá a interface antiga (templates HTML do Flask).
+
 1. No dashboard do Render, clique em **New +** → **Static Site**
-2. Conecte seu repositório GitHub
+2. Conecte seu repositório GitHub (o mesmo do backend)
 3. Configure:
    - **Name**: `voxen-frontend`
    - **Root Directory**: `frontend_lovable/connect-dashboard-main`
@@ -72,12 +74,17 @@ Este documento explica como fazer o deploy da aplicação Voxen no Render com o 
 
 4. **Environment Variables** (adicionar):
    ```
-   VITE_API_BASE_URL=https://voxen.onrender.com/api/v1
+   VITE_API_BASE_URL=https://voxen-pi4v.onrender.com/api/v1
    ```
+   ⚠️ **IMPORTANTE**: Substitua `voxen-pi4v.onrender.com` pela URL real do seu backend
 
 5. Clique em **Create Static Site**
 
 6. Após o deploy, o frontend estará disponível em uma URL do Render (ex: `voxen-frontend.onrender.com`)
+
+7. **Acesse o frontend pela URL do Static Site**, não pela URL do backend!
+   - ✅ **Correto**: `https://voxen-frontend.onrender.com` (frontend React)
+   - ❌ **Errado**: `https://voxen-pi4v.onrender.com` (backend Flask com templates antigos)
 
 ### 4. Configurar CORS no Backend
 
