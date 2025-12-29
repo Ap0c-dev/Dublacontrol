@@ -5,7 +5,7 @@ import { api, Aluno, Professor } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap } from 'lucide-react';
+import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -218,8 +218,17 @@ export default function Alunos() {
                             variant="ghost"
                             size="sm"
                             onClick={() => navigate(`/alunos/${aluno.id}`)}
+                            title="Visualizar"
                           >
                             <Eye size={16} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/alunos/${aluno.id}/editar`)}
+                            title="Editar"
+                          >
+                            <Pencil size={16} />
                           </Button>
                         </div>
                       </td>

@@ -72,6 +72,14 @@ const App = () => (
               }
             />
             <Route
+              path="/alunos/:id/editar"
+              element={
+                <RoleProtectedRoute allowedRoles={['admin']} requireWrite={true}>
+                  <AlunoForm />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
               path="/professores"
               element={
                 <RoleProtectedRoute allowedRoles={['admin', 'gerente']}>
