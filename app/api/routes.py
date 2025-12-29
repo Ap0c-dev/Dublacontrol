@@ -1046,28 +1046,52 @@ def api_listar_pagamentos():
             
             alunos = query_alunos.order_by(Aluno.nome).all()
             
-            # Adicionar alunos atrasados sem pagamento registrado (apenas se não houver filtro ou se o filtro for "atrasado")
-            # Não adicionar se o filtro for "pago" ou "pendente"
-            if not status_filtro or status_filtro == 'atrasado':
+            # Adicionar alunos atrasados sem pagamento registrado (apenas se o filtro for "atrasado")
+            # Quando não há filtro, não adicionar alunos sem pagamento, apenas mostrar os pagamentos registrados
+            if status_filtro == 'atrasado':
                 for aluno in alunos:
-                    if aluno.data_vencimento and aluno.data_vencimento < hoje:
-                        # Verificar se já não está na lista de pagamentos
-                        ja_existe = any(p['aluno_id'] == aluno.id for p in resultado)
-                        if not ja_existe:
-                            # Verificar se há pagamento pendente ou rejeitado para este mês
-                            mes_atual = hoje.month
-                            ano_atual = hoje.year
-                            pagamento_existente = Pagamento.query.filter_by(
-                                aluno_id=aluno.id,
-                                mes_referencia=mes_atual,
-                                ano_referencia=ano_atual
-                            ).first()
-                            
-                            # Só adicionar se não houver pagamento ou se o pagamento não estiver aprovado
-                            if not pagamento_existente or pagamento_existente.status != 'aprovado':
-                                # Se há filtro de status "atrasado", adicionar
-                                # Se não há filtro, adicionar também
-                                if not status_filtro or status_filtro == 'atrasado':
+                    if aluno.data_vencimento:
+                        # Calcular data de vencimento para o mês atual
+                        mes_atual = hoje.month
+                        ano_atual = hoje.year
+                        dia_vencimento = aluno.data_vencimento.day
+                        try:
+                            data_vencimento_ref = date(ano_atual, mes_atual, dia_vencimento)
+                        except ValueError:
+                            ultimo_dia = monthrange(ano_atual, mes_atual)[1]
+                            data_vencimento_ref = date(ano_atual, mes_atual, min(dia_vencimento, ultimo_dia))
+                        
+                        if data_vencimento_ref < hoje:
+                            # Verificar se já não está na lista de pagamentos
+                            ja_existe = any(p['aluno_id'] == aluno.id for p in resultado)
+                            if not ja_existe:
+                                # Verificar se há pagamento pendente ou rejeitado para este mês
+                                pagamento_existente = Pagamento.query.filter_by(
+                                    aluno_id=aluno.id,
+                                    mes_referencia=mes_atual,
+                                    ano_referencia=ano_atual
+                                ).first()
+                                
+                                # Só adicionar se não houver pagamento ou se o pagamento não estiver aprovado
+                                if not pagamento_existente or pagamento_existente.status != 'aprovado':
+                                    mes_nome = meses.get(mes_atual, f'Mês {mes_atual}')
+                                    resultado.append({
+                                        'id': f'aluno_{aluno.id}_{mes_atual}_{ano_atual}',
+                                        'aluno_id': aluno.id,
+                                        'aluno_nome': aluno.nome,
+                                        'mes_referencia': mes_atual,
+                                        'ano_referencia': ano_atual,
+                                        'mes_nome': mes_nome,
+                                        'valor': aluno.get_total_mensalidades(),
+                                        'valor_pago': 0,
+                                        'data_vencimento': data_vencimento_ref.isoformat() if data_vencimento_ref else None,
+                                        'data_pagamento': None,
+                                        'status': 'atrasado',
+                                        'status_label': 'Atrasado',
+                                        'url_comprovante': None,
+                                        'observacoes': None,
+                                        'data_cadastro': None
+                                    })
                                     mes_nome = meses.get(mes_atual, f'Mês {mes_atual}')
                                     resultado.append({
                                         'id': f'aluno_{aluno.id}_{mes_atual}_{ano_atual}',
@@ -1264,8 +1288,20 @@ def api_dashboard_stats():
         ano_atual = hoje.year
         
         # Contar alunos ativos sem pagamento e com vencimento passado
+        # Considerar apenas alunos com matrícula ativa (mesmo critério do total_alunos)
         alunos_atrasados = 0
-        alunos_ativos = Aluno.query.filter_by(ativo=True).all()
+        alunos_com_matricula_ativa = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).subquery()
+        
+        alunos_ativos_ids = [row[0] for row in db.session.query(alunos_com_matricula_ativa.c.id).all()]
+        alunos_ativos = Aluno.query.filter(Aluno.id.in_(alunos_ativos_ids)).all() if alunos_ativos_ids else []
         
         for aluno in alunos_ativos:
             if not aluno.data_vencimento:
