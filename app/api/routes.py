@@ -1395,21 +1395,12 @@ def api_alunos_evolucao():
             ultimo_dia = monthrange(ano, mes)[1]
             data_fim_mes = date(ano, mes, ultimo_dia)
             
-            # Contar alunos ativos com matrícula ativa até o final daquele mês
-            # Considerar alunos que tinham matrícula ativa naquele momento
-            alunos_na_epoca = db.session.query(Aluno.id).distinct().join(
-                Matricula, Aluno.id == Matricula.aluno_id
-            ).filter(
+            # Contar alunos ativos que foram cadastrados até o final daquele mês
+            # Baseado na data de cadastro do aluno
+            alunos_na_epoca = Aluno.query.filter(
                 Aluno.ativo == True,
                 # Aluno foi cadastrado até o final daquele mês
-                db.func.date(Aluno.data_cadastro) <= data_fim_mes,
-                # Matrícula estava ativa naquele momento (sem data_encerramento ou data_encerramento após o fim do mês)
-                db.or_(
-                    Matricula.data_encerramento.is_(None),
-                    Matricula.data_encerramento > data_fim_mes
-                ),
-                # Matrícula foi criada até o final daquele mês
-                db.func.date(Matricula.data_matricula) <= data_fim_mes
+                db.func.date(Aluno.data_cadastro) <= data_fim_mes
             ).count()
             
             meses_nomes = {
