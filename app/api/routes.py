@@ -1371,13 +1371,19 @@ def api_dashboard_stats():
 @api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
 @api_login_required
 def api_alunos_evolucao():
-    """Retorna a evolução do número de alunos nos últimos 12 meses"""
+    """Retorna quantos alunos começaram (data_inicio) em cada um dos últimos 12 meses"""
     try:
         from datetime import timedelta
         from calendar import monthrange
         
         hoje = date.today()
         resultado = []
+        
+        meses_nomes = {
+            1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr',
+            5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+            9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+        }
         
         # Gerar os últimos 12 meses
         for i in range(11, -1, -1):  # De 11 meses atrás até hoje
@@ -1391,39 +1397,29 @@ def api_alunos_evolucao():
                 mes += 12
                 ano -= 1
             
-            # Último dia do mês
+            # Primeiro e último dia do mês
+            primeiro_dia = date(ano, mes, 1)
             ultimo_dia = monthrange(ano, mes)[1]
             data_fim_mes = date(ano, mes, ultimo_dia)
             
-            # Contar alunos ativos que tinham matrícula com data_inicio até o final daquele mês
-            # Considerar matrículas que começaram até o final do mês e não foram encerradas antes
-            alunos_na_epoca = db.session.query(Aluno.id).distinct().join(
+            # Contar quantos alunos únicos começaram (data_inicio) neste mês específico
+            alunos_iniciaram = db.session.query(Aluno.id).distinct().join(
                 Matricula, Aluno.id == Matricula.aluno_id
             ).filter(
                 Aluno.ativo == True,
                 # Matrícula tem data_inicio definida
                 Matricula.data_inicio.isnot(None),
-                # Data de início da matrícula é até o final daquele mês
-                db.func.date(Matricula.data_inicio) <= data_fim_mes,
-                # Matrícula não foi encerrada antes do final daquele mês
-                db.or_(
-                    Matricula.data_encerramento.is_(None),
-                    Matricula.data_encerramento > data_fim_mes
-                )
+                # Data de início da matrícula está dentro deste mês específico
+                db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                db.func.date(Matricula.data_inicio) <= data_fim_mes
             ).count()
-            
-            meses_nomes = {
-                1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr',
-                5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago',
-                9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
-            }
             
             resultado.append({
                 'mes': mes,
                 'ano': ano,
                 'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
                 'mes_ano': f"{meses_nomes.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
-                'total_alunos': alunos_na_epoca,
+                'total_alunos': alunos_iniciaram,
                 'data_referencia': data_fim_mes.isoformat()
             })
         
