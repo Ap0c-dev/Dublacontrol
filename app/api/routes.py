@@ -1403,16 +1403,18 @@ def api_alunos_evolucao():
             data_fim_mes = date(ano, mes, ultimo_dia)
             
             # Contar quantos alunos únicos começaram (data_inicio) neste mês específico
+            # Incluir TODOS os alunos, independente de status (ativo/inativo) ou pagamento
             alunos_iniciaram = db.session.query(Aluno.id).distinct().join(
                 Matricula, Aluno.id == Matricula.aluno_id
             ).filter(
-                Aluno.ativo == True,
                 # Matrícula tem data_inicio definida
                 Matricula.data_inicio.isnot(None),
                 # Data de início da matrícula está dentro deste mês específico
                 db.func.date(Matricula.data_inicio) >= primeiro_dia,
                 db.func.date(Matricula.data_inicio) <= data_fim_mes
             ).count()
+            
+            print(f"📊 Mês {mes}/{ano}: {alunos_iniciaram} alunos começaram (incluindo inativos e com pagamento atrasado)")
             
             resultado.append({
                 'mes': mes,
