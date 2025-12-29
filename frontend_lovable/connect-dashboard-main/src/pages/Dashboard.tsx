@@ -198,7 +198,7 @@ export default function Dashboard() {
               Evolução de Alunos - Últimos 12 Meses
             </DialogTitle>
             <DialogDescription>
-              Gráfico mostrando a quantidade de alunos mês a mês
+              Gráfico mostrando quantos alunos começaram (data de início) em cada mês
             </DialogDescription>
           </DialogHeader>
           {isLoadingEvolucao ? (
@@ -208,7 +208,7 @@ export default function Dashboard() {
           ) : evolucaoData.length > 0 ? (
             <div className="mt-4">
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
                     dataKey="mes_ano" 
@@ -228,16 +228,13 @@ export default function Dashboard() {
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                   <Legend />
-                  <Line 
-                    type="monotone" 
+                  <Bar 
                     dataKey="total_alunos" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={3}
-                    dot={{ fill: 'hsl(var(--primary))', r: 5 }}
-                    activeDot={{ r: 8 }}
-                    name="Total de Alunos"
+                    fill="hsl(var(--primary))"
+                    name="Alunos que começaram"
+                    radius={[8, 8, 0, 0]}
                   />
-                </LineChart>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
