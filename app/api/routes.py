@@ -907,6 +907,7 @@ def api_listar_pagamentos():
         ano_filtro = request.args.get('ano', type=int)
         
         print(f"🔍 Filtros recebidos: aluno_id={aluno_id_filtro}, professor_id={professor_id_filtro}, status={status_filtro}, mes={mes_filtro}, ano={ano_filtro}")
+        print(f"📊 Status filtro: '{status_filtro}' (tipo: {type(status_filtro)})")
         
         hoje = date.today()
         # Se não especificar mês/ano, retornar TODOS os pagamentos
@@ -953,6 +954,10 @@ def api_listar_pagamentos():
                     )
             
             pagamentos = query_pagamentos.order_by(Pagamento.ano_referencia.desc(), Pagamento.mes_referencia.desc(), Pagamento.data_cadastro.desc()).all()
+            
+            print(f"📋 Total de pagamentos encontrados na query: {len(pagamentos)}")
+            if pagamentos:
+                print(f"📋 Status dos primeiros pagamentos: {[p.status for p in pagamentos[:5]]}")
             
             resultado = []
             meses = {
@@ -1027,28 +1032,26 @@ def api_listar_pagamentos():
                     'data_cadastro': pagamento.data_cadastro.isoformat() if pagamento.data_cadastro else None
                 })
             
-            # Também incluir alunos sem pagamento mas que estão atrasados
-            query_alunos = Aluno.query.filter_by(ativo=True)
-            
-            # FILTRAGEM AUTOMÁTICA POR ROLE
-            if current_user.is_professor() and current_user.professor_id:
-                query_alunos = query_alunos.join(Matricula).filter(Matricula.professor_id == current_user.professor_id).distinct()
-            elif current_user.is_aluno() and current_user.aluno_id:
-                query_alunos = query_alunos.filter_by(id=current_user.aluno_id)
-            
-            if aluno_id_filtro:
-                query_alunos = query_alunos.filter_by(id=aluno_id_filtro)
-            
-            if professor_id_filtro and not current_user.is_professor():
-                query_alunos = query_alunos.join(Matricula).filter(
-                    Matricula.professor_id == professor_id_filtro
-                ).distinct()
-            
-            alunos = query_alunos.order_by(Aluno.nome).all()
-            
             # Adicionar alunos atrasados sem pagamento registrado (apenas se o filtro for "atrasado")
             # Quando não há filtro, não adicionar alunos sem pagamento, apenas mostrar os pagamentos registrados
             if status_filtro == 'atrasado':
+                query_alunos = Aluno.query.filter_by(ativo=True)
+                
+                # FILTRAGEM AUTOMÁTICA POR ROLE
+                if current_user.is_professor() and current_user.professor_id:
+                    query_alunos = query_alunos.join(Matricula).filter(Matricula.professor_id == current_user.professor_id).distinct()
+                elif current_user.is_aluno() and current_user.aluno_id:
+                    query_alunos = query_alunos.filter_by(id=current_user.aluno_id)
+                
+                if aluno_id_filtro:
+                    query_alunos = query_alunos.filter_by(id=aluno_id_filtro)
+                
+                if professor_id_filtro and not current_user.is_professor():
+                    query_alunos = query_alunos.join(Matricula).filter(
+                        Matricula.professor_id == professor_id_filtro
+                    ).distinct()
+                
+                alunos = query_alunos.order_by(Aluno.nome).all()
                 for aluno in alunos:
                     if aluno.data_vencimento:
                         # Calcular data de vencimento para o mês atual
@@ -1335,13 +1338,19 @@ def api_dashboard_stats():
                     alunos_atrasados += 1
         
         # Calcular receita mensal (pagamentos aprovados do mês atual)
-        receita_mensal = db.session.query(
+        # Considerar pagamentos aprovados que foram pagos no mês atual (mes_referencia e ano_referencia)
+        receita_mensal_query = db.session.query(
             db.func.sum(Pagamento.valor_pago)
         ).filter(
             Pagamento.status == 'aprovado',
             Pagamento.mes_referencia == hoje.month,
             Pagamento.ano_referencia == hoje.year
-        ).scalar() or 0.0
+        )
+        receita_mensal = receita_mensal_query.scalar()
+        if receita_mensal is None:
+            receita_mensal = 0.0
+        else:
+            receita_mensal = float(receita_mensal)
         
         return jsonify({
             'success': True,
