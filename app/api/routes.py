@@ -1368,6 +1368,74 @@ def api_dashboard_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
+@api_login_required
+def api_alunos_evolucao():
+    """Retorna a evolução do número de alunos nos últimos 12 meses"""
+    try:
+        from datetime import timedelta
+        from calendar import monthrange
+        
+        hoje = date.today()
+        resultado = []
+        
+        # Gerar os últimos 12 meses
+        for i in range(11, -1, -1):  # De 11 meses atrás até hoje
+            # Calcular data do mês
+            meses_antes = i
+            ano = hoje.year
+            mes = hoje.month - meses_antes
+            
+            # Ajustar se o mês for negativo ou zero
+            while mes <= 0:
+                mes += 12
+                ano -= 1
+            
+            # Último dia do mês
+            ultimo_dia = monthrange(ano, mes)[1]
+            data_fim_mes = date(ano, mes, ultimo_dia)
+            
+            # Contar alunos ativos com matrícula ativa até o final daquele mês
+            # Considerar alunos que tinham matrícula ativa naquele momento
+            alunos_na_epoca = db.session.query(Aluno.id).distinct().join(
+                Matricula, Aluno.id == Matricula.aluno_id
+            ).filter(
+                Aluno.ativo == True,
+                # Aluno foi cadastrado até o final daquele mês
+                db.func.date(Aluno.data_cadastro) <= data_fim_mes,
+                # Matrícula estava ativa naquele momento (sem data_encerramento ou data_encerramento após o fim do mês)
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > data_fim_mes
+                ),
+                # Matrícula foi criada até o final daquele mês
+                db.func.date(Matricula.data_matricula) <= data_fim_mes
+            ).count()
+            
+            meses_nomes = {
+                1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr',
+                5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+                9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+            }
+            
+            resultado.append({
+                'mes': mes,
+                'ano': ano,
+                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
+                'mes_ano': f"{meses_nomes.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
+                'total_alunos': alunos_na_epoca,
+                'data_referencia': data_fim_mes.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar evolução de alunos: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== NOTAS ====================
 
 @api_bp.route('/notas', methods=['GET'])

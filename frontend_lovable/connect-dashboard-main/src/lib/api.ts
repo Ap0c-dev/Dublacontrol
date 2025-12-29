@@ -216,6 +216,25 @@ class ApiClient {
     }
   }
 
+  async getAlunosEvolucao(): Promise<ApiResponse<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/alunos-evolucao`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar evolução de alunos:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
     try {
       const headers = this.getHeaders();

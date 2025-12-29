@@ -5,10 +5,21 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { api, DashboardStats } from '@/lib/api';
 import { Users, GraduationCap, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEvolucaoOpen, setIsEvolucaoOpen] = useState(false);
+  const [evolucaoData, setEvolucaoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>([]);
+  const [isLoadingEvolucao, setIsLoadingEvolucao] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -58,6 +69,31 @@ export default function Dashboard() {
     fetchStats();
   }, [toast]);
 
+  const handleOpenEvolucao = async () => {
+    setIsEvolucaoOpen(true);
+    setIsLoadingEvolucao(true);
+    try {
+      const response = await api.getAlunosEvolucao();
+      if (response.success) {
+        setEvolucaoData(response.data);
+      } else {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: response.error || 'Não foi possível obter a evolução de alunos.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro de conexão',
+        description: 'Verifique se o servidor está rodando.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingEvolucao(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -89,6 +125,7 @@ export default function Dashboard() {
               icon={Users}
               variant="primary"
               trend={{ value: 12, isPositive: true }}
+              onClick={handleOpenEvolucao}
             />
             <StatCard
               title="Professores"
@@ -151,6 +188,65 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Evolução de Alunos */}
+      <Dialog open={isEvolucaoOpen} onOpenChange={setIsEvolucaoOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users size={24} />
+              Evolução de Alunos - Últimos 12 Meses
+            </DialogTitle>
+            <DialogDescription>
+              Gráfico mostrando a quantidade de alunos mês a mês
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingEvolucao ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : evolucaoData.length > 0 ? (
+            <div className="mt-4">
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="mes_ano" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total_alunos" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={3}
+                    dot={{ fill: 'hsl(var(--primary))', r: 5 }}
+                    activeDot={{ r: 8 }}
+                    name="Total de Alunos"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Nenhum dado disponível.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
