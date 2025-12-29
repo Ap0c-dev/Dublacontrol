@@ -124,7 +124,10 @@ export default function Dashboard() {
               value={stats.total_alunos}
               icon={Users}
               variant="primary"
-              trend={{ value: 12, isPositive: true }}
+              trend={stats.crescimento_alunos !== undefined ? {
+                value: Math.abs(stats.crescimento_alunos),
+                isPositive: stats.crescimento_alunos >= 0
+              } : undefined}
               onClick={handleOpenEvolucao}
             />
             <StatCard

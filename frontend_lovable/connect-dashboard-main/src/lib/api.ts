@@ -41,6 +41,7 @@ interface DashboardStats {
   total_pagamentos: number;
   pagamentos_atrasados: number;
   receita_mensal: number;
+  crescimento_alunos?: number; // Porcentagem de crescimento em relação ao mês anterior
 }
 
 interface Aluno {

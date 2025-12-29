@@ -1352,6 +1352,55 @@ def api_dashboard_stats():
         else:
             receita_mensal = float(receita_mensal)
         
+        # Calcular crescimento de alunos em relação ao mês anterior na mesma data
+        # Exemplo: se hoje é 29/12, comparar alunos até 29/12 com alunos até 29/11
+        from datetime import timedelta
+        from calendar import monthrange
+        
+        dia_atual = hoje.day
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        # Data de referência deste mês (até hoje)
+        data_referencia_atual = hoje
+        
+        # Calcular data equivalente no mês anterior
+        if mes_atual == 1:
+            mes_anterior = 12
+            ano_anterior = ano_atual - 1
+        else:
+            mes_anterior = mes_atual - 1
+            ano_anterior = ano_atual
+        
+        # Ajustar dia se o mês anterior tiver menos dias
+        ultimo_dia_mes_anterior = monthrange(ano_anterior, mes_anterior)[1]
+        dia_referencia_anterior = min(dia_atual, ultimo_dia_mes_anterior)
+        data_referencia_anterior = date(ano_anterior, mes_anterior, dia_referencia_anterior)
+        
+        # Contar alunos que começaram até a data atual deste mês
+        alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Matricula.data_inicio.isnot(None),
+            db.func.date(Matricula.data_inicio) <= data_referencia_atual
+        ).count()
+        
+        # Contar alunos que começaram até a mesma data do mês anterior
+        alunos_ate_mes_anterior = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Matricula.data_inicio.isnot(None),
+            db.func.date(Matricula.data_inicio) <= data_referencia_anterior
+        ).count()
+        
+        # Calcular porcentagem de crescimento
+        crescimento_alunos = 0.0
+        if alunos_ate_mes_anterior > 0:
+            crescimento_alunos = ((alunos_ate_hoje - alunos_ate_mes_anterior) / alunos_ate_mes_anterior) * 100
+        elif alunos_ate_hoje > 0:
+            # Se não havia alunos no mês anterior mas há agora, crescimento de 100%
+            crescimento_alunos = 100.0
+        
         return jsonify({
             'success': True,
             'data': {
@@ -1362,7 +1411,8 @@ def api_dashboard_stats():
                 'vencimentos_hoje': vencimentos_hoje,
                 'pagamentos_atrasados': int(alunos_atrasados),  # Garantir que é int
                 'receita_mensal': float(receita_mensal),  # Campo esperado pelo frontend
-                'total_pagamentos': Pagamento.query.count()  # Campo adicional útil
+                'total_pagamentos': Pagamento.query.count(),  # Campo adicional útil
+                'crescimento_alunos': round(crescimento_alunos, 1)  # Porcentagem de crescimento
             }
         })
     except Exception as e:
