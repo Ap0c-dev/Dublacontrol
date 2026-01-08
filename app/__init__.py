@@ -212,6 +212,47 @@ def create_app():
                 if 'does not exist' not in error_str and 'no such table' not in error_str:
                     print(f"⚠️  Aviso na migração: {e}")
             
+            # Migração: Adicionar coluna observacao na tabela alunos se não existir
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                table_names = inspector.get_table_names()
+                if 'alunos' in table_names:
+                    columns = [col['name'] for col in inspector.get_columns('alunos')]
+                    
+                    if 'observacao' not in columns:
+                        print("🔄 Migração: Adicionando coluna 'observacao' na tabela 'alunos'...")
+                        db_uri = str(db.engine.url)
+                        is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                        
+                        try:
+                            if is_postgres:
+                                # PostgreSQL suporta IF NOT EXISTS
+                                db.session.execute(text("""
+                                    ALTER TABLE alunos 
+                                    ADD COLUMN IF NOT EXISTS observacao TEXT
+                                """))
+                            else:
+                                # SQLite não suporta IF NOT EXISTS, mas já verificamos acima
+                                db.session.execute(text("""
+                                    ALTER TABLE alunos 
+                                    ADD COLUMN observacao TEXT
+                                """))
+                            db.session.commit()
+                            print("✅ Migração concluída: coluna 'observacao' adicionada na tabela 'alunos'")
+                        except Exception as alter_error:
+                            db.session.rollback()
+                            error_str = str(alter_error).lower()
+                            if 'already exists' in error_str or 'duplicate column' in error_str:
+                                print("✅ Coluna 'observacao' já existe na tabela 'alunos'")
+                            else:
+                                raise
+            except Exception as e:
+                db.session.rollback()
+                error_str = str(e).lower()
+                if 'does not exist' not in error_str and 'no such table' not in error_str:
+                    print(f"⚠️  Aviso na migração de observacao: {e}")
+            
             db.create_all()
             
             # Verificar e criar usuário admin se não existir (apenas em produção)
