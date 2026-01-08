@@ -2297,7 +2297,9 @@ def api_importar_alunos():
                 nome = str(row[idx_nome].value).strip() if row[idx_nome].value else ''
                 telefone = str(row[idx_telefone].value).strip() if row[idx_telefone].value else ''
                 cidade = str(row[idx_cidade].value).strip() if row[idx_cidade].value else ''
-                estado = str(row[idx_estado].value).strip().upper() if row[idx_estado].value else ''
+                # Estado deve ter no máximo 2 caracteres (UF)
+                estado_raw = str(row[idx_estado].value).strip().upper() if row[idx_estado].value else ''
+                estado = estado_raw[:2] if estado_raw else ''  # Limitar a 2 caracteres
                 forma_pagamento = str(row[idx_forma_pagamento].value).strip() if row[idx_forma_pagamento].value else ''
                 
                 # Validar campos obrigatórios
