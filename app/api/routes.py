@@ -542,6 +542,8 @@ def api_listar_alunos():
                 'status': status,  # Campo esperado pelo frontend
                 'status_vencimento': aluno.get_status_vencimento(),
                 'created_at': aluno.data_cadastro.isoformat() if aluno.data_cadastro else None,  # Campo esperado pelo frontend
+                'motivo_exclusao': aluno.motivo_exclusao,
+                'observacao': aluno.observacao
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -614,6 +616,8 @@ def api_get_aluno(aluno_id):
                 'aprovado': aluno.aprovado,
                 'experimental': aluno.experimental,
                 'status_vencimento': aluno.get_status_vencimento(),
+                'motivo_exclusao': aluno.motivo_exclusao,
+                'observacao': aluno.observacao,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -2087,6 +2091,8 @@ def api_editar_aluno(aluno_id):
             aluno.aprovado = data['aprovado']
         if 'experimental' in data:
             aluno.experimental = data['experimental']
+        if 'observacao' in data:
+            aluno.observacao = (data['observacao'] or '').strip() or None
         
         # Atualizar matrículas se fornecidas
         if 'matriculas' in data:

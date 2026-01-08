@@ -42,6 +42,7 @@ class Aluno(db.Model):
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     data_exclusao = db.Column(db.Date, nullable=True)
     motivo_exclusao = db.Column(db.String(200), nullable=True)
+    observacao = db.Column(db.Text, nullable=True)  # Observações gerais sobre o aluno (especialmente para inativos)
     
     # Aprovação de cadastro
     aprovado = db.Column(db.Boolean, default=True, nullable=False)  # True = aprovado, False = pendente
@@ -159,7 +160,8 @@ class Aluno(db.Model):
             'data_cadastro': self.data_cadastro.isoformat() if self.data_cadastro else None,
             'ativo': self.ativo,
             'data_exclusao': self.data_exclusao.isoformat() if self.data_exclusao else None,
-            'motivo_exclusao': self.motivo_exclusao
+            'motivo_exclusao': self.motivo_exclusao,
+            'observacao': self.observacao
         }
 
 # Evento para preencher dia_vencimento automaticamente (compatibilidade com banco antigo)

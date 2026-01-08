@@ -65,6 +65,7 @@ export default function AlunoForm() {
     ativo: true,
     aprovado: true,
     experimental: false,
+    observacao: '',
   });
 
   const [username, setUsername] = useState('');
@@ -104,6 +105,7 @@ export default function AlunoForm() {
               ativo: aluno.ativo ?? true,
               aprovado: aluno.aprovado ?? true,
               experimental: aluno.experimental || false,
+              observacao: aluno.observacao || '',
             });
 
             // Carregar matrículas
@@ -337,6 +339,7 @@ export default function AlunoForm() {
         ativo: formData.ativo,
         aprovado: formData.aprovado,
         experimental: formData.experimental,
+        observacao: formData.observacao || null,
         senha_usuario: senhaUsuario || '', // Backend gerará senha aleatória se vazio
         matriculas: matriculasValidas.map((m) => {
           // Converter valor_mensalidade para número, tratando strings vazias
@@ -856,6 +859,28 @@ export default function AlunoForm() {
               </div>
             </CardContent>
           </Card>
+
+          {!formData.ativo && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Observações (Aluno Inativo)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <Label htmlFor="observacao">Observações sobre o aluno inativo</Label>
+                  <textarea
+                    id="observacao"
+                    className="w-full min-h-[100px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    value={formData.observacao}
+                    onChange={(e) =>
+                      setFormData({ ...formData, observacao: e.target.value })
+                    }
+                    placeholder="Digite observações sobre o aluno inativo..."
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={() => navigate('/alunos')}>

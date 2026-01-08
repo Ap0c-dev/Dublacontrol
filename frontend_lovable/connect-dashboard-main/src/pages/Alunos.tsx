@@ -22,6 +22,7 @@ export default function Alunos() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterProfessor, setFilterProfessor] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'ativo' | 'inativo'>('ativo');
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -50,6 +51,12 @@ export default function Alunos() {
         if (filterProfessor) {
           filters.professor_id = filterProfessor;
         }
+        if (filterStatus === 'ativo') {
+          filters.ativo = true;
+        } else if (filterStatus === 'inativo') {
+          filters.ativo = false;
+        }
+        // Se filterStatus === 'all', não adiciona filtro de ativo
         
         const response = await api.getAlunos(filters);
         if (response.success) {
@@ -74,7 +81,7 @@ export default function Alunos() {
 
     const debounce = setTimeout(fetchAlunos, 300);
     return () => clearTimeout(debounce);
-  }, [search, filterProfessor, toast]);
+  }, [search, filterProfessor, filterStatus, toast]);
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -148,6 +155,21 @@ export default function Alunos() {
                       {professor.nome}
                     </SelectItem>
                   ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-[200px]">
+            <Select
+              value={filterStatus}
+              onValueChange={(value) => setFilterStatus(value as 'all' | 'ativo' | 'inativo')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Alunos Ativos</SelectItem>
+                <SelectItem value="inativo">Alunos Inativos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -172,6 +172,18 @@ export default function AlunoDetalhes() {
           </CardContent>
         </Card>
 
+        {/* Observações para alunos inativos */}
+        {!aluno.ativo && aluno.observacao && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{aluno.observacao}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
         <Tabs defaultValue="matriculas" className="space-y-4">
           <TabsList>
