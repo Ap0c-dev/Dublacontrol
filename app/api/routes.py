@@ -2183,6 +2183,464 @@ def api_excluir_aluno(aluno_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@api_bp.route('/alunos/importar', methods=['POST'])
+@api_write_required
+@api_admin_required
+def api_importar_alunos():
+    """Importar alunos de arquivo Excel (.xlsx)"""
+    try:
+        from openpyxl import load_workbook
+        from app.routes import normalizar_texto
+        
+        # Verificar se arquivo foi enviado
+        if 'arquivo' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+        
+        arquivo = request.files['arquivo']
+        
+        if arquivo.filename == '':
+            return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+        
+        # Verificar extensão
+        if not arquivo.filename.endswith(('.xlsx', '.xls')):
+            return jsonify({'error': 'Formato inválido. Use arquivo .xlsx ou .xls'}), 400
+        
+        # Carregar arquivo Excel
+        try:
+            wb = load_workbook(arquivo, data_only=True)
+            ws = wb.active
+        except Exception as e:
+            return jsonify({'error': f'Erro ao ler arquivo Excel: {str(e)}'}), 400
+        
+        # Ler cabeçalhos (primeira linha)
+        headers = []
+        for cell in ws[1]:
+            headers.append(cell.value.lower().strip() if cell.value else '')
+        
+        print(f"📋 Cabeçalhos encontrados: {headers}")
+        
+        # Mapear nomes de colunas (case-insensitive, com variações)
+        def encontrar_coluna(nomes_possiveis):
+            for nome in nomes_possiveis:
+                for idx, header in enumerate(headers):
+                    if nome.lower() in header.lower():
+                        return idx
+            return None
+        
+        # Índices das colunas
+        idx_nome = encontrar_coluna(['nome', 'name'])
+        idx_telefone = encontrar_coluna(['telefone', 'phone', 'tel'])
+        idx_cidade = encontrar_coluna(['cidade', 'city'])
+        idx_estado = encontrar_coluna(['estado', 'state', 'uf'])
+        idx_forma_pagamento = encontrar_coluna(['forma_pagamento', 'forma pagamento', 'pagamento', 'payment'])
+        idx_data_vencimento = encontrar_coluna(['data_vencimento', 'data vencimento', 'vencimento', 'due_date'])
+        idx_nome_responsavel = encontrar_coluna(['nome_responsavel', 'nome responsavel', 'responsavel', 'responsible'])
+        idx_telefone_responsavel = encontrar_coluna(['telefone_responsavel', 'telefone responsavel', 'tel responsavel'])
+        idx_data_nascimento = encontrar_coluna(['data_nascimento', 'data nascimento', 'nascimento', 'birth', 'birthday'])
+        
+        # Modalidades (opcionais)
+        idx_dublagem_online = encontrar_coluna(['dublagem_online', 'dublagem online'])
+        idx_dublagem_presencial = encontrar_coluna(['dublagem_presencial', 'dublagem presencial'])
+        idx_teatro_online = encontrar_coluna(['teatro_online', 'teatro online'])
+        idx_teatro_presencial = encontrar_coluna(['teatro_presencial', 'teatro presencial'])
+        idx_locucao = encontrar_coluna(['locucao', 'locução'])
+        idx_teatro_tv_cinema = encontrar_coluna(['teatro_tv_cinema', 'teatro tv cinema', 'tv cinema'])
+        idx_musical = encontrar_coluna(['musical'])
+        
+        # Campos opcionais
+        idx_aprovado = encontrar_coluna(['aprovado', 'approved'])
+        idx_ativo = encontrar_coluna(['ativo', 'active'])
+        idx_experimental = encontrar_coluna(['experimental'])
+        
+        # Colunas para professor/matrícula (opcionais)
+        idx_professor_nome = encontrar_coluna(['professor_nome', 'professor', 'nome_professor'])
+        idx_professor_modalidade = encontrar_coluna(['professor_modalidade', 'modalidade', 'tipo_curso', 'curso'])
+        idx_valor_mensalidade = encontrar_coluna(['valor_mensalidade', 'mensalidade', 'valor'])
+        idx_data_inicio = encontrar_coluna(['data_inicio', 'data inicio', 'inicio'])
+        idx_horario_dia_semana = encontrar_coluna(['horario_dia_semana', 'dia_semana', 'dia semana', 'dia'])
+        idx_horario_aula = encontrar_coluna(['horario_aula', 'horario', 'horário'])
+        
+        # Validar colunas obrigatórias
+        erros_validacao = []
+        if idx_nome is None:
+            erros_validacao.append('Coluna "nome" não encontrada')
+        if idx_telefone is None:
+            erros_validacao.append('Coluna "telefone" não encontrada')
+        if idx_cidade is None:
+            erros_validacao.append('Coluna "cidade" não encontrada')
+        if idx_estado is None:
+            erros_validacao.append('Coluna "estado" não encontrada')
+        if idx_forma_pagamento is None:
+            erros_validacao.append('Coluna "forma_pagamento" não encontrada')
+        if idx_data_vencimento is None:
+            erros_validacao.append('Coluna "data_vencimento" não encontrada')
+        
+        if erros_validacao:
+            return jsonify({
+                'error': 'Colunas obrigatórias não encontradas',
+                'detalhes': erros_validacao,
+                'colunas_encontradas': headers
+            }), 400
+        
+        # Processar linhas (começando da linha 2, pois linha 1 é cabeçalho)
+        alunos_criados = 0
+        alunos_erro = []
+        alunos_duplicados = []
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+            # Pular linhas vazias
+            if not row[idx_nome].value:
+                continue
+            
+            try:
+                # Ler valores
+                nome = str(row[idx_nome].value).strip() if row[idx_nome].value else ''
+                telefone = str(row[idx_telefone].value).strip() if row[idx_telefone].value else ''
+                cidade = str(row[idx_cidade].value).strip() if row[idx_cidade].value else ''
+                estado = str(row[idx_estado].value).strip().upper() if row[idx_estado].value else ''
+                forma_pagamento = str(row[idx_forma_pagamento].value).strip() if row[idx_forma_pagamento].value else ''
+                
+                # Validar campos obrigatórios
+                if not nome or not telefone or not cidade or not estado or not forma_pagamento:
+                    alunos_erro.append({
+                        'linha': row_idx,
+                        'nome': nome or '(vazio)',
+                        'erro': 'Campos obrigatórios faltando'
+                    })
+                    continue
+                
+                # Normalizar nome e cidade
+                nome = normalizar_texto(nome)
+                cidade = normalizar_texto(cidade)
+                
+                # Verificar se aluno já existe (por telefone)
+                aluno_existente = Aluno.query.filter_by(telefone=telefone, ativo=True).first()
+                if aluno_existente:
+                    alunos_duplicados.append({
+                        'linha': row_idx,
+                        'nome': nome,
+                        'telefone': telefone
+                    })
+                    continue
+                
+                # Processar data_vencimento
+                data_vencimento = None
+                if row[idx_data_vencimento].value:
+                    valor_venc = row[idx_data_vencimento].value
+                    if isinstance(valor_venc, datetime):
+                        data_vencimento = valor_venc.date()
+                    elif isinstance(valor_venc, date):
+                        data_vencimento = valor_venc
+                    elif isinstance(valor_venc, (int, float)):
+                        # Pode ser um número (dia do mês)
+                        dia = int(valor_venc)
+                        if 1 <= dia <= 31:
+                            # Usar dia do mês atual
+                            hoje = date.today()
+                            try:
+                                data_vencimento = date(hoje.year, hoje.month, dia)
+                            except ValueError:
+                                # Se dia inválido para o mês, usar último dia do mês
+                                from calendar import monthrange
+                                ultimo_dia = monthrange(hoje.year, hoje.month)[1]
+                                data_vencimento = date(hoje.year, hoje.month, min(dia, ultimo_dia))
+                    else:
+                        # Tentar parsear como string
+                        try:
+                            data_vencimento = datetime.strptime(str(valor_venc), '%d/%m/%Y').date()
+                        except:
+                            try:
+                                data_vencimento = datetime.strptime(str(valor_venc), '%Y-%m-%d').date()
+                            except:
+                                pass
+                
+                if not data_vencimento:
+                    # Se não conseguiu parsear, usar dia 10 como padrão
+                    hoje = date.today()
+                    data_vencimento = date(hoje.year, hoje.month, 10)
+                
+                # Processar data_nascimento (opcional)
+                data_nascimento = None
+                if idx_data_nascimento is not None and row[idx_data_nascimento].value:
+                    valor_nasc = row[idx_data_nascimento].value
+                    if isinstance(valor_nasc, datetime):
+                        data_nascimento = valor_nasc.date()
+                    elif isinstance(valor_nasc, date):
+                        data_nascimento = valor_nasc
+                    else:
+                        try:
+                            data_nascimento = datetime.strptime(str(valor_nasc), '%d/%m/%Y').date()
+                        except:
+                            try:
+                                data_nascimento = datetime.strptime(str(valor_nasc), '%Y-%m-%d').date()
+                            except:
+                                pass
+                
+                # Campos opcionais
+                nome_responsavel = None
+                if idx_nome_responsavel is not None and row[idx_nome_responsavel].value:
+                    nome_responsavel = normalizar_texto(str(row[idx_nome_responsavel].value).strip())
+                    if not nome_responsavel:
+                        nome_responsavel = None
+                
+                telefone_responsavel = None
+                if idx_telefone_responsavel is not None and row[idx_telefone_responsavel].value:
+                    telefone_responsavel = str(row[idx_telefone_responsavel].value).strip()
+                    if not telefone_responsavel:
+                        telefone_responsavel = None
+                
+                # Modalidades (padrão: False)
+                dublagem_online = False
+                if idx_dublagem_online is not None and row[idx_dublagem_online].value:
+                    valor = str(row[idx_dublagem_online].value).lower().strip()
+                    dublagem_online = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                dublagem_presencial = False
+                if idx_dublagem_presencial is not None and row[idx_dublagem_presencial].value:
+                    valor = str(row[idx_dublagem_presencial].value).lower().strip()
+                    dublagem_presencial = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                teatro_online = False
+                if idx_teatro_online is not None and row[idx_teatro_online].value:
+                    valor = str(row[idx_teatro_online].value).lower().strip()
+                    teatro_online = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                teatro_presencial = False
+                if idx_teatro_presencial is not None and row[idx_teatro_presencial].value:
+                    valor = str(row[idx_teatro_presencial].value).lower().strip()
+                    teatro_presencial = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                locucao = False
+                if idx_locucao is not None and row[idx_locucao].value:
+                    valor = str(row[idx_locucao].value).lower().strip()
+                    locucao = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                teatro_tv_cinema = False
+                if idx_teatro_tv_cinema is not None and row[idx_teatro_tv_cinema].value:
+                    valor = str(row[idx_teatro_tv_cinema].value).lower().strip()
+                    teatro_tv_cinema = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                musical = False
+                if idx_musical is not None and row[idx_musical].value:
+                    valor = str(row[idx_musical].value).lower().strip()
+                    musical = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'x', '✓']
+                
+                # Campos de status (padrão: True para aprovado e ativo)
+                aprovado = True
+                if idx_aprovado is not None and row[idx_aprovado].value:
+                    valor = str(row[idx_aprovado].value).lower().strip()
+                    aprovado = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'aprovado']
+                
+                ativo = True
+                if idx_ativo is not None and row[idx_ativo].value:
+                    valor = str(row[idx_ativo].value).lower().strip()
+                    ativo = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'ativo']
+                
+                experimental = False
+                if idx_experimental is not None and row[idx_experimental].value:
+                    valor = str(row[idx_experimental].value).lower().strip()
+                    experimental = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'experimental']
+                
+                # Criar aluno
+                aluno = Aluno(
+                    nome=nome,
+                    telefone=telefone,
+                    nome_responsavel=nome_responsavel,
+                    telefone_responsavel=telefone_responsavel,
+                    cidade=cidade,
+                    estado=estado,
+                    forma_pagamento=forma_pagamento,
+                    data_vencimento=data_vencimento,
+                    data_nascimento=data_nascimento,
+                    dublagem_online=dublagem_online,
+                    dublagem_presencial=dublagem_presencial,
+                    teatro_online=teatro_online,
+                    teatro_presencial=teatro_presencial,
+                    locucao=locucao,
+                    teatro_tv_cinema=teatro_tv_cinema,
+                    musical=musical,
+                    aprovado=aprovado,
+                    ativo=ativo,
+                    experimental=experimental
+                )
+                
+                db.session.add(aluno)
+                db.session.flush()  # Para obter o ID
+                
+                # Calcular idade se tiver data_nascimento
+                if data_nascimento:
+                    aluno.idade = aluno.calcular_idade()
+                
+                # Criar matrícula se houver informações de professor
+                if idx_professor_nome is not None and row[idx_professor_nome].value:
+                        professor_nome = str(row[idx_professor_nome].value).strip()
+                        if professor_nome:
+                            # Buscar professor pelo nome
+                            professor_nome_normalizado = normalizar_texto(professor_nome)
+                        professor = Professor.query.filter(
+                            db.func.lower(Professor.nome) == professor_nome_normalizado.lower(),
+                            Professor.ativo == True
+                        ).first()
+                        
+                        if professor:
+                            # Obter modalidade
+                            modalidade = None
+                            if idx_professor_modalidade is not None and row[idx_professor_modalidade].value:
+                                modalidade_str = str(row[idx_professor_modalidade].value).strip().lower()
+                                # Mapear variações de nomes de modalidades
+                                modalidades_map = {
+                                    'dublagem online': 'dublagem_online',
+                                    'dublagem_online': 'dublagem_online',
+                                    'dublagem presencial': 'dublagem_presencial',
+                                    'dublagem_presencial': 'dublagem_presencial',
+                                    'teatro online': 'teatro_online',
+                                    'teatro_online': 'teatro_online',
+                                    'teatro presencial': 'teatro_presencial',
+                                    'teatro_presencial': 'teatro_presencial',
+                                    'locucao': 'locucao',
+                                    'locução': 'locucao',
+                                    'teatro tv cinema': 'teatro_tv_cinema',
+                                    'teatro_tv_cinema': 'teatro_tv_cinema',
+                                    'tv cinema': 'teatro_tv_cinema',
+                                    'musical': 'musical'
+                                }
+                                modalidade = modalidades_map.get(modalidade_str)
+                            
+                            # Se não encontrou modalidade na coluna, tentar inferir das colunas de modalidade marcadas
+                            if not modalidade:
+                                if dublagem_online:
+                                    modalidade = 'dublagem_online'
+                                elif dublagem_presencial:
+                                    modalidade = 'dublagem_presencial'
+                                elif teatro_online:
+                                    modalidade = 'teatro_online'
+                                elif teatro_presencial:
+                                    modalidade = 'teatro_presencial'
+                                elif locucao:
+                                    modalidade = 'locucao'
+                                elif teatro_tv_cinema:
+                                    modalidade = 'teatro_tv_cinema'
+                                elif musical:
+                                    modalidade = 'musical'
+                            
+                            if modalidade:
+                                # Obter valor_mensalidade
+                                valor_mensalidade = None
+                                if idx_valor_mensalidade is not None and row[idx_valor_mensalidade].value:
+                                    try:
+                                        valor_str = str(row[idx_valor_mensalidade].value).replace(',', '.').strip()
+                                        valor_mensalidade = float(valor_str)
+                                    except (ValueError, AttributeError):
+                                        pass
+                                
+                                # Obter data_inicio
+                                data_inicio_matricula = None
+                                if idx_data_inicio is not None and row[idx_data_inicio].value:
+                                    valor_inicio = row[idx_data_inicio].value
+                                    if isinstance(valor_inicio, datetime):
+                                        data_inicio_matricula = valor_inicio.date()
+                                    elif isinstance(valor_inicio, date):
+                                        data_inicio_matricula = valor_inicio
+                                    else:
+                                        try:
+                                            data_inicio_matricula = datetime.strptime(str(valor_inicio), '%d/%m/%Y').date()
+                                        except:
+                                            try:
+                                                data_inicio_matricula = datetime.strptime(str(valor_inicio), '%Y-%m-%d').date()
+                                            except:
+                                                pass
+                                
+                                # Obter horário (dia_semana e horario_aula)
+                                dia_semana = None
+                                horario_aula = None
+                                
+                                # Se informou horário diretamente no Excel
+                                if idx_horario_dia_semana is not None and row[idx_horario_dia_semana].value:
+                                    dia_semana = str(row[idx_horario_dia_semana].value).strip()
+                                
+                                if idx_horario_aula is not None and row[idx_horario_aula].value:
+                                    horario_aula = str(row[idx_horario_aula].value).strip()
+                                
+                                # Se não informou horário, tentar buscar automaticamente do professor
+                                if not dia_semana or not horario_aula:
+                                    try:
+                                        from app.models.horario_professor import HorarioProfessor
+                                        horario_professor = HorarioProfessor.query.filter_by(
+                                            professor_id=professor.id,
+                                            modalidade=modalidade
+                                        ).first()
+                                        
+                                        if horario_professor:
+                                            if not dia_semana:
+                                                dia_semana = horario_professor.dia_semana
+                                            if not horario_aula:
+                                                horario_aula = horario_professor.horario_aula
+                                            print(f"✅ Horário encontrado automaticamente: {dia_semana} - {horario_aula}")
+                                        else:
+                                            print(f"⚠️ Nenhum horário encontrado para professor {professor.nome} na modalidade {modalidade}")
+                                    except Exception as e:
+                                        print(f"⚠️ Erro ao buscar horário do professor: {str(e)}")
+                                
+                                # Criar matrícula
+                                try:
+                                    matricula = Matricula(
+                                        aluno_id=aluno.id,
+                                        professor_id=professor.id,
+                                        tipo_curso=modalidade,
+                                        valor_mensalidade=valor_mensalidade,
+                                        data_inicio=data_inicio_matricula,
+                                        dia_semana=dia_semana,
+                                        horario_aula=horario_aula
+                                    )
+                                    db.session.add(matricula)
+                                    print(f"✅ Matrícula criada (linha {row_idx}): aluno={nome}, professor={professor.nome}, modalidade={modalidade}, horário={dia_semana or 'N/A'} {horario_aula or 'N/A'}")
+                                except Exception as e:
+                                    print(f"⚠️ Erro ao criar matrícula (linha {row_idx}): {str(e)}")
+                            else:
+                                print(f"⚠️ Modalidade não encontrada para professor (linha {row_idx}): {professor_nome}")
+                        else:
+                            print(f"⚠️ Professor não encontrado (linha {row_idx}): {professor_nome}")
+                
+                alunos_criados += 1
+                print(f"✅ Aluno criado (linha {row_idx}): {nome}")
+                
+            except Exception as e:
+                import traceback
+                print(f"❌ Erro na linha {row_idx}: {traceback.format_exc()}")
+                alunos_erro.append({
+                    'linha': row_idx,
+                    'nome': str(row[idx_nome].value) if row[idx_nome].value else '(vazio)',
+                    'erro': str(e)
+                })
+                continue
+        
+        # Commit de todos os alunos
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'error': f'Erro ao salvar alunos no banco: {str(e)}',
+                'alunos_criados': alunos_criados,
+                'alunos_erro': alunos_erro
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': f'Importação concluída: {alunos_criados} aluno(s) criado(s)',
+            'data': {
+                'alunos_criados': alunos_criados,
+                'alunos_erro': alunos_erro,
+                'alunos_duplicados': alunos_duplicados
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"❌ Erro ao importar alunos: {traceback.format_exc()}")
+        return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
+
 # ==================== CRUD PROFESSORES ====================
 
 @api_bp.route('/professores', methods=['POST'])
