@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import Alunos from "./pages/Alunos";
 import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AlunoForm from "./pages/AlunoForm";
+import ImportarAlunos from "./pages/ImportarAlunos";
 import Professores from "./pages/Professores";
 import ProfessorForm from "./pages/ProfessorForm";
 import Pagamentos from "./pages/Pagamentos";
@@ -76,6 +77,14 @@ const App = () => (
               element={
                 <RoleProtectedRoute allowedRoles={['admin']} requireWrite={true}>
                   <AlunoForm />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/alunos/importar"
+              element={
+                <RoleProtectedRoute allowedRoles={['admin']} requireWrite={true}>
+                  <ImportarAlunos />
                 </RoleProtectedRoute>
               }
             />

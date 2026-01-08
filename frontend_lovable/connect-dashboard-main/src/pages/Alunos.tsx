@@ -5,7 +5,7 @@ import { api, Aluno, Professor } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil } from 'lucide-react';
+import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -108,10 +108,16 @@ export default function Alunos() {
               Gerencie os alunos cadastrados
             </p>
           </div>
-          <Button onClick={() => navigate('/alunos/novo')}>
-            <Plus size={18} className="mr-2" />
-            Novo Aluno
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => navigate('/alunos/novo')}>
+              <Plus size={18} className="mr-2" />
+              Novo Aluno
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/alunos/importar')}>
+              <Upload size={18} className="mr-2" />
+              Importar Excel
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filters */}
