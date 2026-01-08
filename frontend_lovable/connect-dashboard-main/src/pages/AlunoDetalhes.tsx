@@ -81,7 +81,17 @@ export default function AlunoDetalhes() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    if (!dateString) return '-';
+    // Se a data vem no formato ISO (YYYY-MM-DD), parsear manualmente para evitar problemas de timezone
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+    }
+    // Para outros formatos, usar Date normalmente
+    const date = new Date(dateString);
+    // Verificar se a data é válida
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('pt-BR');
   };
 
   return (
