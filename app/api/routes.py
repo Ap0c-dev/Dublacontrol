@@ -2,7 +2,7 @@
 API REST para integração com frontend moderno (Lovable, React, etc.)
 Mantém as rotas atuais funcionando, adiciona endpoints API em paralelo
 """
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file, make_response
 from flask_login import login_user, current_user
 from app.models.professor import db, Professor
 from app.models.aluno import Aluno
@@ -473,7 +473,7 @@ def api_listar_alunos():
     """Lista todos os alunos (com filtros opcionais e filtragem por role)"""
     try:
         # Filtros opcionais
-        ativo = request.args.get('ativo', 'true').lower() == 'true'
+        ativo_param = request.args.get('ativo')  # None se não for passado
         aprovado = request.args.get('aprovado')
         search = request.args.get('search', '').strip()
         professor_id = request.args.get('professor_id')
@@ -489,8 +489,10 @@ def api_listar_alunos():
             query = query.filter_by(id=current_user.aluno_id)
         # Admin e Gerente: vêem todos (sem filtro adicional)
         
-        if ativo:
-            query = query.filter_by(ativo=True)
+        # Filtrar por status ativo/inativo apenas se o parâmetro for passado
+        if ativo_param is not None:
+            ativo = ativo_param.lower() == 'true'
+            query = query.filter_by(ativo=ativo)
         
         if aprovado is not None:
             query = query.filter_by(aprovado=aprovado.lower() == 'true')
@@ -543,7 +545,7 @@ def api_listar_alunos():
                 'status_vencimento': aluno.get_status_vencimento(),
                 'created_at': aluno.data_cadastro.isoformat() if aluno.data_cadastro else None,  # Campo esperado pelo frontend
                 'motivo_exclusao': aluno.motivo_exclusao,
-                'observacao': aluno.observacao
+                'observacao': aluno.observacao,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -2648,6 +2650,144 @@ def api_importar_alunos():
         import traceback
         print(f"❌ Erro ao importar alunos: {traceback.format_exc()}")
         return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
+
+@api_bp.route('/alunos/exportar', methods=['GET'])
+@api_login_required
+def api_exportar_alunos():
+    """Exportar todos os alunos para arquivo Excel (.xlsx)"""
+    try:
+        from openpyxl import Workbook
+        from io import BytesIO
+        import tempfile
+        
+        # Obter filtros opcionais
+        ativo_param = request.args.get('ativo')
+        search = request.args.get('search', '').strip()
+        professor_id = request.args.get('professor_id')
+        
+        # Construir query
+        query = Aluno.query
+        
+        # FILTRAGEM AUTOMÁTICA POR ROLE
+        if current_user.is_professor() and current_user.professor_id:
+            query = query.join(Matricula).filter(Matricula.professor_id == current_user.professor_id).distinct()
+        elif current_user.is_aluno() and current_user.aluno_id:
+            query = query.filter_by(id=current_user.aluno_id)
+        
+        # Aplicar filtros
+        if ativo_param is not None:
+            ativo = ativo_param.lower() == 'true'
+            query = query.filter_by(ativo=ativo)
+        
+        if professor_id and not current_user.is_professor():
+            try:
+                professor_id_int = int(professor_id)
+                query = query.join(Matricula).filter(Matricula.professor_id == professor_id_int).distinct()
+            except ValueError:
+                pass
+        
+        if search:
+            query = query.filter(
+                db.or_(
+                    Aluno.nome.ilike(f'%{search}%'),
+                    Aluno.telefone.ilike(f'%{search}%')
+                )
+            )
+        
+        alunos = query.order_by(Aluno.nome).all()
+        
+        # Criar workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Alunos"
+        
+        # Cabeçalhos
+        headers = [
+            'Nome', 'Telefone', 'Telefone Responsável', 'Nome Responsável',
+            'Cidade', 'Estado', 'Data Nascimento', 'Data Vencimento',
+            'Forma Pagamento', 'Status', 'Ativo', 'Aprovado',
+            'Data Cadastro', 'Observação', 'Motivo Exclusão'
+        ]
+        ws.append(headers)
+        
+        # Estilizar cabeçalhos
+        from openpyxl.styles import Font, PatternFill
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+        
+        # Adicionar dados
+        for aluno in alunos:
+            # Determinar status
+            if not aluno.ativo:
+                status = 'Inativo'
+            elif not aluno.aprovado:
+                status = 'Pendente'
+            else:
+                status = 'Ativo'
+            
+            row = [
+                aluno.nome or '',
+                aluno.telefone or '',
+                aluno.telefone_responsavel or '',
+                aluno.nome_responsavel or '',
+                aluno.cidade or '',
+                aluno.estado or '',
+                aluno.data_nascimento.strftime('%d/%m/%Y') if aluno.data_nascimento else '',
+                aluno.data_vencimento.strftime('%d/%m/%Y') if aluno.data_vencimento else '',
+                aluno.forma_pagamento or '',
+                status,
+                'Sim' if aluno.ativo else 'Não',
+                'Sim' if aluno.aprovado else 'Não',
+                aluno.data_cadastro.strftime('%d/%m/%Y %H:%M') if aluno.data_cadastro else '',
+                aluno.observacao or '',
+                aluno.motivo_exclusao or ''
+            ]
+            ws.append(row)
+        
+        # Ajustar largura das colunas
+        column_widths = {
+            'A': 30,  # Nome
+            'B': 15,  # Telefone
+            'C': 15,  # Telefone Responsável
+            'D': 30,  # Nome Responsável
+            'E': 20,  # Cidade
+            'F': 5,   # Estado
+            'G': 15,  # Data Nascimento
+            'H': 15,  # Data Vencimento
+            'I': 15,  # Forma Pagamento
+            'J': 12,  # Status
+            'K': 8,   # Ativo
+            'L': 8,   # Aprovado
+            'M': 18,  # Data Cadastro
+            'N': 40,  # Observação
+            'O': 40   # Motivo Exclusão
+        }
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
+        
+        # Salvar em BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # Criar nome do arquivo com timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'alunos_export_{timestamp}.xlsx'
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao exportar alunos: {traceback.format_exc()}")
+        return jsonify({'error': f'Erro ao exportar alunos: {str(e)}'}), 500
 
 # ==================== CRUD PROFESSORES ====================
 

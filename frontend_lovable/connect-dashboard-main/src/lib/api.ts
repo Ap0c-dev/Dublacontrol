@@ -302,12 +302,13 @@ class ApiClient {
     }
   }
 
-  async getAlunos(filters?: { search?: string; status?: string; professor_id?: string }): Promise<ApiResponse<Aluno[]>> {
+  async getAlunos(filters?: { search?: string; status?: string; professor_id?: string; ativo?: boolean }): Promise<ApiResponse<Aluno[]>> {
     try {
       const params = new URLSearchParams();
       if (filters?.search) params.append('search', filters.search);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.professor_id) params.append('professor_id', filters.professor_id);
+      if (filters?.ativo !== undefined) params.append('ativo', filters.ativo.toString());
       
       const url = `${API_BASE_URL}/alunos${params.toString() ? `?${params}` : ''}`;
       const response = await fetch(url, {

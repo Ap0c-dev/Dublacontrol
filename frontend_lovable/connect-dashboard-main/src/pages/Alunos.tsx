@@ -5,7 +5,7 @@ import { api, Aluno, Professor } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload } from 'lucide-react';
+import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -83,6 +83,92 @@ export default function Alunos() {
     return () => clearTimeout(debounce);
   }, [search, filterProfessor, filterStatus, toast]);
 
+  const handleExportarExcel = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast({
+          title: 'Erro',
+          description: 'Você precisa estar autenticado para exportar.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Construir URL com filtros atuais
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (filterProfessor) params.append('professor_id', filterProfessor);
+      if (filterStatus === 'ativo') {
+        params.append('ativo', 'true');
+      } else if (filterStatus === 'inativo') {
+        params.append('ativo', 'false');
+      }
+      // Se filterStatus === 'all', não adiciona parâmetro ativo
+
+      const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+      const API_BASE_URL = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+      const url = `${API_BASE_URL}/alunos/exportar${params.toString() ? `?${params}` : ''}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: 'Erro de autenticação',
+            description: 'Sua sessão expirou. Por favor, faça login novamente.',
+            variant: 'destructive',
+          });
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/login');
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Obter o blob do arquivo
+      const blob = await response.blob();
+      
+      // Criar link de download
+      const url_blob = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url_blob;
+      
+      // Obter nome do arquivo do header Content-Disposition ou usar padrão
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'alunos_export.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url_blob);
+
+      toast({
+        title: 'Sucesso',
+        description: 'Arquivo Excel exportado com sucesso!',
+      });
+    } catch (error) {
+      console.error('Erro ao exportar alunos:', error);
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível exportar o arquivo Excel.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       ativo: { label: 'Ativo', variant: 'default' },
@@ -123,6 +209,14 @@ export default function Alunos() {
             <Button variant="outline" onClick={() => navigate('/alunos/importar')}>
               <Upload size={18} className="mr-2" />
               Importar Excel
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleExportarExcel}
+              disabled={isLoading || alunos.length === 0}
+            >
+              <Download size={18} className="mr-2" />
+              Exportar Excel
             </Button>
           </div>
         </div>
