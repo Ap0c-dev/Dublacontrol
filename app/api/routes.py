@@ -1371,33 +1371,85 @@ def api_dashboard_stats():
                 if data_vencimento_ref < hoje:
                     alunos_atrasados += 1
         
-        # Calcular receita mensal (pagamentos aprovados pagos no mês atual)
-        # Considerar pagamentos aprovados onde a data_pagamento está no mês atual
-        # Isso captura pagamentos que foram efetivamente recebidos neste mês
-        primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+        # Calcular receita mensal (pagamentos aprovados referentes ao mês atual)
+        # Considerar pagamentos aprovados onde mes_referencia e ano_referencia são do mês atual
+        # Isso captura a receita referente ao mês atual, independente de quando foi pago
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        # Buscar receita mensal usando mes_referencia e ano_referencia
         receita_mensal_query = db.session.query(
             db.func.sum(Pagamento.valor_pago)
         ).filter(
             Pagamento.status == 'aprovado',
-            db.func.date(Pagamento.data_pagamento) >= primeiro_dia_mes,
-            db.func.date(Pagamento.data_pagamento) <= hoje
+            Pagamento.mes_referencia == mes_atual,
+            Pagamento.ano_referencia == ano_atual
         )
         receita_mensal = receita_mensal_query.scalar()
+        
+        # Se não encontrar nada no mês atual, tentar com data_pagamento (fallback)
+        if receita_mensal is None or receita_mensal == 0:
+            primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+            receita_mensal_query_fallback = db.session.query(
+                db.func.sum(Pagamento.valor_pago)
+            ).filter(
+                Pagamento.status == 'aprovado',
+                Pagamento.data_pagamento >= primeiro_dia_mes,
+                Pagamento.data_pagamento <= hoje
+            )
+            receita_mensal = receita_mensal_query_fallback.scalar()
+            if receita_mensal is not None and receita_mensal > 0:
+                print(f"⚠️ Receita mensal calculada via fallback (data_pagamento)")
+        
+        # Se ainda não encontrar nada, buscar o último mês com receita (para casos onde estamos no início do mês)
+        if receita_mensal is None or receita_mensal == 0:
+            # Buscar o último pagamento aprovado para pegar seu mes_referencia e ano_referencia
+            ultimo_pagamento = db.session.query(Pagamento).filter(
+                Pagamento.status == 'aprovado'
+            ).order_by(
+                Pagamento.ano_referencia.desc(),
+                Pagamento.mes_referencia.desc()
+            ).first()
+            
+            if ultimo_pagamento:
+                # Calcular receita do último mês que teve pagamentos
+                receita_mensal_query_ultimo = db.session.query(
+                    db.func.sum(Pagamento.valor_pago)
+                ).filter(
+                    Pagamento.status == 'aprovado',
+                    Pagamento.mes_referencia == ultimo_pagamento.mes_referencia,
+                    Pagamento.ano_referencia == ultimo_pagamento.ano_referencia
+                )
+                receita_mensal = receita_mensal_query_ultimo.scalar()
+                if receita_mensal is not None and receita_mensal > 0:
+                    print(f"⚠️ Receita mensal calculada do último mês com pagamentos ({ultimo_pagamento.mes_referencia}/{ultimo_pagamento.ano_referencia})")
+        
+        # Log para debug - verificar quantos pagamentos foram encontrados
+        total_pagamentos_mes = db.session.query(Pagamento).filter(
+            Pagamento.status == 'aprovado',
+            Pagamento.mes_referencia == mes_atual,
+            Pagamento.ano_referencia == ano_atual
+        ).count()
+        
+        # Verificar também total de pagamentos aprovados (qualquer mês)
+        total_pagamentos_aprovados = db.session.query(Pagamento).filter(
+            Pagamento.status == 'aprovado'
+        ).count()
+        
         if receita_mensal is None:
             receita_mensal = 0.0
         else:
             receita_mensal = float(receita_mensal)
         
         # Log para debug
-        print(f"📊 Receita mensal ({hoje.month}/{hoje.year}): R$ {receita_mensal:.2f}")
+        print(f"📊 Receita mensal ({mes_atual}/{ano_atual}): R$ {receita_mensal:.2f}")
+        print(f"   - Pagamentos aprovados no mês atual: {total_pagamentos_mes}")
+        print(f"   - Total de pagamentos aprovados (geral): {total_pagamentos_aprovados}")
         
         # Calcular crescimento de alunos comparando mês anterior completo com mês atual até hoje
         # Exemplo: se hoje é 10/01, comparar todos os alunos de dezembro com alunos de janeiro até hoje
         from datetime import timedelta
         from calendar import monthrange
-        
-        mes_atual = hoje.month
-        ano_atual = hoje.year
         
         # Calcular mês anterior
         if mes_atual == 1:
@@ -1469,34 +1521,39 @@ def api_dashboard_stats():
             crescimento_alunos = 100.0
             print(f"   Crescimento: 100% (de 0 para {alunos_mes_atual})")
         
-        # Calcular crescimento de receita em relação ao mês anterior na mesma data
-        # Receita até hoje deste mês (pagamentos aprovados até hoje)
+        # Calcular crescimento de receita em relação ao mês anterior
+        # Usar mes_referencia e ano_referencia para ser consistente com receita_mensal
         receita_ate_hoje = db.session.query(
             db.func.sum(Pagamento.valor_pago)
         ).filter(
             Pagamento.status == 'aprovado',
             Pagamento.mes_referencia == mes_atual,
-            Pagamento.ano_referencia == ano_atual,
-            db.func.date(Pagamento.data_pagamento) <= data_referencia_atual
+            Pagamento.ano_referencia == ano_atual
         ).scalar() or 0.0
         
-        # Receita até a mesma data do mês anterior
+        # Receita do mês anterior completo
         receita_ate_mes_anterior = db.session.query(
             db.func.sum(Pagamento.valor_pago)
         ).filter(
             Pagamento.status == 'aprovado',
             Pagamento.mes_referencia == mes_anterior,
-            Pagamento.ano_referencia == ano_anterior,
-            db.func.date(Pagamento.data_pagamento) <= data_referencia_anterior
+            Pagamento.ano_referencia == ano_anterior
         ).scalar() or 0.0
+        
+        # Log para debug
+        print(f"📊 Crescimento de receita:")
+        print(f"   Mês anterior ({mes_anterior}/{ano_anterior}): R$ {receita_ate_mes_anterior:.2f}")
+        print(f"   Mês atual ({mes_atual}/{ano_atual}): R$ {receita_ate_hoje:.2f}")
         
         # Calcular porcentagem de crescimento de receita
         crescimento_receita = 0.0
         if receita_ate_mes_anterior > 0:
             crescimento_receita = ((receita_ate_hoje - receita_ate_mes_anterior) / receita_ate_mes_anterior) * 100
+            print(f"   Crescimento: {crescimento_receita:.1f}%")
         elif receita_ate_hoje > 0:
             # Se não havia receita no mês anterior mas há agora, crescimento de 100%
             crescimento_receita = 100.0
+            print(f"   Crescimento: 100% (de 0 para R$ {receita_ate_hoje:.2f})")
         
         return jsonify({
             'success': True,
