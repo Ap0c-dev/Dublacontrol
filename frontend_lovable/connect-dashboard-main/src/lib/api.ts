@@ -42,6 +42,7 @@ interface DashboardStats {
   pagamentos_atrasados: number;
   receita_mensal: number;
   crescimento_alunos?: number; // Porcentagem de crescimento em relação ao mês anterior
+  crescimento_receita?: number; // Porcentagem de crescimento de receita em relação ao mês anterior
 }
 
 interface Aluno {
@@ -228,6 +229,25 @@ class ApiClient {
       return response.json();
     } catch (error) {
       console.error('Erro ao buscar evolução de alunos:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
+  async getFaturamentoMensal(): Promise<ApiResponse<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; receita: number; data_referencia: string }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/faturamento-mensal`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar faturamento mensal:', error);
       return {
         success: false,
         error: 'Erro de conexão com o servidor',

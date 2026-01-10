@@ -291,7 +291,7 @@ export default function Alunos() {
                       Contato
                     </th>
                     <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4 hidden lg:table-cell">
-                      Data de Cadastro
+                      Data de Início
                     </th>
                     <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4">
                       Status

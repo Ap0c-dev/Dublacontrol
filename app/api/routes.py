@@ -526,6 +526,15 @@ def api_listar_alunos():
             else:
                 status = 'ativo'
             
+            # Buscar a primeira data de início das matrículas do aluno
+            primeira_data_inicio = None
+            if aluno.matriculas:
+                matriculas_com_data = [m for m in aluno.matriculas if m.data_inicio]
+                if matriculas_com_data:
+                    # Ordenar por data_inicio e pegar a mais antiga
+                    matriculas_com_data.sort(key=lambda m: m.data_inicio)
+                    primeira_data_inicio = matriculas_com_data[0].data_inicio
+            
             resultado.append({
                 'id': aluno.id,
                 'nome': aluno.nome,
@@ -544,7 +553,7 @@ def api_listar_alunos():
                 'experimental': aluno.experimental,
                 'status': status,  # Campo esperado pelo frontend
                 'status_vencimento': aluno.get_status_vencimento(),
-                'created_at': aluno.data_cadastro.isoformat() if aluno.data_cadastro else None,  # Campo esperado pelo frontend
+                'created_at': primeira_data_inicio.isoformat() if primeira_data_inicio else (aluno.data_cadastro.isoformat() if aluno.data_cadastro else None),  # Usar data_inicio se disponível, senão data_cadastro
                 'motivo_exclusao': aluno.motivo_exclusao,
                 'observacao': aluno.observacao,
                 'modalidades': {
@@ -1385,28 +1394,79 @@ def api_dashboard_stats():
         data_referencia_anterior = date(ano_anterior, mes_anterior, dia_referencia_anterior)
         
         # Contar alunos que começaram até a data atual deste mês
+        # Considerar apenas alunos ativos com matrículas ativas (sem data_encerramento)
+        # IMPORTANTE: Usar a mesma lógica do total_alunos para consistência
         alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
             Matricula, Aluno.id == Matricula.aluno_id
         ).filter(
+            Aluno.ativo == True,
             Matricula.data_inicio.isnot(None),
-            db.func.date(Matricula.data_inicio) <= data_referencia_atual
+            db.func.date(Matricula.data_inicio) <= data_referencia_atual,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje  # Usar hoje, não data_referencia_atual
+            )
         ).count()
         
         # Contar alunos que começaram até a mesma data do mês anterior
+        # Considerar apenas alunos ativos com matrículas ativas naquela data
+        # IMPORTANTE: Na data de referência anterior, considerar matrículas que estavam ativas naquela data
         alunos_ate_mes_anterior = db.session.query(Aluno.id).distinct().join(
             Matricula, Aluno.id == Matricula.aluno_id
         ).filter(
+            Aluno.ativo == True,
             Matricula.data_inicio.isnot(None),
-            db.func.date(Matricula.data_inicio) <= data_referencia_anterior
+            db.func.date(Matricula.data_inicio) <= data_referencia_anterior,
+            # Matrícula não estava encerrada na data de referência anterior
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > data_referencia_anterior
+            )
         ).count()
+        
+        # Log para debug
+        print(f"📊 Crescimento de alunos:")
+        print(f"   Data atual: {data_referencia_atual} - Alunos até hoje: {alunos_ate_hoje}")
+        print(f"   Data anterior: {data_referencia_anterior} - Alunos até mês anterior: {alunos_ate_mes_anterior}")
         
         # Calcular porcentagem de crescimento
         crescimento_alunos = 0.0
         if alunos_ate_mes_anterior > 0:
             crescimento_alunos = ((alunos_ate_hoje - alunos_ate_mes_anterior) / alunos_ate_mes_anterior) * 100
+            print(f"   Crescimento: {crescimento_alunos:.1f}%")
         elif alunos_ate_hoje > 0:
             # Se não havia alunos no mês anterior mas há agora, crescimento de 100%
             crescimento_alunos = 100.0
+            print(f"   Crescimento: 100% (de 0 para {alunos_ate_hoje})")
+        
+        # Calcular crescimento de receita em relação ao mês anterior na mesma data
+        # Receita até hoje deste mês (pagamentos aprovados até hoje)
+        receita_ate_hoje = db.session.query(
+            db.func.sum(Pagamento.valor_pago)
+        ).filter(
+            Pagamento.status == 'aprovado',
+            Pagamento.mes_referencia == mes_atual,
+            Pagamento.ano_referencia == ano_atual,
+            db.func.date(Pagamento.data_pagamento) <= data_referencia_atual
+        ).scalar() or 0.0
+        
+        # Receita até a mesma data do mês anterior
+        receita_ate_mes_anterior = db.session.query(
+            db.func.sum(Pagamento.valor_pago)
+        ).filter(
+            Pagamento.status == 'aprovado',
+            Pagamento.mes_referencia == mes_anterior,
+            Pagamento.ano_referencia == ano_anterior,
+            db.func.date(Pagamento.data_pagamento) <= data_referencia_anterior
+        ).scalar() or 0.0
+        
+        # Calcular porcentagem de crescimento de receita
+        crescimento_receita = 0.0
+        if receita_ate_mes_anterior > 0:
+            crescimento_receita = ((receita_ate_hoje - receita_ate_mes_anterior) / receita_ate_mes_anterior) * 100
+        elif receita_ate_hoje > 0:
+            # Se não havia receita no mês anterior mas há agora, crescimento de 100%
+            crescimento_receita = 100.0
         
         return jsonify({
             'success': True,
@@ -1419,7 +1479,8 @@ def api_dashboard_stats():
                 'pagamentos_atrasados': int(alunos_atrasados),  # Garantir que é int
                 'receita_mensal': float(receita_mensal),  # Campo esperado pelo frontend
                 'total_pagamentos': Pagamento.query.count(),  # Campo adicional útil
-                'crescimento_alunos': round(crescimento_alunos, 1)  # Porcentagem de crescimento
+                'crescimento_alunos': round(crescimento_alunos, 1),  # Porcentagem de crescimento
+                'crescimento_receita': round(crescimento_receita, 1)  # Porcentagem de crescimento de receita
             }
         })
     except Exception as e:
@@ -1489,6 +1550,69 @@ def api_alunos_evolucao():
     except Exception as e:
         import traceback
         print(f"❌ Erro ao buscar evolução de alunos: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/faturamento-mensal', methods=['GET'])
+@api_login_required
+def api_faturamento_mensal():
+    """Retorna o faturamento (receita) de cada um dos últimos 12 meses"""
+    try:
+        from datetime import timedelta
+        from calendar import monthrange
+        
+        hoje = date.today()
+        resultado = []
+        
+        meses_nomes = {
+            1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr',
+            5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+            9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+        }
+        
+        # Gerar os últimos 12 meses
+        for i in range(11, -1, -1):  # De 11 meses atrás até hoje
+            # Calcular data do mês
+            meses_antes = i
+            ano = hoje.year
+            mes = hoje.month - meses_antes
+            
+            # Ajustar se o mês for negativo ou zero
+            while mes <= 0:
+                mes += 12
+                ano -= 1
+            
+            # Calcular receita do mês (pagamentos aprovados)
+            # Usar mes_referencia e ano_referencia para agrupar por mês de referência do pagamento
+            receita_mes = db.session.query(
+                db.func.sum(Pagamento.valor_pago)
+            ).filter(
+                Pagamento.status == 'aprovado',
+                Pagamento.mes_referencia == mes,
+                Pagamento.ano_referencia == ano
+            ).scalar() or 0.0
+            
+            receita_mes = float(receita_mes)
+            
+            # Data de referência (fim do mês)
+            ultimo_dia = monthrange(ano, mes)[1]
+            data_fim_mes = date(ano, mes, ultimo_dia)
+            
+            resultado.append({
+                'mes': mes,
+                'ano': ano,
+                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
+                'mes_ano': f"{meses_nomes.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
+                'receita': receita_mes,
+                'data_referencia': data_fim_mes.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar faturamento mensal: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== NOTAS ====================
@@ -3442,6 +3566,7 @@ def api_excluir_matricula(matricula_id):
 def api_listar_lista_espera():
     """Lista todos os alunos em lista de espera"""
     try:
+        import traceback
         efetivado = request.args.get('efetivado')
         query = ListaEspera.query
         
@@ -3460,6 +3585,8 @@ def api_listar_lista_espera():
             'data': [item.to_dict() for item in lista_espera]
         })
     except Exception as e:
+        import traceback
+        print(f"❌ Erro ao listar lista de espera: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_bp.route('/lista-espera', methods=['POST'])

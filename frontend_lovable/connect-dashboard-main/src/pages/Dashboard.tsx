@@ -22,6 +22,9 @@ export default function Dashboard() {
   const [isEvolucaoOpen, setIsEvolucaoOpen] = useState(false);
   const [evolucaoData, setEvolucaoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>([]);
   const [isLoadingEvolucao, setIsLoadingEvolucao] = useState(false);
+  const [isFaturamentoOpen, setIsFaturamentoOpen] = useState(false);
+  const [faturamentoData, setFaturamentoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; receita: number; data_referencia: string }>>([]);
+  const [isLoadingFaturamento, setIsLoadingFaturamento] = useState(false);
   const [notificacoes, setNotificacoes] = useState<Array<{
     id: number;
     nome: string;
@@ -139,6 +142,31 @@ export default function Dashboard() {
     }
   };
 
+  const handleOpenFaturamento = async () => {
+    setIsFaturamentoOpen(true);
+    setIsLoadingFaturamento(true);
+    try {
+      const response = await api.getFaturamentoMensal();
+      if (response.success) {
+        setFaturamentoData(response.data);
+      } else {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: response.error || 'Não foi possível obter o faturamento mensal.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro de conexão',
+        description: 'Verifique se o servidor está rodando.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingFaturamento(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -240,7 +268,11 @@ export default function Dashboard() {
               value={formatCurrency(stats.receita_mensal || 0)}
               icon={CreditCard}
               variant="success"
-              trend={{ value: 8, isPositive: true }}
+              trend={stats.crescimento_receita !== undefined ? {
+                value: Math.abs(stats.crescimento_receita),
+                isPositive: stats.crescimento_receita >= 0
+              } : undefined}
+              onClick={handleOpenFaturamento}
             />
             <StatCard
               title="Pagamentos Atrasados"
@@ -334,6 +366,64 @@ export default function Dashboard() {
                     dataKey="total_alunos" 
                     fill="hsl(var(--primary))"
                     name="Alunos que começaram"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Nenhum dado disponível.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Faturamento Mensal */}
+      <Dialog open={isFaturamentoOpen} onOpenChange={setIsFaturamentoOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard size={24} />
+              Faturamento Mensal - Últimos 12 Meses
+            </DialogTitle>
+            <DialogDescription>
+              Gráfico mostrando a receita (pagamentos aprovados) de cada mês
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingFaturamento ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : faturamentoData.length > 0 ? (
+            <div className="mt-4">
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={faturamentoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="mes_ano" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={(value) => formatCurrency(value)}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Legend />
+                  <Bar 
+                    dataKey="receita" 
+                    fill="hsl(var(--success))"
+                    name="Receita (R$)"
                     radius={[8, 8, 0, 0]}
                   />
                 </BarChart>
