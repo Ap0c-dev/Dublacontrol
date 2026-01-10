@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { api, DashboardStats } from '@/lib/api';
-import { Users, GraduationCap, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { Users, GraduationCap, CreditCard, AlertCircle, Loader2, Clock, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,15 @@ export default function Dashboard() {
   const [isEvolucaoOpen, setIsEvolucaoOpen] = useState(false);
   const [evolucaoData, setEvolucaoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>([]);
   const [isLoadingEvolucao, setIsLoadingEvolucao] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<Array<{
+    id: number;
+    nome: string;
+    telefone: string;
+    curso?: string;
+    data_pretende_entrar?: string;
+    data_cadastro?: string;
+  }>>([]);
+  const [notificacoesVisiveis, setNotificacoesVisiveis] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -69,6 +80,40 @@ export default function Dashboard() {
     fetchStats();
   }, [toast]);
 
+  // Buscar notificações da lista de espera separadamente
+  useEffect(() => {
+    const fetchNotificacoes = async () => {
+      try {
+        const response = await api.getNotificacoesListaEspera();
+        if (response.success && response.data) {
+          setNotificacoes(response.data);
+          // Mostrar notificações que ainda não foram exibidas
+          response.data.forEach((notif: any) => {
+            setNotificacoesVisiveis((prev) => {
+              if (!prev.has(notif.id)) {
+                toast({
+                  title: 'Aluno da Lista de Espera',
+                  description: `${notif.nome} pretende entrar no curso hoje${notif.curso ? ` (${notif.curso})` : ''}`,
+                  duration: 10000,
+                });
+                return new Set(prev).add(notif.id);
+              }
+              return prev;
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar notificações:', error);
+      }
+    };
+    
+    fetchNotificacoes();
+    // Verificar notificações a cada 5 minutos
+    const interval = setInterval(fetchNotificacoes, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [toast]);
+
   const handleOpenEvolucao = async () => {
     setIsEvolucaoOpen(true);
     setIsLoadingEvolucao(true);
@@ -101,9 +146,63 @@ export default function Dashboard() {
     }).format(value);
   };
 
+  const fecharNotificacao = (id: number) => {
+    setNotificacoesVisiveis((prev) => {
+      const novo = new Set(prev);
+      novo.add(id);
+      return novo;
+    });
+  };
+
   return (
     <MainLayout>
       <div className="space-y-8">
+        {/* Notificações da Lista de Espera */}
+        {notificacoes.length > 0 && (
+          <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+            {notificacoes
+              .filter((notif) => !notificacoesVisiveis.has(notif.id))
+              .map((notif) => (
+                <Card key={notif.id} className="border-orange-500 bg-orange-50 dark:bg-orange-950/20 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1">
+                        <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-sm text-orange-900 dark:text-orange-100">
+                            Aluno da Lista de Espera
+                          </h4>
+                          <p className="text-sm text-orange-800 dark:text-orange-200 mt-1">
+                            <strong>{notif.nome}</strong> pretende entrar no curso hoje
+                            {notif.curso && (
+                              <span className="block text-xs mt-1">Curso: {notif.curso}</span>
+                            )}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 text-xs"
+                            onClick={() => navigate('/alunos/lista-espera')}
+                          >
+                            Ver Lista de Espera
+                          </Button>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 flex-shrink-0"
+                        onClick={() => fecharNotificacao(notif.id)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        )}
+
         {/* Header */}
         <div className="animate-fade-in">
           <h1 className="text-2xl lg:text-3xl font-bold text-gradient animate-float">Dashboard</h1>

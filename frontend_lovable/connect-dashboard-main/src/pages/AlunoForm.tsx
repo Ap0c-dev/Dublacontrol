@@ -60,6 +60,7 @@ export default function AlunoForm() {
     cidade: '',
     estado: '',
     data_nascimento: '',
+    idade: '',
     forma_pagamento: '',
     data_vencimento: '',
     ativo: true,
@@ -100,6 +101,7 @@ export default function AlunoForm() {
               cidade: aluno.cidade || '',
               estado: aluno.estado || '',
               data_nascimento: aluno.data_nascimento ? aluno.data_nascimento.split('T')[0] : '',
+              idade: aluno.idade?.toString() || '',
               forma_pagamento: aluno.forma_pagamento || '',
               data_vencimento: aluno.data_vencimento ? aluno.data_vencimento.split('T')[0] : '',
               ativo: aluno.ativo ?? true,
@@ -334,6 +336,7 @@ export default function AlunoForm() {
         cidade: formData.cidade,
         estado: formData.estado,
         data_nascimento: formData.data_nascimento || null,
+        idade: formData.idade ? parseInt(formData.idade) : null,
         forma_pagamento: formData.forma_pagamento,
         data_vencimento: formData.data_vencimento,
         ativo: formData.ativo,
@@ -492,6 +495,17 @@ export default function AlunoForm() {
                     type="date"
                     value={formData.data_nascimento}
                     onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Idade</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="150"
+                    value={formData.idade}
+                    onChange={(e) => setFormData({ ...formData, idade: e.target.value })}
+                    placeholder="Ex: 25"
                   />
                 </div>
                 <div>

@@ -954,6 +954,204 @@ class ApiClient {
       };
     }
   }
+
+  // ==================== LISTA DE ESPERA ====================
+  
+  async getListaEspera(efetivado?: boolean): Promise<ApiResponse<any[]>> {
+    try {
+      const params = new URLSearchParams();
+      if (efetivado !== undefined) params.append('efetivado', efetivado.toString());
+      
+      const url = `${API_BASE_URL}/lista-espera${params.toString() ? `?${params}` : ''}`;
+      const response = await fetch(url, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar lista de espera:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao buscar lista de espera',
+        data: []
+      };
+    }
+  }
+
+  async criarListaEspera(data: {
+    nome: string;
+    telefone: string;
+    curso?: string;
+    idade?: number;
+    cidade?: string;
+    estado?: string;
+    dia_semana?: string;
+    nome_responsavel?: string;
+    telefone_responsavel?: string;
+    observacao?: string;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lista-espera`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || `Erro HTTP ${response.status}`,
+          data: null
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao criar lista de espera:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao criar lista de espera',
+        data: null
+      };
+    }
+  }
+
+  async editarListaEspera(id: number, data: Partial<{
+    nome: string;
+    telefone: string;
+    curso?: string;
+    idade?: number;
+    cidade?: string;
+    estado?: string;
+    dia_semana?: string;
+    nome_responsavel?: string;
+    telefone_responsavel?: string;
+    observacao?: string;
+  }>): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lista-espera/${id}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || `Erro HTTP ${response.status}`,
+          data: null
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao editar lista de espera:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao editar lista de espera',
+        data: null
+      };
+    }
+  }
+
+  async deletarListaEspera(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lista-espera/${id}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erro ao deletar lista de espera:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao deletar lista de espera',
+        data: undefined
+      };
+    }
+  }
+
+  async efetivarListaEspera(id: number, data: {
+    forma_pagamento: string;
+    data_vencimento: string;
+    cidade: string;
+    estado: string;
+    data_nascimento?: string;
+    experimental?: boolean;
+    matriculas: Array<{
+      modalidade: string;
+      professor_id: number;
+      horario_id: number;
+      valor_mensalidade: number;
+      data_inicio?: string;
+    }>;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lista-espera/${id}/efetivar`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || `Erro HTTP ${response.status}`,
+          data: null
+        };
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao efetivar lista de espera:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao efetivar lista de espera',
+        data: null
+      };
+    }
+  }
+
+  async getNotificacoesListaEspera(): Promise<ApiResponse<Array<{
+    id: number;
+    nome: string;
+    telefone: string;
+    curso?: string;
+    data_pretende_entrar?: string;
+    data_cadastro?: string;
+  }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notificacoes/lista-espera`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao buscar notificações',
+        data: []
+      };
+    }
+  }
 }
 
 export const api = new ApiClient();

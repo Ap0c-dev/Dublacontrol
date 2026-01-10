@@ -5,7 +5,7 @@ import { api, Aluno, Professor } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload, Download } from 'lucide-react';
+import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload, Download, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -209,6 +209,10 @@ export default function Alunos() {
             <Button variant="outline" onClick={() => navigate('/alunos/importar')}>
               <Upload size={18} className="mr-2" />
               Importar Excel
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/alunos/lista-espera')}>
+              <Clock size={18} className="mr-2" />
+              Lista de Espera
             </Button>
             <Button 
               variant="outline" 

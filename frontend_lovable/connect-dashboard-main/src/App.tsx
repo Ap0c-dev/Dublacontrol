@@ -15,6 +15,7 @@ import Alunos from "./pages/Alunos";
 import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AlunoForm from "./pages/AlunoForm";
 import ImportarAlunos from "./pages/ImportarAlunos";
+import ListaEspera from "./pages/ListaEspera";
 import Professores from "./pages/Professores";
 import ProfessorForm from "./pages/ProfessorForm";
 import Pagamentos from "./pages/Pagamentos";
@@ -85,6 +86,14 @@ const App = () => (
               element={
                 <RoleProtectedRoute allowedRoles={['admin']} requireWrite={true}>
                   <ImportarAlunos />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/alunos/lista-espera"
+              element={
+                <RoleProtectedRoute allowedRoles={['admin']}>
+                  <ListaEspera />
                 </RoleProtectedRoute>
               }
             />

@@ -11,6 +11,7 @@ from app.models.usuario import Usuario
 from app.models.pagamento import Pagamento
 from app.models.nota import Nota
 from app.models.senha_reset import SenhaReset
+from app.models.lista_espera import ListaEspera
 from datetime import datetime, date
 from functools import wraps
 import hashlib
@@ -1852,6 +1853,7 @@ def api_criar_aluno():
             forma_pagamento=forma_pagamento,
             data_vencimento=data_vencimento,
             data_nascimento=data_nascimento,
+            idade=data.get('idade'),
             dublagem_online='dublagem_online' in modalidades_set,
             dublagem_presencial='dublagem_presencial' in modalidades_set,
             teatro_online='teatro_online' in modalidades_set,
@@ -2086,6 +2088,8 @@ def api_editar_aluno(aluno_id):
                 return jsonify({'error': 'Data de vencimento inválida'}), 400
         if 'data_nascimento' in data:
             aluno.data_nascimento = datetime.strptime(data['data_nascimento'], '%Y-%m-%d').date() if data['data_nascimento'] else None
+        if 'idade' in data:
+            aluno.idade = data['idade'] if data['idade'] else None
         
         if 'ativo' in data:
             aluno.ativo = data['ativo']
@@ -3430,4 +3434,287 @@ def api_excluir_matricula(matricula_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+# ==================== LISTA DE ESPERA ====================
+
+@api_bp.route('/lista-espera', methods=['GET'])
+@api_login_required
+def api_listar_lista_espera():
+    """Lista todos os alunos em lista de espera"""
+    try:
+        efetivado = request.args.get('efetivado')
+        query = ListaEspera.query
+        
+        if efetivado is not None:
+            efetivado_bool = efetivado.lower() == 'true'
+            query = query.filter_by(efetivado=efetivado_bool)
+        else:
+            # Por padrão, mostrar apenas não efetivados
+            query = query.filter_by(efetivado=False)
+        
+        lista_espera = query.order_by(ListaEspera.data_cadastro.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'count': len(lista_espera),
+            'data': [item.to_dict() for item in lista_espera]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/lista-espera', methods=['POST'])
+@api_write_required
+@api_admin_required
+def api_criar_lista_espera():
+    """Criar novo registro na lista de espera"""
+    try:
+        from app.routes import normalizar_texto
+        data = request.get_json()
+        
+        nome = normalizar_texto((data.get('nome') or '').strip())
+        telefone = (data.get('telefone') or '').strip()
+        
+        if not nome:
+            return jsonify({'success': False, 'error': 'Nome é obrigatório'}), 400
+        if not telefone:
+            return jsonify({'success': False, 'error': 'Telefone é obrigatório'}), 400
+        
+        # Parsear data_pretende_entrar
+        data_pretende_entrar = None
+        if data.get('data_pretende_entrar'):
+            try:
+                data_pretende_entrar = datetime.strptime(data['data_pretende_entrar'], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        lista_espera = ListaEspera(
+            nome=nome,
+            telefone=telefone,
+            curso=normalizar_texto((data.get('curso') or '').strip()) or None,
+            idade=data.get('idade'),
+            cidade=normalizar_texto((data.get('cidade') or '').strip()) or None,
+            regiao=normalizar_texto((data.get('regiao') or '').strip()) or None,
+            estado=(data.get('estado') or '').strip().upper()[:2] if data.get('estado') else None,
+            dia_semana=(data.get('dia_semana') or '').strip() or None,
+            data_pretende_entrar=data_pretende_entrar,
+            nome_responsavel=normalizar_texto((data.get('nome_responsavel') or '').strip()) or None,
+            telefone_responsavel=(data.get('telefone_responsavel') or '').strip() or None,
+            observacao=(data.get('observacao') or '').strip() or None
+        )
+        
+        db.session.add(lista_espera)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': lista_espera.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/lista-espera/<int:lista_espera_id>', methods=['PUT'])
+@api_write_required
+@api_admin_required
+def api_editar_lista_espera(lista_espera_id):
+    """Editar registro da lista de espera"""
+    try:
+        from app.routes import normalizar_texto
+        lista_espera = ListaEspera.query.get_or_404(lista_espera_id)
+        data = request.get_json()
+        
+        if 'nome' in data and data['nome']:
+            lista_espera.nome = normalizar_texto(str(data['nome']).strip())
+        if 'telefone' in data and data['telefone']:
+            lista_espera.telefone = str(data['telefone']).strip()
+        if 'curso' in data:
+            lista_espera.curso = normalizar_texto(str(data['curso']).strip()) if data['curso'] else None
+        if 'idade' in data:
+            lista_espera.idade = data['idade'] if data['idade'] else None
+        if 'cidade' in data:
+            lista_espera.cidade = normalizar_texto(str(data['cidade']).strip()) if data['cidade'] else None
+        if 'regiao' in data:
+            lista_espera.regiao = normalizar_texto(str(data['regiao']).strip()) if data['regiao'] else None
+        if 'estado' in data:
+            lista_espera.estado = str(data['estado']).strip().upper()[:2] if data['estado'] else None
+        if 'dia_semana' in data:
+            lista_espera.dia_semana = str(data['dia_semana']).strip() if data['dia_semana'] else None
+        if 'data_pretende_entrar' in data:
+            if data['data_pretende_entrar']:
+                try:
+                    lista_espera.data_pretende_entrar = datetime.strptime(data['data_pretende_entrar'], '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            else:
+                lista_espera.data_pretende_entrar = None
+        if 'nome_responsavel' in data:
+            lista_espera.nome_responsavel = normalizar_texto(str(data['nome_responsavel']).strip()) if data['nome_responsavel'] else None
+        if 'telefone_responsavel' in data:
+            lista_espera.telefone_responsavel = str(data['telefone_responsavel']).strip() if data['telefone_responsavel'] else None
+        if 'observacao' in data:
+            lista_espera.observacao = str(data['observacao']).strip() if data['observacao'] else None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': lista_espera.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/lista-espera/<int:lista_espera_id>', methods=['DELETE'])
+@api_write_required
+@api_admin_required
+def api_deletar_lista_espera(lista_espera_id):
+    """Deletar registro da lista de espera"""
+    try:
+        lista_espera = ListaEspera.query.get_or_404(lista_espera_id)
+        db.session.delete(lista_espera)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/lista-espera/<int:lista_espera_id>/efetivar', methods=['POST'])
+@api_write_required
+@api_admin_required
+def api_efetivar_lista_espera(lista_espera_id):
+    """Efetivar matrícula: converte aluno da lista de espera em aluno regular"""
+    try:
+        from app.routes import normalizar_texto
+        lista_espera = ListaEspera.query.get_or_404(lista_espera_id)
+        
+        if lista_espera.efetivado:
+            return jsonify({'success': False, 'error': 'Este registro já foi efetivado'}), 400
+        
+        data = request.get_json()
+        
+        # Validar campos obrigatórios para criar aluno
+        if not data.get('forma_pagamento'):
+            return jsonify({'success': False, 'error': 'Forma de pagamento é obrigatória'}), 400
+        if not data.get('data_vencimento'):
+            return jsonify({'success': False, 'error': 'Data de vencimento é obrigatória'}), 400
+        if not data.get('cidade'):
+            return jsonify({'success': False, 'error': 'Cidade é obrigatória'}), 400
+        if not data.get('estado'):
+            return jsonify({'success': False, 'error': 'Estado é obrigatório'}), 400
+        if not data.get('matriculas') or len(data.get('matriculas', [])) == 0:
+            return jsonify({'success': False, 'error': 'É necessário adicionar pelo menos uma matrícula'}), 400
+        
+        # Criar aluno com dados da lista de espera + dados fornecidos
+        aluno = Aluno(
+            nome=lista_espera.nome,
+            telefone=lista_espera.telefone,
+            nome_responsavel=lista_espera.nome_responsavel,
+            telefone_responsavel=lista_espera.telefone_responsavel,
+            idade=lista_espera.idade,
+            cidade=normalizar_texto(data.get('cidade', lista_espera.cidade or '').strip()),
+            estado=str(data.get('estado', lista_espera.estado or '')).strip().upper()[:2],
+            forma_pagamento=normalizar_texto(data.get('forma_pagamento').strip()),
+            data_vencimento=datetime.strptime(data['data_vencimento'], '%Y-%m-%d').date(),
+            data_nascimento=datetime.strptime(data['data_nascimento'], '%Y-%m-%d').date() if data.get('data_nascimento') else None,
+            ativo=True,
+            aprovado=True,
+            experimental=data.get('experimental', False),
+            observacao=lista_espera.observacao
+        )
+        
+        # Determinar modalidades baseado nas matrículas
+        modalidades_set = set()
+        for mat in data.get('matriculas', []):
+            modalidade = (mat.get('modalidade') or '').strip()
+            if modalidade:
+                modalidades_set.add(modalidade)
+        
+        for mod in ['dublagem_online', 'dublagem_presencial', 'teatro_online', 'teatro_presencial', 'locucao', 'teatro_tv_cinema', 'musical']:
+            setattr(aluno, mod, mod in modalidades_set)
+        
+        db.session.add(aluno)
+        db.session.flush()  # Para obter o ID do aluno
+        
+        # Criar matrículas
+        for mat_data in data.get('matriculas', []):
+            modalidade = (mat_data.get('modalidade') or '').strip()
+            professor_id = mat_data.get('professor_id')
+            horario_id = mat_data.get('horario_id')
+            valor_mensalidade = mat_data.get('valor_mensalidade')
+            data_inicio = mat_data.get('data_inicio')
+            
+            if not modalidade or not professor_id or not horario_id:
+                continue
+            
+            # Buscar horário do professor para obter dia_semana e horario_aula
+            from app.models.horario_professor import HorarioProfessor
+            horario = HorarioProfessor.query.get(horario_id)
+            if not horario:
+                continue
+            
+            matricula = Matricula(
+                aluno_id=aluno.id,
+                professor_id=professor_id,
+                tipo_curso=modalidade,
+                valor_mensalidade=float(valor_mensalidade) if valor_mensalidade else None,
+                data_inicio=datetime.strptime(data_inicio, '%Y-%m-%d').date() if data_inicio else None,
+                dia_semana=horario.dia_semana,
+                horario_aula=horario.horario_aula
+            )
+            db.session.add(matricula)
+        
+        # Marcar lista de espera como efetivada
+        lista_espera.efetivado = True
+        lista_espera.data_efetivacao = datetime.now()
+        lista_espera.aluno_id = aluno.id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'aluno': aluno.to_dict(),
+                'lista_espera': lista_espera.to_dict()
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_bp.route('/notificacoes/lista-espera', methods=['GET'])
+@api_login_required
+def api_notificacoes_lista_espera():
+    """Retorna alunos da lista de espera que pretendem entrar no curso hoje"""
+    try:
+        hoje = date.today()
+        
+        # Buscar registros não efetivados com data_pretende_entrar igual a hoje
+        lista_espera = ListaEspera.query.filter(
+            and_(
+                ListaEspera.efetivado == False,
+                ListaEspera.data_pretende_entrar == hoje
+            )
+        ).order_by(ListaEspera.data_cadastro.desc()).all()
+        
+        notificacoes = []
+        for item in lista_espera:
+            notificacoes.append({
+                'id': item.id,
+                'nome': item.nome,
+                'telefone': item.telefone,
+                'curso': item.curso,
+                'data_pretende_entrar': item.data_pretende_entrar.isoformat() if item.data_pretende_entrar else None,
+                'data_cadastro': item.data_cadastro.isoformat() if item.data_cadastro else None,
+            })
+        
+        return jsonify({
+            'success': True,
+            'count': len(notificacoes),
+            'data': notificacoes
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 

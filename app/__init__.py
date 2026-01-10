@@ -143,7 +143,7 @@ def create_app():
         return dict(range=range_func)
     
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento, senha_reset
+    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento, senha_reset, lista_espera
     
     # Configurar Cloudinary
     import cloudinary
@@ -252,6 +252,130 @@ def create_app():
                 error_str = str(e).lower()
                 if 'does not exist' not in error_str and 'no such table' not in error_str:
                     print(f"⚠️  Aviso na migração de observacao: {e}")
+            
+            # Migração: Criar tabela lista_espera se não existir
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                table_names = inspector.get_table_names()
+                if 'lista_espera' not in table_names:
+                    print("🔄 Migração: Criando tabela 'lista_espera'...")
+                    db_uri = str(db.engine.url)
+                    is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                    
+                    if is_postgres:
+                        db.session.execute(text("""
+                            CREATE TABLE IF NOT EXISTS lista_espera (
+                                id SERIAL PRIMARY KEY,
+                                nome VARCHAR(200) NOT NULL,
+                                telefone VARCHAR(20) NOT NULL,
+                                curso VARCHAR(100),
+                                idade INTEGER,
+                                cidade VARCHAR(100),
+                                regiao VARCHAR(100),
+                                estado VARCHAR(2),
+                                dia_semana VARCHAR(20),
+                                data_pretende_entrar DATE,
+                                nome_responsavel VARCHAR(200),
+                                telefone_responsavel VARCHAR(20),
+                                observacao TEXT,
+                                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                efetivado BOOLEAN DEFAULT FALSE NOT NULL,
+                                data_efetivacao TIMESTAMP,
+                                aluno_id INTEGER REFERENCES alunos(id)
+                            )
+                        """))
+                    else:
+                        db.session.execute(text("""
+                            CREATE TABLE IF NOT EXISTS lista_espera (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                nome VARCHAR(200) NOT NULL,
+                                telefone VARCHAR(20) NOT NULL,
+                                curso VARCHAR(100),
+                                idade INTEGER,
+                                cidade VARCHAR(100),
+                                regiao VARCHAR(100),
+                                estado VARCHAR(2),
+                                dia_semana VARCHAR(20),
+                                data_pretende_entrar DATE,
+                                nome_responsavel VARCHAR(200),
+                                telefone_responsavel VARCHAR(20),
+                                observacao TEXT,
+                                data_cadastro DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                efetivado BOOLEAN DEFAULT 0 NOT NULL,
+                                data_efetivacao DATETIME,
+                                aluno_id INTEGER REFERENCES alunos(id)
+                            )
+                        """))
+                    db.session.commit()
+                    print("✅ Migração concluída: tabela 'lista_espera' criada")
+            except Exception as e:
+                db.session.rollback()
+                error_str = str(e).lower()
+                if 'already exists' not in error_str and 'duplicate' not in error_str:
+                    print(f"⚠️  Aviso na migração de lista_espera: {e}")
+            
+            # Migração: Adicionar colunas regiao e data_pretende_entrar na tabela lista_espera se não existirem
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                table_names = inspector.get_table_names()
+                if 'lista_espera' in table_names:
+                    columns = [col['name'] for col in inspector.get_columns('lista_espera')]
+                    
+                    db_uri = str(db.engine.url)
+                    is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                    
+                    if 'regiao' not in columns:
+                        print("🔄 Migração: Adicionando coluna 'regiao' na tabela 'lista_espera'...")
+                        try:
+                            if is_postgres:
+                                db.session.execute(text("""
+                                    ALTER TABLE lista_espera 
+                                    ADD COLUMN IF NOT EXISTS regiao VARCHAR(100)
+                                """))
+                            else:
+                                db.session.execute(text("""
+                                    ALTER TABLE lista_espera 
+                                    ADD COLUMN regiao VARCHAR(100)
+                                """))
+                            db.session.commit()
+                            print("✅ Migração concluída: coluna 'regiao' adicionada na tabela 'lista_espera'")
+                        except Exception as alter_error:
+                            db.session.rollback()
+                            error_str = str(alter_error).lower()
+                            if 'already exists' in error_str or 'duplicate column' in error_str:
+                                print("✅ Coluna 'regiao' já existe na tabela 'lista_espera'")
+                            else:
+                                raise
+                    
+                    if 'data_pretende_entrar' not in columns:
+                        print("🔄 Migração: Adicionando coluna 'data_pretende_entrar' na tabela 'lista_espera'...")
+                        try:
+                            if is_postgres:
+                                db.session.execute(text("""
+                                    ALTER TABLE lista_espera 
+                                    ADD COLUMN IF NOT EXISTS data_pretende_entrar DATE
+                                """))
+                            else:
+                                db.session.execute(text("""
+                                    ALTER TABLE lista_espera 
+                                    ADD COLUMN data_pretende_entrar DATE
+                                """))
+                            db.session.commit()
+                            print("✅ Migração concluída: coluna 'data_pretende_entrar' adicionada na tabela 'lista_espera'")
+                        except Exception as alter_error:
+                            db.session.rollback()
+                            error_str = str(alter_error).lower()
+                            if 'already exists' in error_str or 'duplicate column' in error_str:
+                                print("✅ Coluna 'data_pretende_entrar' já existe na tabela 'lista_espera'")
+                            else:
+                                raise
+            except Exception as e:
+                db.session.rollback()
+                error_str = str(e).lower()
+                if 'does not exist' not in error_str and 'no such table' not in error_str:
+                    print(f"⚠️  Aviso na migração de lista_espera (colunas): {e}")
             
             db.create_all()
             
