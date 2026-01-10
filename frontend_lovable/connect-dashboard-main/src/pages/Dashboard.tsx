@@ -691,7 +691,7 @@ export default function Dashboard() {
           ) : evolucaoData.length > 0 ? (
             <div className="mt-4">
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={evolucaoData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
                     dataKey={tipoEvolucao === 'diario' ? 'dia' : 'mes_ano'} 
@@ -731,6 +731,7 @@ export default function Dashboard() {
                     activeDot={{ r: 6 }}
                     label={{
                       position: 'top',
+                      offset: 10,
                       formatter: (value: number) => value.toString(),
                       style: { 
                         fontSize: '11px',
