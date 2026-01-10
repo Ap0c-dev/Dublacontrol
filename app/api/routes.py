@@ -1353,14 +1353,16 @@ def api_dashboard_stats():
                 if data_vencimento_ref < hoje:
                     alunos_atrasados += 1
         
-        # Calcular receita mensal (pagamentos aprovados do mês atual)
-        # Considerar pagamentos aprovados que foram pagos no mês atual (mes_referencia e ano_referencia)
+        # Calcular receita mensal (pagamentos aprovados pagos no mês atual)
+        # Considerar pagamentos aprovados onde a data_pagamento está no mês atual
+        # Isso captura pagamentos que foram efetivamente recebidos neste mês
+        primeiro_dia_mes = date(hoje.year, hoje.month, 1)
         receita_mensal_query = db.session.query(
             db.func.sum(Pagamento.valor_pago)
         ).filter(
             Pagamento.status == 'aprovado',
-            Pagamento.mes_referencia == hoje.month,
-            Pagamento.ano_referencia == hoje.year
+            db.func.date(Pagamento.data_pagamento) >= primeiro_dia_mes,
+            db.func.date(Pagamento.data_pagamento) <= hoje
         )
         receita_mensal = receita_mensal_query.scalar()
         if receita_mensal is None:
@@ -1368,19 +1370,18 @@ def api_dashboard_stats():
         else:
             receita_mensal = float(receita_mensal)
         
-        # Calcular crescimento de alunos em relação ao mês anterior na mesma data
-        # Exemplo: se hoje é 29/12, comparar alunos até 29/12 com alunos até 29/11
+        # Log para debug
+        print(f"📊 Receita mensal ({hoje.month}/{hoje.year}): R$ {receita_mensal:.2f}")
+        
+        # Calcular crescimento de alunos comparando mês anterior completo com mês atual até hoje
+        # Exemplo: se hoje é 10/01, comparar todos os alunos de dezembro com alunos de janeiro até hoje
         from datetime import timedelta
         from calendar import monthrange
         
-        dia_atual = hoje.day
         mes_atual = hoje.month
         ano_atual = hoje.year
         
-        # Data de referência deste mês (até hoje)
-        data_referencia_atual = hoje
-        
-        # Calcular data equivalente no mês anterior
+        # Calcular mês anterior
         if mes_atual == 1:
             mes_anterior = 12
             ano_anterior = ano_atual - 1
@@ -1388,56 +1389,59 @@ def api_dashboard_stats():
             mes_anterior = mes_atual - 1
             ano_anterior = ano_atual
         
-        # Ajustar dia se o mês anterior tiver menos dias
+        # Primeiro e último dia do mês anterior (mês completo)
+        primeiro_dia_mes_anterior = date(ano_anterior, mes_anterior, 1)
         ultimo_dia_mes_anterior = monthrange(ano_anterior, mes_anterior)[1]
-        dia_referencia_anterior = min(dia_atual, ultimo_dia_mes_anterior)
-        data_referencia_anterior = date(ano_anterior, mes_anterior, dia_referencia_anterior)
+        ultima_data_mes_anterior = date(ano_anterior, mes_anterior, ultimo_dia_mes_anterior)
         
-        # Contar alunos que começaram até a data atual deste mês
-        # Considerar apenas alunos ativos com matrículas ativas (sem data_encerramento)
-        # IMPORTANTE: Usar a mesma lógica do total_alunos para consistência
-        alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
+        # Primeiro dia do mês atual e data de hoje
+        primeiro_dia_mes_atual = date(ano_atual, mes_atual, 1)
+        data_referencia_atual = hoje
+        
+        # Contar alunos que começaram no mês anterior completo
+        # Considerar apenas alunos ativos com matrículas ativas
+        alunos_mes_anterior = db.session.query(Aluno.id).distinct().join(
             Matricula, Aluno.id == Matricula.aluno_id
         ).filter(
             Aluno.ativo == True,
             Matricula.data_inicio.isnot(None),
-            db.func.date(Matricula.data_inicio) <= data_referencia_atual,
+            db.func.date(Matricula.data_inicio) >= primeiro_dia_mes_anterior,
+            db.func.date(Matricula.data_inicio) <= ultima_data_mes_anterior,
             db.or_(
                 Matricula.data_encerramento.is_(None),
-                Matricula.data_encerramento > hoje  # Usar hoje, não data_referencia_atual
+                Matricula.data_encerramento > hoje
             )
         ).count()
         
-        # Contar alunos que começaram até a mesma data do mês anterior
-        # Considerar apenas alunos ativos com matrículas ativas naquela data
-        # IMPORTANTE: Na data de referência anterior, considerar matrículas que estavam ativas naquela data
-        alunos_ate_mes_anterior = db.session.query(Aluno.id).distinct().join(
+        # Contar alunos que começaram no mês atual até hoje
+        # Considerar apenas alunos ativos com matrículas ativas
+        alunos_mes_atual = db.session.query(Aluno.id).distinct().join(
             Matricula, Aluno.id == Matricula.aluno_id
         ).filter(
             Aluno.ativo == True,
             Matricula.data_inicio.isnot(None),
-            db.func.date(Matricula.data_inicio) <= data_referencia_anterior,
-            # Matrícula não estava encerrada na data de referência anterior
+            db.func.date(Matricula.data_inicio) >= primeiro_dia_mes_atual,
+            db.func.date(Matricula.data_inicio) <= data_referencia_atual,
             db.or_(
                 Matricula.data_encerramento.is_(None),
-                Matricula.data_encerramento > data_referencia_anterior
+                Matricula.data_encerramento > hoje
             )
         ).count()
         
         # Log para debug
         print(f"📊 Crescimento de alunos:")
-        print(f"   Data atual: {data_referencia_atual} - Alunos até hoje: {alunos_ate_hoje}")
-        print(f"   Data anterior: {data_referencia_anterior} - Alunos até mês anterior: {alunos_ate_mes_anterior}")
+        print(f"   Mês anterior ({mes_anterior}/{ano_anterior}): {alunos_mes_anterior} alunos")
+        print(f"   Mês atual ({mes_atual}/{ano_atual}) até hoje: {alunos_mes_atual} alunos")
         
         # Calcular porcentagem de crescimento
         crescimento_alunos = 0.0
-        if alunos_ate_mes_anterior > 0:
-            crescimento_alunos = ((alunos_ate_hoje - alunos_ate_mes_anterior) / alunos_ate_mes_anterior) * 100
+        if alunos_mes_anterior > 0:
+            crescimento_alunos = ((alunos_mes_atual - alunos_mes_anterior) / alunos_mes_anterior) * 100
             print(f"   Crescimento: {crescimento_alunos:.1f}%")
-        elif alunos_ate_hoje > 0:
+        elif alunos_mes_atual > 0:
             # Se não havia alunos no mês anterior mas há agora, crescimento de 100%
             crescimento_alunos = 100.0
-            print(f"   Crescimento: 100% (de 0 para {alunos_ate_hoje})")
+            print(f"   Crescimento: 100% (de 0 para {alunos_mes_atual})")
         
         # Calcular crescimento de receita em relação ao mês anterior na mesma data
         # Receita até hoje deste mês (pagamentos aprovados até hoje)
