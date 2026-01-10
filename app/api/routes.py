@@ -1398,6 +1398,14 @@ def api_dashboard_stats():
         primeiro_dia_mes_atual = date(ano_atual, mes_atual, 1)
         data_referencia_atual = hoje
         
+        # Data de referência do mês anterior (mesmo dia do mês)
+        # Se hoje é 10/01, data_referencia_anterior será 10/12
+        dia_atual = hoje.day
+        ultimo_dia_mes_anterior = monthrange(ano_anterior, mes_anterior)[1]
+        # Garantir que o dia não exceda o último dia do mês anterior
+        dia_referencia_anterior = min(dia_atual, ultimo_dia_mes_anterior)
+        data_referencia_anterior = date(ano_anterior, mes_anterior, dia_referencia_anterior)
+        
         # Contar alunos que começaram no mês anterior completo
         # Considerar apenas alunos ativos com matrículas ativas
         alunos_mes_anterior = db.session.query(Aluno.id).distinct().join(
