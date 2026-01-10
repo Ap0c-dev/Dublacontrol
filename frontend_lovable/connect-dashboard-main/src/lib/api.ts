@@ -1154,6 +1154,8 @@ class ApiClient {
     curso?: string;
     data_pretende_entrar?: string;
     data_cadastro?: string;
+    dias_atrasado?: number;
+    esta_atrasado?: boolean;
   }>>> {
     try {
       const response = await fetch(`${API_BASE_URL}/notificacoes/lista-espera`, {

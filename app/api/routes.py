@@ -3818,20 +3818,29 @@ def api_efetivar_lista_espera(lista_espera_id):
 @api_bp.route('/notificacoes/lista-espera', methods=['GET'])
 @api_login_required
 def api_notificacoes_lista_espera():
-    """Retorna alunos da lista de espera que pretendem entrar no curso hoje"""
+    """Retorna alunos da lista de espera que pretendem entrar no curso hoje ou que a data já passou (atrasados)"""
     try:
         hoje = date.today()
         
-        # Buscar registros não efetivados com data_pretende_entrar igual a hoje
+        # Buscar registros não efetivados com data_pretende_entrar igual a hoje OU que já passou
+        # Isso inclui alunos que deveriam ter entrado hoje ou em dias anteriores
         lista_espera = ListaEspera.query.filter(
             and_(
                 ListaEspera.efetivado == False,
-                ListaEspera.data_pretende_entrar == hoje
+                ListaEspera.data_pretende_entrar.isnot(None),
+                ListaEspera.data_pretende_entrar <= hoje  # Data de hoje ou anterior
             )
-        ).order_by(ListaEspera.data_cadastro.desc()).all()
+        ).order_by(
+            ListaEspera.data_pretende_entrar.asc(),  # Ordenar por data (mais antigos primeiro)
+            ListaEspera.data_cadastro.desc()
+        ).all()
         
         notificacoes = []
         for item in lista_espera:
+            # Verificar se está atrasado
+            dias_atrasado = (hoje - item.data_pretende_entrar).days if item.data_pretende_entrar else 0
+            esta_atrasado = dias_atrasado > 0
+            
             notificacoes.append({
                 'id': item.id,
                 'nome': item.nome,
@@ -3839,6 +3848,8 @@ def api_notificacoes_lista_espera():
                 'curso': item.curso,
                 'data_pretende_entrar': item.data_pretende_entrar.isoformat() if item.data_pretende_entrar else None,
                 'data_cadastro': item.data_cadastro.isoformat() if item.data_cadastro else None,
+                'dias_atrasado': dias_atrasado,
+                'esta_atrasado': esta_atrasado
             })
         
         return jsonify({
@@ -3847,5 +3858,7 @@ def api_notificacoes_lista_espera():
             'data': notificacoes
         })
     except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar notificações de lista de espera: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 

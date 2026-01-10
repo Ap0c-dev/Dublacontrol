@@ -32,6 +32,8 @@ export default function Dashboard() {
     curso?: string;
     data_pretende_entrar?: string;
     data_cadastro?: string;
+    dias_atrasado?: number;
+    esta_atrasado?: boolean;
   }>>([]);
   const [notificacoesVisiveis, setNotificacoesVisiveis] = useState<Set<number>>(new Set());
   const { toast } = useToast();
@@ -94,10 +96,15 @@ export default function Dashboard() {
           response.data.forEach((notif: any) => {
             setNotificacoesVisiveis((prev) => {
               if (!prev.has(notif.id)) {
+                const mensagem = notif.esta_atrasado 
+                  ? `${notif.nome} pretendia entrar há ${notif.dias_atrasado} ${notif.dias_atrasado === 1 ? 'dia' : 'dias'}${notif.curso ? ` (${notif.curso})` : ''}`
+                  : `${notif.nome} pretende entrar no curso hoje${notif.curso ? ` (${notif.curso})` : ''}`;
+                
                 toast({
-                  title: 'Aluno da Lista de Espera',
-                  description: `${notif.nome} pretende entrar no curso hoje${notif.curso ? ` (${notif.curso})` : ''}`,
+                  title: notif.esta_atrasado ? 'Aluno da Lista de Espera - Atrasado' : 'Aluno da Lista de Espera',
+                  description: mensagem,
                   duration: 10000,
+                  variant: notif.esta_atrasado ? 'destructive' : 'default',
                 });
                 return new Set(prev).add(notif.id);
               }
@@ -190,20 +197,43 @@ export default function Dashboard() {
           <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
             {notificacoes
               .filter((notif) => !notificacoesVisiveis.has(notif.id))
-              .map((notif) => (
-                <Card key={notif.id} className="border-orange-500 bg-orange-50 dark:bg-orange-950/20 shadow-lg">
+              .map((notif) => {
+                const estaAtrasado = notif.esta_atrasado || false;
+                const diasAtrasado = notif.dias_atrasado || 0;
+                const cardClass = estaAtrasado 
+                  ? "border-red-500 bg-red-50 dark:bg-red-950/20 shadow-lg"
+                  : "border-orange-500 bg-orange-50 dark:bg-orange-950/20 shadow-lg";
+                const iconClass = estaAtrasado
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-orange-600 dark:text-orange-400";
+                const textClass = estaAtrasado
+                  ? "text-red-900 dark:text-red-100"
+                  : "text-orange-900 dark:text-orange-100";
+                const textSecondaryClass = estaAtrasado
+                  ? "text-red-800 dark:text-red-200"
+                  : "text-orange-800 dark:text-orange-200";
+                
+                return (
+                <Card key={notif.id} className={cardClass}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                        <Clock className={`w-5 h-5 ${iconClass} mt-0.5 flex-shrink-0`} />
                         <div className="flex-1">
-                          <h4 className="font-semibold text-sm text-orange-900 dark:text-orange-100">
-                            Aluno da Lista de Espera
+                          <h4 className={`font-semibold text-sm ${textClass}`}>
+                            {estaAtrasado ? 'Aluno da Lista de Espera - Atrasado' : 'Aluno da Lista de Espera'}
                           </h4>
-                          <p className="text-sm text-orange-800 dark:text-orange-200 mt-1">
-                            <strong>{notif.nome}</strong> pretende entrar no curso hoje
+                          <p className={`text-sm ${textSecondaryClass} mt-1`}>
+                            <strong>{notif.nome}</strong> {estaAtrasado 
+                              ? `pretendia entrar há ${diasAtrasado} ${diasAtrasado === 1 ? 'dia' : 'dias'}`
+                              : 'pretende entrar no curso hoje'}
                             {notif.curso && (
                               <span className="block text-xs mt-1">Curso: {notif.curso}</span>
+                            )}
+                            {notif.data_pretende_entrar && (
+                              <span className="block text-xs mt-1">
+                                Data prevista: {new Date(notif.data_pretende_entrar).toLocaleDateString('pt-BR')}
+                              </span>
                             )}
                           </p>
                           <Button
@@ -227,7 +257,8 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
           </div>
         )}
 
