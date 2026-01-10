@@ -218,9 +218,26 @@ class ApiClient {
     }
   }
 
-  async getAlunosEvolucao(): Promise<ApiResponse<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>> {
+  async getAlunosEvolucao(mes?: number | null, ano?: number): Promise<ApiResponse<Array<{ 
+    mes?: number; 
+    ano?: number; 
+    mes_nome?: string; 
+    mes_ano?: string; 
+    dia?: number;
+    data?: string;
+    data_formatada?: string;
+    total_alunos: number; 
+    data_referencia?: string;
+    tipo?: string;
+  }>> & { tipo?: 'mensal' | 'diario' }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/alunos-evolucao`, {
+      let url = `${API_BASE_URL}/dashboard/alunos-evolucao`;
+      const params = new URLSearchParams();
+      if (mes) params.append('mes', mes.toString());
+      if (ano) params.append('ano', ano.toString());
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await fetch(url, {
         headers: this.getHeaders(),
       });
       if (!response.ok) {

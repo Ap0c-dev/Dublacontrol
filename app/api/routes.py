@@ -1501,7 +1501,7 @@ def api_dashboard_stats():
 @api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
 @api_login_required
 def api_alunos_evolucao():
-    """Retorna quantos alunos começaram (data_inicio) em cada um dos últimos 12 meses"""
+    """Retorna quantos alunos começaram (data_inicio) em cada um dos últimos 12 meses ou dia a dia de um mês específico"""
     try:
         from datetime import timedelta
         from calendar import monthrange
@@ -1509,55 +1509,101 @@ def api_alunos_evolucao():
         hoje = date.today()
         resultado = []
         
+        # Verificar se foi solicitado um mês específico (filtro)
+        mes_filtro = request.args.get('mes', type=int)
+        ano_filtro = request.args.get('ano', type=int)
+        
         meses_nomes = {
+            1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+            5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+            9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+        }
+        
+        meses_nomes_curto = {
             1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr',
             5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago',
             9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
         }
         
-        # Gerar os últimos 12 meses
-        for i in range(11, -1, -1):  # De 11 meses atrás até hoje
-            # Calcular data do mês
-            meses_antes = i
-            ano = hoje.year
-            mes = hoje.month - meses_antes
+        # Se foi especificado um mês, retornar dados dia a dia
+        if mes_filtro and ano_filtro:
+            primeiro_dia = date(ano_filtro, mes_filtro, 1)
+            ultimo_dia = monthrange(ano_filtro, mes_filtro)[1]
+            data_fim_mes = date(ano_filtro, mes_filtro, ultimo_dia)
             
-            # Ajustar se o mês for negativo ou zero
-            while mes <= 0:
-                mes += 12
-                ano -= 1
+            # Limitar até hoje se o mês for o mês atual
+            if ano_filtro == hoje.year and mes_filtro == hoje.month:
+                data_fim_mes = hoje
             
-            # Primeiro e último dia do mês
-            primeiro_dia = date(ano, mes, 1)
-            ultimo_dia = monthrange(ano, mes)[1]
-            data_fim_mes = date(ano, mes, ultimo_dia)
-            
-            # Contar quantos alunos únicos começaram (data_inicio) neste mês específico
-            # Incluir TODOS os alunos, independente de status (ativo/inativo) ou pagamento
-            alunos_iniciaram = db.session.query(Aluno.id).distinct().join(
-                Matricula, Aluno.id == Matricula.aluno_id
-            ).filter(
-                # Matrícula tem data_inicio definida
-                Matricula.data_inicio.isnot(None),
-                # Data de início da matrícula está dentro deste mês específico
-                db.func.date(Matricula.data_inicio) >= primeiro_dia,
-                db.func.date(Matricula.data_inicio) <= data_fim_mes
-            ).count()
-            
-            print(f"📊 Mês {mes}/{ano}: {alunos_iniciaram} alunos começaram (incluindo inativos e com pagamento atrasado)")
-            
-            resultado.append({
-                'mes': mes,
-                'ano': ano,
-                'mes_nome': meses_nomes.get(mes, f'Mês {mes}'),
-                'mes_ano': f"{meses_nomes.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
-                'total_alunos': alunos_iniciaram,
-                'data_referencia': data_fim_mes.isoformat()
-            })
+            # Gerar todos os dias do mês
+            data_atual = primeiro_dia
+            while data_atual <= data_fim_mes:
+                # Contar alunos que começaram até este dia (acumulado)
+                alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
+                    Matricula, Aluno.id == Matricula.aluno_id
+                ).filter(
+                    Matricula.data_inicio.isnot(None),
+                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    db.func.date(Matricula.data_inicio) <= data_atual
+                ).count()
+                
+                resultado.append({
+                    'dia': data_atual.day,
+                    'mes': mes_filtro,
+                    'ano': ano_filtro,
+                    'data': data_atual.isoformat(),
+                    'data_formatada': data_atual.strftime('%d/%m/%Y'),
+                    'total_alunos': alunos_ate_hoje,
+                    'tipo': 'diario'
+                })
+                
+                data_atual += timedelta(days=1)
+        else:
+            # Modo padrão: retornar os últimos 12 meses
+            for i in range(11, -1, -1):  # De 11 meses atrás até hoje
+                # Calcular data do mês
+                meses_antes = i
+                ano = hoje.year
+                mes = hoje.month - meses_antes
+                
+                # Ajustar se o mês for negativo ou zero
+                while mes <= 0:
+                    mes += 12
+                    ano -= 1
+                
+                # Primeiro e último dia do mês
+                primeiro_dia = date(ano, mes, 1)
+                ultimo_dia = monthrange(ano, mes)[1]
+                data_fim_mes = date(ano, mes, ultimo_dia)
+                
+                # Contar quantos alunos únicos começaram (data_inicio) neste mês específico
+                # Incluir TODOS os alunos, independente de status (ativo/inativo) ou pagamento
+                alunos_iniciaram = db.session.query(Aluno.id).distinct().join(
+                    Matricula, Aluno.id == Matricula.aluno_id
+                ).filter(
+                    # Matrícula tem data_inicio definida
+                    Matricula.data_inicio.isnot(None),
+                    # Data de início da matrícula está dentro deste mês específico
+                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    db.func.date(Matricula.data_inicio) <= data_fim_mes
+                ).count()
+                
+                print(f"📊 Mês {mes}/{ano}: {alunos_iniciaram} alunos começaram (incluindo inativos e com pagamento atrasado)")
+                
+                resultado.append({
+                    'mes': mes,
+                    'ano': ano,
+                    'mes_nome': meses_nomes_curto.get(mes, f'Mês {mes}'),
+                    'mes_ano': f"{meses_nomes_curto.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
+                    'total_alunos': alunos_iniciaram,
+                    'data_referencia': data_fim_mes.isoformat(),
+                    'tipo': 'mensal'
+                })
         
         return jsonify({
             'success': True,
-            'data': resultado
+            'data': resultado,
+            'tipo': 'diario' if (mes_filtro and ano_filtro) else 'mensal'
         })
     except Exception as e:
         import traceback

@@ -14,19 +14,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEvolucaoOpen, setIsEvolucaoOpen] = useState(false);
-  const [evolucaoData, setEvolucaoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; total_alunos: number; data_referencia: string }>>([]);
+  const [evolucaoData, setEvolucaoData] = useState<Array<{ 
+    mes?: number; 
+    ano?: number; 
+    mes_nome?: string; 
+    mes_ano?: string; 
+    dia?: number;
+    data?: string;
+    data_formatada?: string;
+    total_alunos: number; 
+    data_referencia?: string;
+    tipo?: string;
+  }>>([]);
   const [isLoadingEvolucao, setIsLoadingEvolucao] = useState(false);
+  const [tipoEvolucao, setTipoEvolucao] = useState<'mensal' | 'diario'>('mensal');
+  const [mesFiltro, setMesFiltro] = useState<number | null>(null);
+  const [anoFiltro, setAnoFiltro] = useState<number>(new Date().getFullYear());
   const [isFaturamentoOpen, setIsFaturamentoOpen] = useState(false);
   const [faturamentoData, setFaturamentoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; receita: number; data_referencia: string }>>([]);
   const [isLoadingFaturamento, setIsLoadingFaturamento] = useState(false);
@@ -133,13 +148,14 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [toast]);
 
-  const handleOpenEvolucao = async () => {
+  const handleOpenEvolucao = async (mes?: number | null, ano?: number) => {
     setIsEvolucaoOpen(true);
     setIsLoadingEvolucao(true);
     try {
-      const response = await api.getAlunosEvolucao();
+      const response = await api.getAlunosEvolucao(mes || undefined, ano);
       if (response.success) {
         setEvolucaoData(response.data);
+        setTipoEvolucao(response.tipo || 'mensal');
       } else {
         toast({
           title: 'Erro ao carregar dados',
@@ -151,6 +167,48 @@ export default function Dashboard() {
       toast({
         title: 'Erro de conexão',
         description: 'Verifique se o servidor está rodando.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingEvolucao(false);
+    }
+  };
+
+  const handleFiltroMes = async (mes: string) => {
+    const mesNum = mes === 'todos' ? null : parseInt(mes);
+    setMesFiltro(mesNum);
+    setIsLoadingEvolucao(true);
+    try {
+      const response = await api.getAlunosEvolucao(mesNum || undefined, anoFiltro);
+      if (response.success) {
+        setEvolucaoData(response.data);
+        setTipoEvolucao(response.tipo || 'mensal');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível filtrar os dados.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingEvolucao(false);
+    }
+  };
+
+  const handleFiltroAno = async (ano: string) => {
+    const anoNum = parseInt(ano);
+    setAnoFiltro(anoNum);
+    setIsLoadingEvolucao(true);
+    try {
+      const response = await api.getAlunosEvolucao(mesFiltro || undefined, anoNum);
+      if (response.success) {
+        setEvolucaoData(response.data);
+        setTipoEvolucao(response.tipo || 'mensal');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível filtrar os dados.',
         variant: 'destructive',
       });
     } finally {
@@ -566,16 +624,66 @@ export default function Dashboard() {
 
       {/* Modal de Evolução de Alunos */}
       <Dialog open={isEvolucaoOpen} onOpenChange={setIsEvolucaoOpen}>
-        <DialogContent className="sm:max-w-[800px]">
+        <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users size={24} />
-              Evolução de Alunos - Últimos 12 Meses
+              {tipoEvolucao === 'diario' 
+                ? `Evolução de Alunos - ${mesFiltro ? new Date(anoFiltro, mesFiltro - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''}` 
+                : 'Evolução de Alunos - Últimos 12 Meses'}
             </DialogTitle>
             <DialogDescription>
-              Gráfico mostrando quantos alunos começaram (data de início) em cada mês
+              {tipoEvolucao === 'diario' 
+                ? 'Gráfico mostrando a evolução dia a dia (acumulado) de alunos que começaram'
+                : 'Gráfico mostrando quantos alunos começaram (data de início) em cada mês'}
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Filtros */}
+          <div className="flex gap-4 items-end mt-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Ano</label>
+              <Select value={anoFiltro.toString()} onValueChange={handleFiltroAno}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const ano = new Date().getFullYear() - i;
+                    return (
+                      <SelectItem key={ano} value={ano.toString()}>
+                        {ano}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Mês</label>
+              <Select value={mesFiltro?.toString() || 'todos'} onValueChange={handleFiltroMes}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os meses</SelectItem>
+                  <SelectItem value="1">Janeiro</SelectItem>
+                  <SelectItem value="2">Fevereiro</SelectItem>
+                  <SelectItem value="3">Março</SelectItem>
+                  <SelectItem value="4">Abril</SelectItem>
+                  <SelectItem value="5">Maio</SelectItem>
+                  <SelectItem value="6">Junho</SelectItem>
+                  <SelectItem value="7">Julho</SelectItem>
+                  <SelectItem value="8">Agosto</SelectItem>
+                  <SelectItem value="9">Setembro</SelectItem>
+                  <SelectItem value="10">Outubro</SelectItem>
+                  <SelectItem value="11">Novembro</SelectItem>
+                  <SelectItem value="12">Dezembro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {isLoadingEvolucao ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -583,12 +691,15 @@ export default function Dashboard() {
           ) : evolucaoData.length > 0 ? (
             <div className="mt-4">
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={evolucaoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
-                    dataKey="mes_ano" 
+                    dataKey={tipoEvolucao === 'diario' ? 'dia' : 'mes_ano'} 
                     className="text-xs"
                     tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    angle={tipoEvolucao === 'diario' ? -45 : 0}
+                    textAnchor={tipoEvolucao === 'diario' ? 'end' : 'middle'}
+                    height={tipoEvolucao === 'diario' ? 80 : 30}
                   />
                   <YAxis 
                     className="text-xs"
@@ -601,15 +712,25 @@ export default function Dashboard() {
                       borderRadius: '8px'
                     }}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    labelFormatter={(label) => {
+                      if (tipoEvolucao === 'diario') {
+                        const item = evolucaoData.find(d => d.dia === label);
+                        return item?.data_formatada || `Dia ${label}`;
+                      }
+                      return label;
+                    }}
                   />
                   <Legend />
-                  <Bar 
+                  <Line 
+                    type="monotone"
                     dataKey="total_alunos" 
-                    fill="hsl(var(--primary))"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
                     name="Alunos que começaram"
-                    radius={[8, 8, 0, 0]}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
                   />
-                </BarChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
