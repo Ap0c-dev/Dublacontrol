@@ -42,6 +42,11 @@ export default function Dashboard() {
   const [tipoEvolucao, setTipoEvolucao] = useState<'mensal' | 'diario'>('mensal');
   const [mesFiltro, setMesFiltro] = useState<number | null>(null);
   const [anoFiltro, setAnoFiltro] = useState<number>(new Date().getFullYear());
+  const [distribuicaoModalidades, setDistribuicaoModalidades] = useState<Array<{ modalidade: string; modalidade_nome: string; total_alunos: number }>>([]);
+  const [distribuicaoProfessores, setDistribuicaoProfessores] = useState<Array<{ professor_id: number; professor_nome: string; total_alunos: number }>>([]);
+  const [distribuicaoRegioes, setDistribuicaoRegioes] = useState<{ estados: Array<{ estado: string; total_alunos: number }>; cidades: Array<{ cidade: string; total_alunos: number }> }>({ estados: [], cidades: [] });
+  const [distribuicaoIdades, setDistribuicaoIdades] = useState<Array<{ faixa: string; total_alunos: number }>>([]);
+  const [isLoadingDistribuicoes, setIsLoadingDistribuicoes] = useState(false);
   const [isFaturamentoOpen, setIsFaturamentoOpen] = useState(false);
   const [faturamentoData, setFaturamentoData] = useState<Array<{ mes: number; ano: number; mes_nome: string; mes_ano: string; receita: number; data_referencia: string }>>([]);
   const [isLoadingFaturamento, setIsLoadingFaturamento] = useState(false);
@@ -233,6 +238,32 @@ export default function Dashboard() {
       });
     } finally {
       setIsLoadingEvolucao(false);
+    }
+  };
+
+  const fetchDistribuicoes = async () => {
+    setIsLoadingDistribuicoes(true);
+    try {
+      const [modalidadesRes, professoresRes, regioesRes, idadesRes] = await Promise.all([
+        api.getDistribuicaoModalidades(),
+        api.getDistribuicaoProfessores(),
+        api.getDistribuicaoRegioes(),
+        api.getDistribuicaoIdades()
+      ]);
+
+      if (modalidadesRes.success) setDistribuicaoModalidades(modalidadesRes.data);
+      if (professoresRes.success) setDistribuicaoProfessores(professoresRes.data);
+      if (regioesRes.success) setDistribuicaoRegioes(regioesRes.data);
+      if (idadesRes.success) setDistribuicaoIdades(idadesRes.data);
+    } catch (error) {
+      console.error('Erro ao buscar distribuições:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar as distribuições.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingDistribuicoes(false);
     }
   };
 
@@ -446,10 +477,16 @@ export default function Dashboard() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="visao-geral" className="w-full">
+        <Tabs defaultValue="visao-geral" className="w-full" onValueChange={(value) => {
+          if (value === 'alunos') {
+            fetchDistribuicoes();
+          } else if (value === 'professores') {
+            fetchProfessoresData();
+          }
+        }}>
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-            <TabsTrigger value="professores" onClick={fetchProfessoresData}>Professores</TabsTrigger>
+            <TabsTrigger value="professores">Professores</TabsTrigger>
             <TabsTrigger value="alunos">Alunos</TabsTrigger>
             <TabsTrigger value="receita">Receita</TabsTrigger>
             <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
@@ -618,6 +655,172 @@ export default function Dashboard() {
                 Ver Gráfico de Evolução
               </Button>
             </div>
+
+            {/* Distribuição por Modalidade */}
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Distribuição por Modalidade</h2>
+              {isLoadingDistribuicoes ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : distribuicaoModalidades.length > 0 ? (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={distribuicaoModalidades}
+                        dataKey="total_alunos"
+                        nameKey="modalidade_nome"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={(entry) => `${entry.modalidade_nome}: ${entry.total_alunos}`}
+                      >
+                        {distribuicaoModalidades.map((entry, index) => {
+                          const colors = [
+                            'hsl(var(--primary))',
+                            'hsl(var(--secondary))',
+                            'hsl(var(--accent))',
+                            '#8884d8',
+                            '#82ca9d',
+                            '#ffc658',
+                            '#ff7300',
+                            '#8dd1e1'
+                          ];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={distribuicaoModalidades}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="modalidade_nome" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="total_alunos" fill="hsl(var(--primary))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">Nenhum dado disponível.</p>
+              )}
+            </div>
+
+            {/* Distribuição por Professor */}
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Distribuição por Professor</h2>
+              {isLoadingDistribuicoes ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : distribuicaoProfessores.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={distribuicaoProfessores}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="professor_nome" angle={-45} textAnchor="end" height={100} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="total_alunos" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">Nenhum dado disponível.</p>
+              )}
+            </div>
+
+            {/* Distribuição por Cidade/Estado */}
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Distribuição por Localização</h2>
+              {isLoadingDistribuicoes ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : distribuicaoRegioes.cidades.length > 0 || distribuicaoRegioes.estados.length > 0 ? (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {distribuicaoRegioes.estados.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Por Estado</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={distribuicaoRegioes.estados}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="estado" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="total_alunos" fill="hsl(var(--primary))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {distribuicaoRegioes.cidades.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Por Cidade (Top 10)</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={distribuicaoRegioes.cidades.slice(0, 10)}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="cidade" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="total_alunos" fill="hsl(var(--primary))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">Nenhum dado disponível.</p>
+              )}
+            </div>
+
+            {/* Distribuição por Idade */}
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Distribuição por Faixa Etária</h2>
+              {isLoadingDistribuicoes ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : distribuicaoIdades.length > 0 ? (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={distribuicaoIdades}
+                        dataKey="total_alunos"
+                        nameKey="faixa"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={(entry) => `${entry.faixa} anos: ${entry.total_alunos}`}
+                      >
+                        {distribuicaoIdades.map((entry, index) => {
+                          const colors = [
+                            'hsl(var(--primary))',
+                            'hsl(var(--secondary))',
+                            'hsl(var(--accent))',
+                            '#8884d8',
+                            '#82ca9d'
+                          ];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={distribuicaoIdades}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="faixa" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="total_alunos" fill="hsl(var(--primary))" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">Nenhum dado disponível.</p>
+              )}
+            </div>
           </TabsContent>
 
           {/* Tab: Receita */}
@@ -661,8 +864,8 @@ export default function Dashboard() {
             </DialogTitle>
             <DialogDescription>
               {tipoEvolucao === 'diario' 
-                ? 'Gráfico mostrando a evolução dia a dia (acumulado) de alunos que começaram'
-                : 'Gráfico mostrando quantos alunos começaram (data de início) em cada mês'}
+                ? 'Gráfico mostrando a evolução dia a dia (acumulado) de alunos ativos cadastrados'
+                : 'Gráfico mostrando quantos alunos ativos foram cadastrados (data de cadastro) em cada mês'}
             </DialogDescription>
           </DialogHeader>
           
@@ -749,7 +952,7 @@ export default function Dashboard() {
                   />
                   <Legend />
                   <Line 
-                    type="monotone"
+                    type="linear"
                     dataKey="total_alunos" 
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}

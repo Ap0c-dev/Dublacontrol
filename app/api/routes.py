@@ -29,6 +29,24 @@ api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 # Formato: {token: user_id}
 valid_tokens = {}
 
+# Handler global para requisições OPTIONS (CORS preflight)
+# Isso garante que requisições OPTIONS sejam tratadas antes de chegar aos endpoints
+@api_bp.before_request
+def handle_preflight():
+    """Trata requisições OPTIONS (CORS preflight)"""
+    if request.method == "OPTIONS":
+        response = make_response('', 200)
+        origin = request.headers.get('Origin')
+        if origin:
+            response.headers.add("Access-Control-Allow-Origin", origin)
+        else:
+            response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
+        response.headers.add('Access-Control-Allow-Methods', "GET,POST,PUT,DELETE,OPTIONS")
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Max-Age', '3600')
+        return response
+
 # Rota raiz da API
 @api_bp.route('/', methods=['GET'])
 def api_root():
@@ -1501,7 +1519,7 @@ def api_dashboard_stats():
 @api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
 @api_login_required
 def api_alunos_evolucao():
-    """Retorna quantos alunos começaram (data_inicio) em cada um dos últimos 12 meses ou dia a dia de um mês específico"""
+    """Retorna quantos alunos ativos foram cadastrados (data_cadastro) em cada um dos últimos 12 meses ou dia a dia de um mês específico"""
     try:
         from datetime import timedelta
         from calendar import monthrange
@@ -1540,13 +1558,12 @@ def api_alunos_evolucao():
             # Gerar todos os dias do mês
             data_atual = primeiro_dia
             while data_atual <= data_fim_mes:
-                # Contar alunos que começaram até este dia (acumulado)
-                alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
-                    Matricula, Aluno.id == Matricula.aluno_id
-                ).filter(
-                    Matricula.data_inicio.isnot(None),
-                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
-                    db.func.date(Matricula.data_inicio) <= data_atual
+                # Contar alunos ativos cadastrados até este dia (acumulado)
+                # Usar data_cadastro e filtrar apenas alunos ativos
+                alunos_ate_hoje = db.session.query(Aluno.id).filter(
+                    Aluno.ativo == True,
+                    db.func.date(Aluno.data_cadastro) >= primeiro_dia,
+                    db.func.date(Aluno.data_cadastro) <= data_atual
                 ).count()
                 
                 resultado.append({
@@ -1578,26 +1595,22 @@ def api_alunos_evolucao():
                 ultimo_dia = monthrange(ano, mes)[1]
                 data_fim_mes = date(ano, mes, ultimo_dia)
                 
-                # Contar quantos alunos únicos começaram (data_inicio) neste mês específico
-                # Incluir TODOS os alunos, independente de status (ativo/inativo) ou pagamento
-                alunos_iniciaram = db.session.query(Aluno.id).distinct().join(
-                    Matricula, Aluno.id == Matricula.aluno_id
-                ).filter(
-                    # Matrícula tem data_inicio definida
-                    Matricula.data_inicio.isnot(None),
-                    # Data de início da matrícula está dentro deste mês específico
-                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
-                    db.func.date(Matricula.data_inicio) <= data_fim_mes
+                # Contar quantos alunos ativos foram cadastrados (data_cadastro) neste mês específico
+                alunos_cadastrados = db.session.query(Aluno.id).filter(
+                    Aluno.ativo == True,
+                    # Data de cadastro está dentro deste mês específico
+                    db.func.date(Aluno.data_cadastro) >= primeiro_dia,
+                    db.func.date(Aluno.data_cadastro) <= data_fim_mes
                 ).count()
                 
-                print(f"📊 Mês {mes}/{ano}: {alunos_iniciaram} alunos começaram (incluindo inativos e com pagamento atrasado)")
+                print(f"📊 Mês {mes}/{ano}: {alunos_cadastrados} alunos ativos cadastrados")
                 
                 resultado.append({
                     'mes': mes,
                     'ano': ano,
                     'mes_nome': meses_nomes_curto.get(mes, f'Mês {mes}'),
                     'mes_ano': f"{meses_nomes_curto.get(mes, f'Mês {mes}')}/{str(ano)[2:]}",
-                    'total_alunos': alunos_iniciaram,
+                    'total_alunos': alunos_cadastrados,
                     'data_referencia': data_fim_mes.isoformat(),
                     'tipo': 'mensal'
                 })
@@ -1673,6 +1686,226 @@ def api_faturamento_mensal():
     except Exception as e:
         import traceback
         print(f"❌ Erro ao buscar faturamento mensal: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+# ==================== DISTRIBUIÇÃO DE ALUNOS ====================
+
+@api_bp.route('/dashboard/distribuicao-modalidades', methods=['GET'])
+@api_login_required
+def api_distribuicao_modalidades():
+    """Retorna distribuição de alunos por modalidade"""
+    try:
+        from app.models.matricula import Matricula
+        from app.models.aluno import Aluno
+        
+        hoje = date.today()
+        
+        # Mapear tipos de curso para nomes amigáveis
+        modalidades_nomes = {
+            'dublagem_online': 'Dublagem Online',
+            'dublagem_presencial': 'Dublagem Presencial',
+            'teatro_online': 'Teatro Online',
+            'teatro_presencial': 'Teatro Presencial',
+            'teatro_tv_cinema': 'Teatro TV/Cinema',
+            'locucao': 'Locução',
+            'musical': 'Musical',
+            'curso_apresentador': 'Curso Apresentador'
+        }
+        
+        # Contar alunos únicos por modalidade (apenas matrículas ativas)
+        resultado = []
+        modalidades = db.session.query(Matricula.tipo_curso).distinct().filter(
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        for modalidade_tuple in modalidades:
+            modalidade = modalidade_tuple[0]
+            # Contar alunos únicos nesta modalidade
+            alunos_count = db.session.query(Matricula.aluno_id).distinct().filter(
+                Matricula.tipo_curso == modalidade,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).count()
+            
+            resultado.append({
+                'modalidade': modalidade,
+                'modalidade_nome': modalidades_nomes.get(modalidade, modalidade.replace('_', ' ').title()),
+                'total_alunos': alunos_count
+            })
+        
+        # Ordenar por total de alunos (maior primeiro)
+        resultado.sort(key=lambda x: x['total_alunos'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar distribuição por modalidades: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/distribuicao-professores', methods=['GET'])
+@api_login_required
+def api_distribuicao_professores():
+    """Retorna distribuição de alunos por professor"""
+    try:
+        from app.models.professor import Professor
+        from app.models.matricula import Matricula
+        
+        hoje = date.today()
+        
+        # Buscar todos os professores ativos
+        professores = Professor.query.filter_by(ativo=True).all()
+        resultado = []
+        
+        for professor in professores:
+            # Contar alunos únicos ativos deste professor
+            alunos_count = db.session.query(Matricula.aluno_id).distinct().filter(
+                Matricula.professor_id == professor.id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).count()
+            
+            if alunos_count > 0:  # Só incluir professores com alunos
+                resultado.append({
+                    'professor_id': professor.id,
+                    'professor_nome': professor.nome,
+                    'total_alunos': alunos_count
+                })
+        
+        # Ordenar por total de alunos (maior primeiro)
+        resultado.sort(key=lambda x: x['total_alunos'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar distribuição por professores: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/distribuicao-regioes', methods=['GET'])
+@api_login_required
+def api_distribuicao_regioes():
+    """Retorna distribuição de alunos por cidade e estado"""
+    try:
+        from app.models.aluno import Aluno
+        from app.models.matricula import Matricula
+        
+        hoje = date.today()
+        
+        # Buscar alunos ativos com matrículas ativas
+        alunos_ativos = db.session.query(Aluno.id, Aluno.cidade, Aluno.estado).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        # Agrupar por estado
+        estados = {}
+        # Agrupar por cidade/estado
+        cidades = {}
+        
+        for aluno_id, cidade, estado in alunos_ativos:
+            # Por estado
+            if estado:
+                if estado not in estados:
+                    estados[estado] = 0
+                estados[estado] += 1
+            
+            # Por cidade/estado
+            if cidade and estado:
+                cidade_key = f"{cidade}/{estado}"
+                if cidade_key not in cidades:
+                    cidades[cidade_key] = 0
+                cidades[cidade_key] += 1
+        
+        resultado_estados = [{'estado': k, 'total_alunos': v} for k, v in sorted(estados.items(), key=lambda x: x[1], reverse=True)]
+        resultado_cidades = [{'cidade': k, 'total_alunos': v} for k, v in sorted(cidades.items(), key=lambda x: x[1], reverse=True)]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'estados': resultado_estados,
+                'cidades': resultado_cidades
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar distribuição por regiões: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/distribuicao-idades', methods=['GET'])
+@api_login_required
+def api_distribuicao_idades():
+    """Retorna distribuição de alunos por faixa etária"""
+    try:
+        from app.models.aluno import Aluno
+        from app.models.matricula import Matricula
+        
+        hoje = date.today()
+        
+        # Buscar alunos ativos com matrículas ativas e idade
+        alunos = db.session.query(Aluno.id, Aluno.idade, Aluno.data_nascimento).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        # Definir faixas etárias
+        faixas = {
+            '0-10': 0,
+            '11-15': 0,
+            '16-20': 0,
+            '21-30': 0,
+            '31+': 0
+        }
+        
+        for aluno_id, idade, data_nascimento in alunos:
+            # Calcular idade se não estiver preenchida
+            if idade is None and data_nascimento:
+                idade_calc = hoje.year - data_nascimento.year - ((hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day))
+            else:
+                idade_calc = idade
+            
+            if idade_calc is not None:
+                if idade_calc <= 10:
+                    faixas['0-10'] += 1
+                elif idade_calc <= 15:
+                    faixas['11-15'] += 1
+                elif idade_calc <= 20:
+                    faixas['16-20'] += 1
+                elif idade_calc <= 30:
+                    faixas['21-30'] += 1
+                else:
+                    faixas['31+'] += 1
+        
+        resultado = [{'faixa': k, 'total_alunos': v} for k, v in faixas.items()]
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar distribuição por idades: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== ANÁLISES DE PROFESSORES ====================

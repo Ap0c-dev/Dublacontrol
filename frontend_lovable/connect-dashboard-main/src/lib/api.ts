@@ -273,6 +273,96 @@ class ApiClient {
     }
   }
 
+  async getDistribuicaoModalidades(): Promise<ApiResponse<Array<{
+    modalidade: string;
+    modalidade_nome: string;
+    total_alunos: number;
+  }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/distribuicao-modalidades`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar distribuição por modalidades:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
+  async getDistribuicaoProfessores(): Promise<ApiResponse<Array<{
+    professor_id: number;
+    professor_nome: string;
+    total_alunos: number;
+  }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/distribuicao-professores`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar distribuição por professores:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
+  async getDistribuicaoRegioes(): Promise<ApiResponse<{
+    estados: Array<{ estado: string; total_alunos: number }>;
+    cidades: Array<{ cidade: string; total_alunos: number }>;
+  }>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/distribuicao-regioes`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar distribuição por regiões:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: { estados: [], cidades: [] }
+      };
+    }
+  }
+
+  async getDistribuicaoIdades(): Promise<ApiResponse<Array<{
+    faixa: string;
+    total_alunos: number;
+  }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/distribuicao-idades`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar distribuição por idades:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
   async getProfessoresPerformance(): Promise<ApiResponse<Array<{
     professor_id: number;
     professor_nome: string;
