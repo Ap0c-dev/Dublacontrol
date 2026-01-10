@@ -1627,6 +1627,231 @@ def api_faturamento_mensal():
         print(f"❌ Erro ao buscar faturamento mensal: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
+# ==================== ANÁLISES DE PROFESSORES ====================
+
+@api_bp.route('/dashboard/professores/performance', methods=['GET'])
+@api_login_required
+def api_professores_performance():
+    """Retorna análise completa de performance de todos os professores"""
+    try:
+        from app.models.professor import Professor
+        from app.models.matricula import Matricula
+        from app.models.aluno import Aluno
+        from app.models.pagamento import Pagamento
+        from datetime import timedelta
+        
+        hoje = date.today()
+        resultado = []
+        
+        # Buscar todos os professores ativos
+        professores = Professor.query.filter_by(ativo=True).all()
+        
+        for professor in professores:
+            # Total de matrículas (ativas e encerradas)
+            total_matriculas = Matricula.query.filter_by(professor_id=professor.id).count()
+            
+            # Matrículas ativas (sem data_encerramento ou data_encerramento no futuro)
+            matriculas_ativas = Matricula.query.filter(
+                Matricula.professor_id == professor.id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).count()
+            
+            # Matrículas encerradas (explicitamente encerradas)
+            matriculas_encerradas_explicitas = Matricula.query.filter(
+                Matricula.professor_id == professor.id,
+                Matricula.data_encerramento.isnot(None),
+                Matricula.data_encerramento <= hoje
+            ).count()
+            
+            # Alunos que mudaram de professor (evasão implícita)
+            # Buscar todos os alunos que já tiveram matrícula com este professor
+            todos_alunos_professor = db.session.query(Matricula.aluno_id).distinct().filter(
+                Matricula.professor_id == professor.id
+            ).all()
+            todos_alunos_ids = [a[0] for a in todos_alunos_professor]
+            
+            # Alunos ativos únicos (distintos) com este professor
+            alunos_ativos_ids = db.session.query(Matricula.aluno_id).distinct().filter(
+                Matricula.professor_id == professor.id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).all()
+            alunos_ativos_count = len([a[0] for a in alunos_ativos_ids])
+            alunos_ativos_set = set([a[0] for a in alunos_ativos_ids])
+            
+            # Identificar alunos que mudaram de professor
+            # Um aluno mudou se: tinha matrícula com este professor (encerrada ou não ativa)
+            # E agora tem matrícula ativa com OUTRO professor
+            alunos_que_mudaram = 0
+            for aluno_id in todos_alunos_ids:
+                if aluno_id not in alunos_ativos_set:
+                    # Aluno não está mais ativo com este professor
+                    # Verificar se tem matrícula ativa com outro professor
+                    outras_matriculas_ativas = Matricula.query.filter(
+                        Matricula.aluno_id == aluno_id,
+                        Matricula.professor_id != professor.id,
+                        db.or_(
+                            Matricula.data_encerramento.is_(None),
+                            Matricula.data_encerramento > hoje
+                        )
+                    ).first()
+                    if outras_matriculas_ativas:
+                        # Aluno mudou de professor - conta como evasão
+                        alunos_que_mudaram += 1
+            
+            # Total de evasões = encerradas explicitamente + alunos que mudaram de professor
+            total_evasoes = matriculas_encerradas_explicitas + alunos_que_mudaram
+            
+            # Calcular retenção (% de alunos que continuam ativos)
+            retencao = 0.0
+            if total_matriculas > 0:
+                retencao = (matriculas_ativas / total_matriculas) * 100
+            
+            # Calcular taxa de evasão (% de alunos que saíram ou mudaram)
+            evasao = 0.0
+            if total_matriculas > 0:
+                evasao = (total_evasoes / total_matriculas) * 100
+            
+            # Receita mensal gerada (soma de valor_mensalidade das matrículas ativas)
+            receita_mensal = db.session.query(
+                db.func.sum(Matricula.valor_mensalidade)
+            ).filter(
+                Matricula.professor_id == professor.id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).scalar() or 0.0
+            
+            # Calcular tempo médio de permanência (em meses)
+            # Para matrículas encerradas, calcular diferença entre data_inicio e data_encerramento
+            tempo_medio_meses = 0.0
+            matriculas_com_tempo = Matricula.query.filter(
+                Matricula.professor_id == professor.id,
+                Matricula.data_encerramento.isnot(None),
+                Matricula.data_inicio.isnot(None)
+            ).all()
+            
+            if matriculas_com_tempo:
+                total_meses = 0
+                for mat in matriculas_com_tempo:
+                    if mat.data_inicio and mat.data_encerramento:
+                        # Calcular diferença em dias e converter para meses
+                        delta_dias = (mat.data_encerramento - mat.data_inicio).days
+                        meses = delta_dias / 30.0  # Aproximação: 30 dias = 1 mês
+                        total_meses += meses
+                tempo_medio_meses = total_meses / len(matriculas_com_tempo) if matriculas_com_tempo else 0.0
+            
+            # Taxa de inadimplência (alunos atrasados / alunos ativos)
+            alunos_atrasados = 0
+            for aluno_id_tuple in alunos_ativos_ids:
+                aluno_id = aluno_id_tuple[0]
+                aluno = Aluno.query.get(aluno_id)
+                if aluno and aluno.ativo:
+                    # Verificar se tem pagamento atrasado
+                    data_vencimento = aluno.data_vencimento
+                    if data_vencimento:
+                        # Ajustar para o mês atual
+                        data_vencimento_ref = date(hoje.year, hoje.month, data_vencimento.day)
+                        if data_vencimento_ref < hoje:
+                            # Verificar se tem pagamento aprovado para este mês
+                            pagamento_aprovado = Pagamento.query.filter(
+                                Pagamento.aluno_id == aluno_id,
+                                Pagamento.mes_referencia == hoje.month,
+                                Pagamento.ano_referencia == hoje.year,
+                                Pagamento.status == 'aprovado'
+                            ).first()
+                            if not pagamento_aprovado:
+                                alunos_atrasados += 1
+            
+            taxa_inadimplencia = 0.0
+            if alunos_ativos_count > 0:
+                taxa_inadimplencia = (alunos_atrasados / alunos_ativos_count) * 100
+            
+            # Modalidades lecionadas
+            modalidades = db.session.query(Matricula.tipo_curso).distinct().filter(
+                Matricula.professor_id == professor.id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).all()
+            modalidades_list = [m[0] for m in modalidades]
+            
+            # Crescimento (novos alunos nos últimos 3 meses vs 3 meses anteriores)
+            # Calcular datas: 3 meses atrás e 6 meses atrás
+            tres_meses_atras = date(hoje.year, hoje.month, 1)
+            for _ in range(3):
+                if tres_meses_atras.month == 1:
+                    tres_meses_atras = date(tres_meses_atras.year - 1, 12, 1)
+                else:
+                    tres_meses_atras = date(tres_meses_atras.year, tres_meses_atras.month - 1, 1)
+            
+            seis_meses_atras = date(hoje.year, hoje.month, 1)
+            for _ in range(6):
+                if seis_meses_atras.month == 1:
+                    seis_meses_atras = date(seis_meses_atras.year - 1, 12, 1)
+                else:
+                    seis_meses_atras = date(seis_meses_atras.year, seis_meses_atras.month - 1, 1)
+            
+            novos_ultimos_3_meses = Matricula.query.filter(
+                Matricula.professor_id == professor.id,
+                Matricula.data_inicio.isnot(None),
+                Matricula.data_inicio >= tres_meses_atras,
+                Matricula.data_inicio < hoje
+            ).count()
+            
+            novos_3_meses_anteriores = Matricula.query.filter(
+                Matricula.professor_id == professor.id,
+                Matricula.data_inicio.isnot(None),
+                Matricula.data_inicio >= seis_meses_atras,
+                Matricula.data_inicio < tres_meses_atras
+            ).count()
+            
+            crescimento = 0.0
+            if novos_3_meses_anteriores > 0:
+                crescimento = ((novos_ultimos_3_meses - novos_3_meses_anteriores) / novos_3_meses_anteriores) * 100
+            elif novos_ultimos_3_meses > 0:
+                crescimento = 100.0  # Crescimento de 100% se não havia alunos antes
+            
+            resultado.append({
+                'professor_id': professor.id,
+                'professor_nome': professor.nome,
+                'total_matriculas': total_matriculas,
+                'matriculas_ativas': matriculas_ativas,
+                'matriculas_encerradas': matriculas_encerradas_explicitas,
+                'alunos_que_mudaram_professor': alunos_que_mudaram,
+                'total_evasoes': total_evasoes,
+                'alunos_ativos': alunos_ativos_count,
+                'retencao': round(retencao, 1),  # %
+                'evasao': round(evasao, 1),  # %
+                'receita_mensal': float(receita_mensal),
+                'tempo_medio_permanencia_meses': round(tempo_medio_meses, 1),
+                'taxa_inadimplencia': round(taxa_inadimplencia, 1),  # %
+                'alunos_atrasados': alunos_atrasados,
+                'modalidades': modalidades_list,
+                'crescimento': round(crescimento, 1),  # %
+                'novos_ultimos_3_meses': novos_ultimos_3_meses,
+                'novos_3_meses_anteriores': novos_3_meses_anteriores
+            })
+        
+        # Ordenar por receita mensal (maior primeiro)
+        resultado.sort(key=lambda x: x['receita_mensal'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': resultado
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar performance de professores: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
 # ==================== NOTAS ====================
 
 @api_bp.route('/notas', methods=['GET'])

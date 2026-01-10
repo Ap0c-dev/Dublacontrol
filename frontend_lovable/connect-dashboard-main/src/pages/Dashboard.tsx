@@ -14,7 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -36,6 +39,27 @@ export default function Dashboard() {
     esta_atrasado?: boolean;
   }>>([]);
   const [notificacoesVisiveis, setNotificacoesVisiveis] = useState<Set<number>>(new Set());
+  const [professoresData, setProfessoresData] = useState<Array<{
+    professor_id: number;
+    professor_nome: string;
+    total_matriculas: number;
+    matriculas_ativas: number;
+    matriculas_encerradas: number;
+    alunos_que_mudaram_professor: number;
+    total_evasoes: number;
+    alunos_ativos: number;
+    retencao: number;
+    evasao: number;
+    receita_mensal: number;
+    tempo_medio_permanencia_meses: number;
+    taxa_inadimplencia: number;
+    alunos_atrasados: number;
+    modalidades: string[];
+    crescimento: number;
+    novos_ultimos_3_meses: number;
+    novos_3_meses_anteriores: number;
+  }>>([]);
+  const [isLoadingProfessores, setIsLoadingProfessores] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -174,6 +198,31 @@ export default function Dashboard() {
     }
   };
 
+  const fetchProfessoresData = async () => {
+    if (professoresData.length > 0) return; // Já carregado
+    setIsLoadingProfessores(true);
+    try {
+      const response = await api.getProfessoresPerformance();
+      if (response.success) {
+        setProfessoresData(response.data);
+      } else {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: response.error || 'Não foi possível obter a performance de professores.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro de conexão',
+        description: 'Verifique se o servidor está rodando.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingProfessores(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -266,92 +315,205 @@ export default function Dashboard() {
         <div className="animate-fade-in">
           <h1 className="text-2xl lg:text-3xl font-bold text-gradient animate-float">Dashboard</h1>
           <p className="text-muted-foreground mt-1 font-mono">
-            Visão geral do sistema
+            Análises e métricas do sistema
           </p>
         </div>
 
-        {/* Stats Grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : stats ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Total de Alunos"
-              value={stats.total_alunos}
-              icon={Users}
-              variant="primary"
-              trend={stats.crescimento_alunos !== undefined ? {
-                value: Math.abs(stats.crescimento_alunos),
-                isPositive: stats.crescimento_alunos >= 0
-              } : undefined}
-              onClick={handleOpenEvolucao}
-            />
-            <StatCard
-              title="Professores"
-              value={stats.total_professores}
-              icon={GraduationCap}
-              variant="default"
-            />
-            <StatCard
-              title="Receita Mensal"
-              value={formatCurrency(stats.receita_mensal || 0)}
-              icon={CreditCard}
-              variant="success"
-              trend={stats.crescimento_receita !== undefined ? {
-                value: Math.abs(stats.crescimento_receita),
-                isPositive: stats.crescimento_receita >= 0
-              } : undefined}
-              onClick={handleOpenFaturamento}
-            />
-            <StatCard
-              title="Pagamentos Atrasados"
-              value={stats.pagamentos_atrasados ?? 0}
-              icon={AlertCircle}
-              variant="destructive"
-              onClick={() => navigate('/pagamentos?status=atrasado')}
-            />
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Não foi possível carregar os dados.</p>
-          </div>
-        )}
+        {/* Tabs */}
+        <Tabs defaultValue="visao-geral" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+            <TabsTrigger value="professores" onClick={fetchProfessoresData}>Professores</TabsTrigger>
+            <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            <TabsTrigger value="receita">Receita</TabsTrigger>
+            <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
+          </TabsList>
 
-        {/* Quick Info Section */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="bg-card rounded-xl border border-border p-6 shadow-card animate-slide-up">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Bem-vindo ao Voxen
-            </h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Gerencie alunos, professores e pagamentos de forma simples e eficiente.
-              Utilize o menu lateral para navegar entre as diferentes seções do sistema.
-            </p>
-          </div>
+          {/* Tab: Visão Geral */}
+          <TabsContent value="visao-geral" className="space-y-6">
+            {/* Stats Grid */}
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : stats ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                  title="Total de Alunos"
+                  value={stats.total_alunos}
+                  icon={Users}
+                  variant="primary"
+                  trend={stats.crescimento_alunos !== undefined ? {
+                    value: Math.abs(stats.crescimento_alunos),
+                    isPositive: stats.crescimento_alunos >= 0
+                  } : undefined}
+                  onClick={handleOpenEvolucao}
+                />
+                <StatCard
+                  title="Professores"
+                  value={stats.total_professores}
+                  icon={GraduationCap}
+                  variant="default"
+                />
+                <StatCard
+                  title="Receita Mensal"
+                  value={formatCurrency(stats.receita_mensal || 0)}
+                  icon={CreditCard}
+                  variant="success"
+                  trend={stats.crescimento_receita !== undefined ? {
+                    value: Math.abs(stats.crescimento_receita),
+                    isPositive: stats.crescimento_receita >= 0
+                  } : undefined}
+                  onClick={handleOpenFaturamento}
+                />
+                <StatCard
+                  title="Pagamentos Atrasados"
+                  value={stats.pagamentos_atrasados ?? 0}
+                  icon={AlertCircle}
+                  variant="destructive"
+                  onClick={() => navigate('/pagamentos?status=atrasado')}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Não foi possível carregar os dados.</p>
+              </div>
+            )}
 
-          <div className="bg-card rounded-xl border border-border p-6 shadow-card animate-slide-up" style={{ animationDelay: '100ms' }}>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Ações Rápidas
-            </h2>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                Visualize a lista completa de alunos
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-success" />
-                Acompanhe os pagamentos atrasados
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-warning" />
-                Gerencie o quadro de professores
-              </li>
-            </ul>
-          </div>
-        </div>
+            {/* Quick Info Section */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="bg-card rounded-xl border border-border p-6 shadow-card animate-slide-up">
+                <h2 className="text-lg font-semibold text-foreground mb-4">
+                  Bem-vindo ao Voxen
+                </h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Gerencie alunos, professores e pagamentos de forma simples e eficiente.
+                  Utilize as abas acima para explorar diferentes análises e métricas do sistema.
+                </p>
+              </div>
+
+              <div className="bg-card rounded-xl border border-border p-6 shadow-card animate-slide-up" style={{ animationDelay: '100ms' }}>
+                <h2 className="text-lg font-semibold text-foreground mb-4">
+                  Ações Rápidas
+                </h2>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    Visualize a lista completa de alunos
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-success" />
+                    Acompanhe os pagamentos atrasados
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-warning" />
+                    Gerencie o quadro de professores
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Tab: Professores */}
+          <TabsContent value="professores" className="space-y-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Performance de Professores</h2>
+              {isLoadingProfessores ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : professoresData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Professor</TableHead>
+                        <TableHead>Alunos Ativos</TableHead>
+                        <TableHead>Retenção</TableHead>
+                        <TableHead>Evasão</TableHead>
+                        <TableHead>Mudaram</TableHead>
+                        <TableHead>Receita Mensal</TableHead>
+                        <TableHead>Inadimplência</TableHead>
+                        <TableHead>Crescimento</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {professoresData.map((prof) => (
+                        <TableRow key={prof.professor_id}>
+                          <TableCell className="font-medium">{prof.professor_nome}</TableCell>
+                          <TableCell>{prof.alunos_ativos}</TableCell>
+                          <TableCell>
+                            <Badge variant={prof.retencao >= 70 ? "default" : prof.retencao >= 50 ? "secondary" : "destructive"}>
+                              {prof.retencao.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={prof.evasao <= 20 ? "default" : prof.evasao <= 40 ? "secondary" : "destructive"}>
+                              {prof.evasao.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {prof.alunos_que_mudaram_professor > 0 && (
+                              <Badge variant="outline">{prof.alunos_que_mudaram_professor}</Badge>
+                            )}
+                            {prof.alunos_que_mudaram_professor === 0 && <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell className="font-semibold">{formatCurrency(prof.receita_mensal)}</TableCell>
+                          <TableCell>
+                            <Badge variant={prof.taxa_inadimplencia <= 10 ? "default" : prof.taxa_inadimplencia <= 20 ? "secondary" : "destructive"}>
+                              {prof.taxa_inadimplencia.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={prof.crescimento >= 0 ? "default" : "destructive"}>
+                              {prof.crescimento >= 0 ? '+' : ''}{prof.crescimento.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <GraduationCap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Nenhum dado de professor disponível.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Tab: Alunos */}
+          <TabsContent value="alunos" className="space-y-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Evolução de Alunos</h2>
+              <Button onClick={handleOpenEvolucao} variant="outline">
+                Ver Gráfico de Evolução
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Tab: Receita */}
+          <TabsContent value="receita" className="space-y-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Faturamento Mensal</h2>
+              <Button onClick={handleOpenFaturamento} variant="outline">
+                Ver Gráfico de Faturamento
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Tab: Pagamentos */}
+          <TabsContent value="pagamentos" className="space-y-6">
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-xl font-semibold mb-4">Status de Pagamentos</h2>
+              <Button onClick={() => navigate('/pagamentos')} variant="outline">
+                Ver Todos os Pagamentos
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Modal de Evolução de Alunos */}

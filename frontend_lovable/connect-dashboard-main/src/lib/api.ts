@@ -256,6 +256,44 @@ class ApiClient {
     }
   }
 
+  async getProfessoresPerformance(): Promise<ApiResponse<Array<{
+    professor_id: number;
+    professor_nome: string;
+    total_matriculas: number;
+    matriculas_ativas: number;
+    matriculas_encerradas: number;
+    alunos_que_mudaram_professor: number;
+    total_evasoes: number;
+    alunos_ativos: number;
+    retencao: number;
+    evasao: number;
+    receita_mensal: number;
+    tempo_medio_permanencia_meses: number;
+    taxa_inadimplencia: number;
+    alunos_atrasados: number;
+    modalidades: string[];
+    crescimento: number;
+    novos_ultimos_3_meses: number;
+    novos_3_meses_anteriores: number;
+  }>>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/professores/performance`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao buscar performance de professores:', error);
+      return {
+        success: false,
+        error: 'Erro de conexão com o servidor',
+        data: []
+      };
+    }
+  }
+
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
     try {
       const headers = this.getHeaders();
