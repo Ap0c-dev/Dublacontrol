@@ -729,6 +729,15 @@ export default function Dashboard() {
                     name="Alunos que começaram"
                     dot={{ r: 4 }}
                     activeDot={{ r: 6 }}
+                    label={{
+                      position: 'top',
+                      formatter: (value: number) => value.toString(),
+                      style: { 
+                        fontSize: '11px',
+                        fill: 'hsl(var(--muted-foreground))',
+                        fontWeight: 500
+                      }
+                    }}
                   />
                 </LineChart>
               </ResponsiveContainer>
