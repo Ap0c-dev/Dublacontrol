@@ -152,10 +152,17 @@ export default function Dashboard() {
     setIsEvolucaoOpen(true);
     setIsLoadingEvolucao(true);
     try {
-      const response = await api.getAlunosEvolucao(mes || undefined, ano);
+      // Se não foram passados parâmetros, usar os filtros atuais (ou undefined se não houver filtro)
+      const mesParaBuscar = mes !== undefined ? mes : (mesFiltro !== null ? mesFiltro : undefined);
+      const anoParaBuscar = ano !== undefined ? ano : anoFiltro;
+      
+      console.log('🔍 Buscando evolução:', { mesParaBuscar, anoParaBuscar });
+      
+      const response = await api.getAlunosEvolucao(mesParaBuscar, anoParaBuscar);
       if (response.success) {
         setEvolucaoData(response.data);
         setTipoEvolucao(response.tipo || 'mensal');
+        console.log('✅ Dados recebidos:', response.data.length, 'itens, tipo:', response.tipo);
       } else {
         toast({
           title: 'Erro ao carregar dados',
@@ -164,6 +171,7 @@ export default function Dashboard() {
         });
       }
     } catch (error) {
+      console.error('❌ Erro ao buscar evolução:', error);
       toast({
         title: 'Erro de conexão',
         description: 'Verifique se o servidor está rodando.',
@@ -183,10 +191,16 @@ export default function Dashboard() {
       if (response.success) {
         setEvolucaoData(response.data);
         setTipoEvolucao(response.tipo || 'mensal');
+      } else {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: response.error || 'Não foi possível filtrar os dados.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
-        title: 'Erro ao carregar dados',
+        title: 'Erro de conexão',
         description: 'Não foi possível filtrar os dados.',
         variant: 'destructive',
       });
@@ -204,10 +218,16 @@ export default function Dashboard() {
       if (response.success) {
         setEvolucaoData(response.data);
         setTipoEvolucao(response.tipo || 'mensal');
+      } else {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: response.error || 'Não foi possível filtrar os dados.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
-        title: 'Erro ao carregar dados',
+        title: 'Erro de conexão',
         description: 'Não foi possível filtrar os dados.',
         variant: 'destructive',
       });
@@ -623,7 +643,14 @@ export default function Dashboard() {
       </div>
 
       {/* Modal de Evolução de Alunos */}
-      <Dialog open={isEvolucaoOpen} onOpenChange={setIsEvolucaoOpen}>
+      <Dialog open={isEvolucaoOpen} onOpenChange={(open) => {
+        setIsEvolucaoOpen(open);
+        // Resetar filtros quando fechar o modal
+        if (!open) {
+          setMesFiltro(null);
+          setAnoFiltro(new Date().getFullYear());
+        }
+      }}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

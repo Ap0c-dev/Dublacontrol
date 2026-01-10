@@ -1513,6 +1513,8 @@ def api_alunos_evolucao():
         mes_filtro = request.args.get('mes', type=int)
         ano_filtro = request.args.get('ano', type=int)
         
+        print(f"📊 Filtros recebidos: mes={mes_filtro}, ano={ano_filtro}")
+        
         meses_nomes = {
             1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
             5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
