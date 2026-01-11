@@ -129,15 +129,19 @@ def importar_alunos(arquivo_excel):
                     })
                     continue
                 
-                # Verificar duplicado
+                # Verificar se aluno já existe (por nome + telefone)
+                # Buscar por telefone primeiro, depois verificar se o nome também corresponde
                 aluno_existente = Aluno.query.filter_by(telefone=telefone, ativo=True).first()
                 if aluno_existente:
-                    alunos_duplicados.append({
-                        'linha': row_idx,
-                        'nome': nome,
-                        'telefone': telefone
-                    })
-                    continue
+                    # Verificar se o nome também corresponde (normalizado)
+                    nome_existente_normalizado = normalizar_texto(aluno_existente.nome)
+                    if nome_existente_normalizado.lower() != nome.lower():
+                        # Telefone existe mas nome diferente - pode ser outro aluno
+                        aluno_existente = None
+                
+                # Se aluno existe, vamos usar ele e verificar se precisa criar nova matrícula
+                aluno = aluno_existente
+                aluno_foi_criado = False
                 
                 # Normalizar
                 nome = normalizar_texto(nome)
@@ -234,34 +238,38 @@ def importar_alunos(arquivo_excel):
                     valor = str(row[idx_experimental].value).lower().strip()
                     experimental = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'experimental']
                 
-                # Criar aluno
-                aluno = Aluno(
-                    nome=nome,
-                    telefone=telefone,
-                    nome_responsavel=nome_responsavel,
-                    telefone_responsavel=telefone_responsavel,
-                    cidade=cidade,
-                    estado=estado,
-                    forma_pagamento=forma_pagamento,
-                    data_vencimento=data_vencimento,
-                    data_nascimento=data_nascimento,
-                    dublagem_online=dublagem_online,
-                    dublagem_presencial=dublagem_presencial,
-                    teatro_online=teatro_online,
-                    teatro_presencial=teatro_presencial,
-                    locucao=locucao,
-                    teatro_tv_cinema=teatro_tv_cinema,
-                    musical=musical,
-                    aprovado=aprovado,
-                    ativo=ativo,
-                    experimental=experimental
-                )
-                
-                db.session.add(aluno)
-                db.session.flush()
-                
-                if data_nascimento:
-                    aluno.idade = aluno.calcular_idade()
+                # Criar aluno apenas se não existir
+                if not aluno:
+                    aluno = Aluno(
+                        nome=nome,
+                        telefone=telefone,
+                        nome_responsavel=nome_responsavel,
+                        telefone_responsavel=telefone_responsavel,
+                        cidade=cidade,
+                        estado=estado,
+                        forma_pagamento=forma_pagamento,
+                        data_vencimento=data_vencimento,
+                        data_nascimento=data_nascimento,
+                        dublagem_online=dublagem_online,
+                        dublagem_presencial=dublagem_presencial,
+                        teatro_online=teatro_online,
+                        teatro_presencial=teatro_presencial,
+                        locucao=locucao,
+                        teatro_tv_cinema=teatro_tv_cinema,
+                        musical=musical,
+                        aprovado=aprovado,
+                        ativo=ativo,
+                        experimental=experimental
+                    )
+                    
+                    db.session.add(aluno)
+                    db.session.flush()
+                    aluno_foi_criado = True
+                    
+                    if data_nascimento:
+                        aluno.idade = aluno.calcular_idade()
+                else:
+                    print(f"ℹ️ Aluno já existe (linha {row_idx}): {nome} - {telefone}, verificando matrícula...")
                 
                 # Criar matrícula se houver professor
                 if idx_professor_nome is not None and row[idx_professor_nome].value:
@@ -313,71 +321,98 @@ def importar_alunos(arquivo_excel):
                                     modalidade = 'musical'
                             
                             if modalidade:
-                                # Valor mensalidade
-                                valor_mensalidade = None
-                                if idx_valor_mensalidade is not None and row[idx_valor_mensalidade].value:
-                                    try:
-                                        valor_str = str(row[idx_valor_mensalidade].value).replace(',', '.').strip()
-                                        valor_mensalidade = float(valor_str)
-                                    except (ValueError, AttributeError):
-                                        pass
-                                
-                                # Data início
-                                data_inicio_matricula = None
-                                if idx_data_inicio is not None and row[idx_data_inicio].value:
-                                    valor_inicio = row[idx_data_inicio].value
-                                    if isinstance(valor_inicio, datetime):
-                                        data_inicio_matricula = valor_inicio.date()
-                                    elif isinstance(valor_inicio, date):
-                                        data_inicio_matricula = valor_inicio
-                                    else:
-                                        try:
-                                            data_inicio_matricula = datetime.strptime(str(valor_inicio), '%d/%m/%Y').date()
-                                        except:
-                                            try:
-                                                data_inicio_matricula = datetime.strptime(str(valor_inicio), '%Y-%m-%d').date()
-                                            except:
-                                                pass
-                                
-                                # Horário
-                                dia_semana = None
-                                horario_aula = None
-                                
-                                if idx_horario_dia_semana is not None and row[idx_horario_dia_semana].value:
-                                    dia_semana = str(row[idx_horario_dia_semana].value).strip()
-                                
-                                if idx_horario_aula is not None and row[idx_horario_aula].value:
-                                    horario_aula = str(row[idx_horario_aula].value).strip()
-                                
-                                # Buscar horário automaticamente se não informado
-                                if not dia_semana or not horario_aula:
-                                    horario_professor = HorarioProfessor.query.filter_by(
-                                        professor_id=professor.id,
-                                        modalidade=modalidade
-                                    ).first()
-                                    
-                                    if horario_professor:
-                                        if not dia_semana:
-                                            dia_semana = horario_professor.dia_semana
-                                        if not horario_aula:
-                                            horario_aula = horario_professor.horario_aula
-                                
-                                # Criar matrícula
-                                matricula = Matricula(
+                                # Verificar se já existe matrícula com esse professor + curso para este aluno
+                                from sqlalchemy import or_
+                                hoje = date.today()
+                                matricula_existente = Matricula.query.filter_by(
                                     aluno_id=aluno.id,
                                     professor_id=professor.id,
-                                    tipo_curso=modalidade,
-                                    valor_mensalidade=valor_mensalidade,
-                                    data_inicio=data_inicio_matricula,
-                                    dia_semana=dia_semana,
-                                    horario_aula=horario_aula
-                                )
-                                db.session.add(matricula)
-                                matriculas_criadas += 1
-                                print(f"  ✅ Matrícula criada: {professor.nome} - {modalidade}")
+                                    tipo_curso=modalidade
+                                ).filter(
+                                    or_(
+                                        Matricula.data_encerramento.is_(None),
+                                        Matricula.data_encerramento > hoje
+                                    )
+                                ).first()
+                                
+                                if matricula_existente:
+                                    print(f"  ℹ️ Matrícula já existe (linha {row_idx}): aluno={nome}, professor={professor.nome}, curso={modalidade} - pulando")
+                                    alunos_duplicados.append({
+                                        'linha': row_idx,
+                                        'nome': nome,
+                                        'telefone': telefone,
+                                        'motivo': f'Matrícula já existe: {professor.nome} - {modalidade}'
+                                    })
+                                else:
+                                    # Valor mensalidade
+                                    valor_mensalidade = None
+                                    if idx_valor_mensalidade is not None and row[idx_valor_mensalidade].value:
+                                        try:
+                                            valor_str = str(row[idx_valor_mensalidade].value).replace(',', '.').strip()
+                                            valor_mensalidade = float(valor_str)
+                                        except (ValueError, AttributeError):
+                                            pass
+                                    
+                                    # Data início
+                                    data_inicio_matricula = None
+                                    if idx_data_inicio is not None and row[idx_data_inicio].value:
+                                        valor_inicio = row[idx_data_inicio].value
+                                        if isinstance(valor_inicio, datetime):
+                                            data_inicio_matricula = valor_inicio.date()
+                                        elif isinstance(valor_inicio, date):
+                                            data_inicio_matricula = valor_inicio
+                                        else:
+                                            try:
+                                                data_inicio_matricula = datetime.strptime(str(valor_inicio), '%d/%m/%Y').date()
+                                            except:
+                                                try:
+                                                    data_inicio_matricula = datetime.strptime(str(valor_inicio), '%Y-%m-%d').date()
+                                                except:
+                                                    pass
+                                    
+                                    # Horário
+                                    dia_semana = None
+                                    horario_aula = None
+                                    
+                                    if idx_horario_dia_semana is not None and row[idx_horario_dia_semana].value:
+                                        dia_semana = str(row[idx_horario_dia_semana].value).strip()
+                                    
+                                    if idx_horario_aula is not None and row[idx_horario_aula].value:
+                                        horario_aula = str(row[idx_horario_aula].value).strip()
+                                    
+                                    # Buscar horário automaticamente se não informado
+                                    if not dia_semana or not horario_aula:
+                                        horario_professor = HorarioProfessor.query.filter_by(
+                                            professor_id=professor.id,
+                                            modalidade=modalidade
+                                        ).first()
+                                        
+                                        if horario_professor:
+                                            if not dia_semana:
+                                                dia_semana = horario_professor.dia_semana
+                                            if not horario_aula:
+                                                horario_aula = horario_professor.horario_aula
+                                    
+                                    # Criar matrícula
+                                    matricula = Matricula(
+                                        aluno_id=aluno.id,
+                                        professor_id=professor.id,
+                                        tipo_curso=modalidade,
+                                        valor_mensalidade=valor_mensalidade,
+                                        data_inicio=data_inicio_matricula,
+                                        dia_semana=dia_semana,
+                                        horario_aula=horario_aula
+                                    )
+                                    db.session.add(matricula)
+                                    matriculas_criadas += 1
+                                    print(f"  ✅ Matrícula criada: {professor.nome} - {modalidade}")
                 
-                alunos_criados += 1
-                print(f"✅ Aluno criado (linha {row_idx}): {nome}")
+                # Contar apenas alunos recém-criados
+                if aluno_foi_criado:
+                    alunos_criados += 1
+                    print(f"✅ Aluno criado (linha {row_idx}): {nome}")
+                else:
+                    print(f"ℹ️ Aluno já existia, matrícula processada (linha {row_idx}): {nome}")
                 
             except Exception as e:
                 import traceback

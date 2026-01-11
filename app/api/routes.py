@@ -949,62 +949,188 @@ def api_listar_pagamentos():
         retornar_todos = not mes_filtro and not ano_filtro
         
         if retornar_todos:
-            # Buscar TODOS os pagamentos registrados
-            query_pagamentos = Pagamento.query
-            
-            # FILTRAGEM AUTOMÁTICA POR ROLE
-            # Professor: vê apenas pagamentos dos seus alunos
-            if current_user.is_professor() and current_user.professor_id:
-                query_pagamentos = query_pagamentos.join(Aluno).join(Matricula).filter(
-                    Matricula.professor_id == current_user.professor_id
-                ).distinct()
-            # Aluno: vê apenas seus próprios pagamentos
-            elif current_user.is_aluno() and current_user.aluno_id:
-                query_pagamentos = query_pagamentos.filter_by(aluno_id=current_user.aluno_id)
-            # Admin e Gerente: vêem todos
-            
-            if aluno_id_filtro:
-                query_pagamentos = query_pagamentos.filter_by(aluno_id=aluno_id_filtro)
-            
-            # Filtrar por professor através de matrículas - apenas se não for professor logado
-            if professor_id_filtro and not current_user.is_professor():
-                query_pagamentos = query_pagamentos.join(Aluno).join(Matricula).filter(
-                    Matricula.professor_id == professor_id_filtro
-                ).distinct()
-            
-            # Aplicar filtro de status
-            # Para "atrasado", precisamos buscar rejeitados + pendentes (verificaremos depois quais pendentes estão atrasados)
-            if status_filtro:
+            # Se não há filtro de status, buscar TODOS os alunos com matrículas ativas
+            # Se há filtro de status, buscar apenas pagamentos registrados com aquele status
+            if not status_filtro:
+                # Buscar TODOS os alunos com matrículas ativas (mostrar todos os matriculados)
+                query_matriculas = Matricula.query.options(
+                    joinedload(Matricula.professor)
+                ).filter(
+                    db.or_(
+                        Matricula.data_encerramento.is_(None),
+                        Matricula.data_encerramento > hoje
+                    )
+                ).join(Aluno).filter(Aluno.ativo == True)
+                
+                # FILTRAGEM AUTOMÁTICA POR ROLE
+                if current_user.is_professor() and current_user.professor_id:
+                    query_matriculas = query_matriculas.filter(Matricula.professor_id == current_user.professor_id)
+                elif current_user.is_aluno() and current_user.aluno_id:
+                    query_matriculas = query_matriculas.filter(Matricula.aluno_id == current_user.aluno_id)
+                
+                if aluno_id_filtro:
+                    query_matriculas = query_matriculas.filter(Matricula.aluno_id == aluno_id_filtro)
+                
+                if professor_id_filtro and not current_user.is_professor():
+                    query_matriculas = query_matriculas.filter(Matricula.professor_id == professor_id_filtro)
+                
+                matriculas = query_matriculas.all()
+                
+                resultado = []
+                meses = {
+                    1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+                    5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+                    9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+                }
+                mes_atual = hoje.month
+                ano_atual = hoje.year
+                
+                # Para cada matrícula ativa, criar uma linha com o status de pagamento atual
+                for matricula in matriculas:
+                    aluno = matricula.aluno
+                    if not aluno or not aluno.ativo:
+                        continue
+                    
+                    # Buscar pagamento para o mês atual
+                    pagamento = Pagamento.query.filter_by(
+                        aluno_id=aluno.id,
+                        mes_referencia=mes_atual,
+                        ano_referencia=ano_atual
+                    ).first()
+                    
+                    # Calcular data de vencimento
+                    data_vencimento_ref = None
+                    if aluno.data_vencimento:
+                        dia_vencimento = aluno.data_vencimento.day
+                        try:
+                            data_vencimento_ref = date(ano_atual, mes_atual, dia_vencimento)
+                        except ValueError:
+                            ultimo_dia = monthrange(ano_atual, mes_atual)[1]
+                            data_vencimento_ref = date(ano_atual, mes_atual, min(dia_vencimento, ultimo_dia))
+                    
+                    # Determinar status de pagamento
+                    status_pagamento = None
+                    valor_pago = 0
+                    data_pagamento = None
+                    url_comprovante = None
+                    pagamento_id = None
+                    
+                    if pagamento:
+                        pagamento_id = pagamento.id
+                        valor_pago = float(pagamento.valor_pago) if pagamento.valor_pago else 0
+                        data_pagamento = pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None
+                        url_comprovante = pagamento.url_comprovante
+                        
+                        if pagamento.status == 'aprovado':
+                            status_pagamento = 'pago'
+                        elif pagamento.status == 'pendente':
+                            if data_vencimento_ref and data_vencimento_ref < hoje:
+                                status_pagamento = 'atrasado'
+                            else:
+                                status_pagamento = 'pendente'
+                        elif pagamento.status == 'rejeitado':
+                            status_pagamento = 'atrasado'
+                        else:
+                            status_pagamento = 'pendente'
+                    else:
+                        # Sem pagamento registrado
+                        if data_vencimento_ref and data_vencimento_ref < hoje:
+                            status_pagamento = 'atrasado'
+                        else:
+                            status_pagamento = 'pendente'
+                    
+                    valor_mensalidade = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else aluno.get_total_mensalidades()
+                    mes_nome = meses.get(mes_atual, f'Mês {mes_atual}')
+                    
+                    # Nome do curso formatado
+                    curso_nomes = {
+                        'dublagem_online': 'Dublagem Online',
+                        'dublagem_presencial': 'Dublagem Presencial',
+                        'teatro_presencial': 'Teatro Presencial',
+                        'locucao': 'Locução',
+                        'teatro_tv_cinema': 'Teatro TV/Cinema',
+                        'musical': 'Musical'
+                    }
+                    curso_nome = curso_nomes.get(matricula.tipo_curso, matricula.tipo_curso)
+                    
+                    # Obter nome do professor
+                    professor_nome = None
+                    if matricula.professor_id:
+                        try:
+                            professor = Professor.query.get(matricula.professor_id)
+                            if professor:
+                                professor_nome = professor.nome
+                        except Exception as e:
+                            print(f"⚠️ Erro ao buscar professor {matricula.professor_id} para matrícula {matricula.id}: {str(e)}")
+                    
+                    resultado.append({
+                        'id': f'{pagamento_id}_mat_{matricula.id}' if pagamento_id else f'aluno_{aluno.id}_mat_{matricula.id}_{mes_atual}_{ano_atual}',
+                        'aluno_id': aluno.id,
+                        'aluno_nome': aluno.nome,
+                        'professor_id': matricula.professor_id,
+                        'professor_nome': professor_nome,
+                        'curso': matricula.tipo_curso,
+                        'curso_nome': curso_nome,
+                        'matricula_id': matricula.id,
+                        'mes_referencia': mes_atual,
+                        'ano_referencia': ano_atual,
+                        'mes_nome': mes_nome,
+                        'valor': valor_pago if valor_pago > 0 else valor_mensalidade,
+                        'valor_pago': valor_pago,
+                        'data_vencimento': data_vencimento_ref.isoformat() if data_vencimento_ref else None,
+                        'data_pagamento': data_pagamento,
+                        'status': status_pagamento,
+                        'status_label': 'Pago' if status_pagamento == 'pago' else 'Pendente' if status_pagamento == 'pendente' else 'Atrasado',
+                        'url_comprovante': url_comprovante,
+                        'observacoes': pagamento.observacoes if pagamento else None,
+                        'data_cadastro': pagamento.data_cadastro.isoformat() if pagamento and pagamento.data_cadastro else None
+                    })
+            else:
+                # Há filtro de status - buscar apenas pagamentos registrados com aquele status
+                query_pagamentos = Pagamento.query
+                
+                # FILTRAGEM AUTOMÁTICA POR ROLE
+                if current_user.is_professor() and current_user.professor_id:
+                    query_pagamentos = query_pagamentos.join(Aluno).join(Matricula).filter(
+                        Matricula.professor_id == current_user.professor_id
+                    ).distinct()
+                elif current_user.is_aluno() and current_user.aluno_id:
+                    query_pagamentos = query_pagamentos.filter_by(aluno_id=current_user.aluno_id)
+                
+                if aluno_id_filtro:
+                    query_pagamentos = query_pagamentos.filter_by(aluno_id=aluno_id_filtro)
+                
+                if professor_id_filtro and not current_user.is_professor():
+                    query_pagamentos = query_pagamentos.join(Aluno).join(Matricula).filter(
+                        Matricula.professor_id == professor_id_filtro
+                    ).distinct()
+                
+                # Aplicar filtro de status
                 if status_filtro == 'pago':
                     query_pagamentos = query_pagamentos.filter_by(status='aprovado')
                 elif status_filtro == 'pendente':
                     query_pagamentos = query_pagamentos.filter_by(status='pendente')
                 elif status_filtro == 'atrasado':
-                    # Atrasados: rejeitados + pendentes (verificaremos depois quais pendentes estão atrasados)
                     query_pagamentos = query_pagamentos.filter(
                         or_(
                             Pagamento.status == 'rejeitado',
                             Pagamento.status == 'pendente'
                         )
                     )
-            
-            pagamentos = query_pagamentos.order_by(Pagamento.ano_referencia.desc(), Pagamento.mes_referencia.desc(), Pagamento.data_cadastro.desc()).all()
-            
-            print(f"📋 Total de pagamentos encontrados na query: {len(pagamentos)}")
-            if pagamentos:
-                print(f"📋 Status dos primeiros pagamentos: {[p.status for p in pagamentos[:5]]}")
-            
-            resultado = []
-            meses = {
-                1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
-                5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-                9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
-            }
-            
-            for pagamento in pagamentos:
-                aluno = pagamento.aluno
-                if not aluno or not aluno.ativo:
-                    continue
+                
+                pagamentos = query_pagamentos.order_by(Pagamento.ano_referencia.desc(), Pagamento.mes_referencia.desc(), Pagamento.data_cadastro.desc()).all()
+                
+                resultado = []
+                meses = {
+                    1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+                    5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+                    9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+                }
+                
+                for pagamento in pagamentos:
+                    aluno = pagamento.aluno
+                    if not aluno or not aluno.ativo:
+                        continue
                 
                 # Buscar matrículas ativas do aluno para este pagamento
                 # Se o pagamento não tem matrícula específica, buscar todas as matrículas ativas
@@ -3160,15 +3286,19 @@ def api_importar_alunos():
                 nome = normalizar_texto(nome)
                 cidade = normalizar_texto(cidade)
                 
-                # Verificar se aluno já existe (por telefone)
+                # Verificar se aluno já existe (por nome + telefone)
+                # Buscar por telefone primeiro, depois verificar se o nome também corresponde
                 aluno_existente = Aluno.query.filter_by(telefone=telefone, ativo=True).first()
                 if aluno_existente:
-                    alunos_duplicados.append({
-                        'linha': row_idx,
-                        'nome': nome,
-                        'telefone': telefone
-                    })
-                    continue
+                    # Verificar se o nome também corresponde (normalizado)
+                    nome_existente_normalizado = normalizar_texto(aluno_existente.nome)
+                    if nome_existente_normalizado.lower() != nome.lower():
+                        # Telefone existe mas nome diferente - pode ser outro aluno
+                        aluno_existente = None
+                
+                # Se aluno existe, vamos usar ele e verificar se precisa criar nova matrícula
+                aluno = aluno_existente
+                aluno_foi_criado = False
                 
                 # Processar data_vencimento
                 data_vencimento = None
@@ -3288,35 +3418,39 @@ def api_importar_alunos():
                     valor = str(row[idx_experimental].value).lower().strip()
                     experimental = valor in ['sim', 's', 'yes', 'y', '1', 'true', 'experimental']
                 
-                # Criar aluno
-                aluno = Aluno(
-                    nome=nome,
-                    telefone=telefone,
-                    nome_responsavel=nome_responsavel,
-                    telefone_responsavel=telefone_responsavel,
-                    cidade=cidade,
-                    estado=estado,
-                    forma_pagamento=forma_pagamento,
-                    data_vencimento=data_vencimento,
-                    data_nascimento=data_nascimento,
-                    dublagem_online=dublagem_online,
-                    dublagem_presencial=dublagem_presencial,
-                    teatro_online=teatro_online,
-                    teatro_presencial=teatro_presencial,
-                    locucao=locucao,
-                    teatro_tv_cinema=teatro_tv_cinema,
-                    musical=musical,
-                    aprovado=aprovado,
-                    ativo=ativo,
-                    experimental=experimental
-                )
-                
-                db.session.add(aluno)
-                db.session.flush()  # Para obter o ID
-                
-                # Calcular idade se tiver data_nascimento
-                if data_nascimento:
-                    aluno.idade = aluno.calcular_idade()
+                # Criar aluno apenas se não existir
+                if not aluno:
+                    aluno = Aluno(
+                        nome=nome,
+                        telefone=telefone,
+                        nome_responsavel=nome_responsavel,
+                        telefone_responsavel=telefone_responsavel,
+                        cidade=cidade,
+                        estado=estado,
+                        forma_pagamento=forma_pagamento,
+                        data_vencimento=data_vencimento,
+                        data_nascimento=data_nascimento,
+                        dublagem_online=dublagem_online,
+                        dublagem_presencial=dublagem_presencial,
+                        teatro_online=teatro_online,
+                        teatro_presencial=teatro_presencial,
+                        locucao=locucao,
+                        teatro_tv_cinema=teatro_tv_cinema,
+                        musical=musical,
+                        aprovado=aprovado,
+                        ativo=ativo,
+                        experimental=experimental
+                    )
+                    
+                    db.session.add(aluno)
+                    db.session.flush()  # Para obter o ID
+                    aluno_foi_criado = True
+                    
+                    # Calcular idade se tiver data_nascimento
+                    if data_nascimento:
+                        aluno.idade = aluno.calcular_idade()
+                else:
+                    print(f"ℹ️ Aluno já existe (linha {row_idx}): {nome} - {telefone}, verificando matrícula...")
                 
                 # Criar matrícula se houver informações de professor
                 if idx_professor_nome is not None and row[idx_professor_nome].value:
@@ -3324,10 +3458,12 @@ def api_importar_alunos():
                         if professor_nome:
                             # Buscar professor pelo nome
                             professor_nome_normalizado = normalizar_texto(professor_nome)
-                        professor = Professor.query.filter(
-                            db.func.lower(Professor.nome) == professor_nome_normalizado.lower(),
-                            Professor.ativo == True
-                        ).first()
+                            professor = Professor.query.filter(
+                                db.func.lower(Professor.nome) == professor_nome_normalizado.lower(),
+                                Professor.ativo == True
+                            ).first()
+                        else:
+                            professor = None
                         
                         if professor:
                             # Obter modalidade
@@ -3371,85 +3507,110 @@ def api_importar_alunos():
                                     modalidade = 'musical'
                             
                             if modalidade:
-                                # Obter valor_mensalidade
-                                valor_mensalidade = None
-                                if idx_valor_mensalidade is not None and row[idx_valor_mensalidade].value:
-                                    try:
-                                        valor_str = str(row[idx_valor_mensalidade].value).replace(',', '.').strip()
-                                        valor_mensalidade = float(valor_str)
-                                    except (ValueError, AttributeError):
-                                        pass
-                                
-                                # Obter data_inicio
-                                data_inicio_matricula = None
-                                if idx_data_inicio is not None and row[idx_data_inicio].value:
-                                    valor_inicio = row[idx_data_inicio].value
-                                    if isinstance(valor_inicio, datetime):
-                                        data_inicio_matricula = valor_inicio.date()
-                                    elif isinstance(valor_inicio, date):
-                                        data_inicio_matricula = valor_inicio
-                                    else:
-                                        try:
-                                            data_inicio_matricula = datetime.strptime(str(valor_inicio), '%d/%m/%Y').date()
-                                        except:
-                                            try:
-                                                data_inicio_matricula = datetime.strptime(str(valor_inicio), '%Y-%m-%d').date()
-                                            except:
-                                                pass
-                                
-                                # Obter horário (dia_semana e horario_aula)
-                                dia_semana = None
-                                horario_aula = None
-                                
-                                # Se informou horário diretamente no Excel
-                                if idx_horario_dia_semana is not None and row[idx_horario_dia_semana].value:
-                                    dia_semana = str(row[idx_horario_dia_semana].value).strip()
-                                
-                                if idx_horario_aula is not None and row[idx_horario_aula].value:
-                                    horario_aula = str(row[idx_horario_aula].value).strip()
-                                
-                                # Se não informou horário, tentar buscar automaticamente do professor
-                                if not dia_semana or not horario_aula:
-                                    try:
-                                        from app.models.horario_professor import HorarioProfessor
-                                        horario_professor = HorarioProfessor.query.filter_by(
-                                            professor_id=professor.id,
-                                            modalidade=modalidade
-                                        ).first()
-                                        
-                                        if horario_professor:
-                                            if not dia_semana:
-                                                dia_semana = horario_professor.dia_semana
-                                            if not horario_aula:
-                                                horario_aula = horario_professor.horario_aula
-                                            print(f"✅ Horário encontrado automaticamente: {dia_semana} - {horario_aula}")
-                                        else:
-                                            print(f"⚠️ Nenhum horário encontrado para professor {professor.nome} na modalidade {modalidade}")
-                                    except Exception as e:
-                                        print(f"⚠️ Erro ao buscar horário do professor: {str(e)}")
-                                
-                                # Criar matrícula
-                                try:
-                                    matricula = Matricula(
-                                        aluno_id=aluno.id,
-                                        professor_id=professor.id,
-                                        tipo_curso=modalidade,
-                                        valor_mensalidade=valor_mensalidade,
-                                        data_inicio=data_inicio_matricula,
-                                        dia_semana=dia_semana,
-                                        horario_aula=horario_aula
+                                # Verificar se já existe matrícula com esse professor + curso para este aluno
+                                matricula_existente = Matricula.query.filter_by(
+                                    aluno_id=aluno.id,
+                                    professor_id=professor.id,
+                                    tipo_curso=modalidade
+                                ).filter(
+                                    db.or_(
+                                        Matricula.data_encerramento.is_(None),
+                                        Matricula.data_encerramento > date.today()
                                     )
-                                    db.session.add(matricula)
-                                    print(f"✅ Matrícula criada (linha {row_idx}): aluno={nome}, professor={professor.nome}, modalidade={modalidade}, horário={dia_semana or 'N/A'} {horario_aula or 'N/A'}")
-                                except Exception as e:
-                                    print(f"⚠️ Erro ao criar matrícula (linha {row_idx}): {str(e)}")
+                                ).first()
+                                
+                                if matricula_existente:
+                                    print(f"ℹ️ Matrícula já existe (linha {row_idx}): aluno={nome}, professor={professor.nome}, curso={modalidade} - pulando")
+                                    alunos_duplicados.append({
+                                        'linha': row_idx,
+                                        'nome': nome,
+                                        'telefone': telefone,
+                                        'motivo': f'Matrícula já existe: {professor.nome} - {modalidade}'
+                                    })
+                                else:
+                                    # Obter valor_mensalidade
+                                    valor_mensalidade = None
+                                    if idx_valor_mensalidade is not None and row[idx_valor_mensalidade].value:
+                                        try:
+                                            valor_str = str(row[idx_valor_mensalidade].value).replace(',', '.').strip()
+                                            valor_mensalidade = float(valor_str)
+                                        except (ValueError, AttributeError):
+                                            pass
+                                    
+                                    # Obter data_inicio
+                                    data_inicio_matricula = None
+                                    if idx_data_inicio is not None and row[idx_data_inicio].value:
+                                        valor_inicio = row[idx_data_inicio].value
+                                        if isinstance(valor_inicio, datetime):
+                                            data_inicio_matricula = valor_inicio.date()
+                                        elif isinstance(valor_inicio, date):
+                                            data_inicio_matricula = valor_inicio
+                                        else:
+                                            try:
+                                                data_inicio_matricula = datetime.strptime(str(valor_inicio), '%d/%m/%Y').date()
+                                            except:
+                                                try:
+                                                    data_inicio_matricula = datetime.strptime(str(valor_inicio), '%Y-%m-%d').date()
+                                                except:
+                                                    pass
+                                    
+                                    # Obter horário (dia_semana e horario_aula)
+                                    dia_semana = None
+                                    horario_aula = None
+                                    
+                                    # Se informou horário diretamente no Excel
+                                    if idx_horario_dia_semana is not None and row[idx_horario_dia_semana].value:
+                                        dia_semana = str(row[idx_horario_dia_semana].value).strip()
+                                    
+                                    if idx_horario_aula is not None and row[idx_horario_aula].value:
+                                        horario_aula = str(row[idx_horario_aula].value).strip()
+                                    
+                                    # Se não informou horário, tentar buscar automaticamente do professor
+                                    if not dia_semana or not horario_aula:
+                                        try:
+                                            from app.models.horario_professor import HorarioProfessor
+                                            horario_professor = HorarioProfessor.query.filter_by(
+                                                professor_id=professor.id,
+                                                modalidade=modalidade
+                                            ).first()
+                                            
+                                            if horario_professor:
+                                                if not dia_semana:
+                                                    dia_semana = horario_professor.dia_semana
+                                                if not horario_aula:
+                                                    horario_aula = horario_professor.horario_aula
+                                                print(f"✅ Horário encontrado automaticamente: {dia_semana} - {horario_aula}")
+                                            else:
+                                                print(f"⚠️ Nenhum horário encontrado para professor {professor.nome} na modalidade {modalidade}")
+                                        except Exception as e:
+                                            print(f"⚠️ Erro ao buscar horário do professor: {str(e)}")
+                                    
+                                    # Criar matrícula
+                                    try:
+                                        matricula = Matricula(
+                                            aluno_id=aluno.id,
+                                            professor_id=professor.id,
+                                            tipo_curso=modalidade,
+                                            valor_mensalidade=valor_mensalidade,
+                                            data_inicio=data_inicio_matricula,
+                                            dia_semana=dia_semana,
+                                            horario_aula=horario_aula
+                                        )
+                                        db.session.add(matricula)
+                                        print(f"✅ Matrícula criada (linha {row_idx}): aluno={nome}, professor={professor.nome}, modalidade={modalidade}, horário={dia_semana or 'N/A'} {horario_aula or 'N/A'}")
+                                    except Exception as e:
+                                        print(f"⚠️ Erro ao criar matrícula (linha {row_idx}): {str(e)}")
                             else:
                                 print(f"⚠️ Modalidade não encontrada para professor (linha {row_idx}): {professor_nome}")
                         else:
                             print(f"⚠️ Professor não encontrado (linha {row_idx}): {professor_nome}")
                 
-                alunos_criados += 1
-                print(f"✅ Aluno criado (linha {row_idx}): {nome}")
+                # Contar apenas alunos recém-criados
+                if aluno_foi_criado:
+                    alunos_criados += 1
+                    print(f"✅ Aluno criado (linha {row_idx}): {nome}")
+                else:
+                    print(f"ℹ️ Aluno já existia, matrícula processada (linha {row_idx}): {nome}")
                 
             except Exception as e:
                 import traceback
