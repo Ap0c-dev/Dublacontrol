@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { api, Pagamento, Professor } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, CreditCard, Calendar, User, Check, X } from 'lucide-react';
+import { Loader2, CreditCard, Calendar, User, Check, X, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -30,6 +30,7 @@ import {
 
 export default function Pagamentos() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +68,12 @@ export default function Pagamentos() {
         
         const response = await api.getPagamentos(filters);
         if (response.success) {
+          console.log('📋 Pagamentos recebidos:', response.data);
+          if (response.data && response.data.length > 0) {
+            console.log('📋 Primeiro pagamento:', response.data[0]);
+            console.log('📋 Professor do primeiro:', response.data[0].professor_nome);
+            console.log('📋 Curso do primeiro:', response.data[0].curso_nome);
+          }
           setPagamentos(response.data);
         } else {
           toast({
@@ -248,6 +255,12 @@ export default function Pagamentos() {
                     <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4">
                       Aluno
                     </th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4 hidden lg:table-cell">
+                      Professor
+                    </th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4 hidden lg:table-cell">
+                      Curso
+                    </th>
                     <th className="text-left text-sm font-medium text-muted-foreground px-6 py-4">
                       Valor
                     </th>
@@ -266,7 +279,20 @@ export default function Pagamentos() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {pagamentos.map((pagamento, index) => (
+                  {pagamentos.map((pagamento, index) => {
+                    // Debug: verificar dados do pagamento
+                    if (index === 0) {
+                      console.log('🔍 Primeiro pagamento renderizado:', {
+                        id: pagamento.id,
+                        aluno_nome: pagamento.aluno_nome,
+                        professor_nome: pagamento.professor_nome,
+                        curso_nome: pagamento.curso_nome,
+                        curso: pagamento.curso,
+                        professor_id: pagamento.professor_id
+                      });
+                    }
+                    
+                    return (
                     <tr 
                       key={pagamento.id} 
                       className="hover:bg-muted/30 transition-colors"
@@ -281,6 +307,16 @@ export default function Pagamentos() {
                             {pagamento.aluno_nome || `Aluno #${pagamento.aluno_id}`}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <span className="text-sm text-muted-foreground">
+                          {pagamento.professor_nome || `(ID: ${pagamento.professor_id || 'N/A'})`}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <span className="text-sm text-muted-foreground">
+                          {pagamento.curso_nome || pagamento.curso || '-'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-foreground">
@@ -304,77 +340,99 @@ export default function Pagamentos() {
                         {getStatusBadge(pagamento.status)}
                       </td>
                       <td className="px-6 py-4">
-                        {pagamento.status === 'pendente' && (
-                          <div className="flex gap-2">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="default">
-                                  <Check size={16} className="mr-1" />
-                                  Aprovar
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Aprovar Pagamento</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Deseja aprovar este pagamento?
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <div className="space-y-4">
-                                  <div>
-                                    <Label>Observações (opcional)</Label>
-                                    <Textarea
-                                      value={observacoes[pagamento.id] || ''}
-                                      onChange={(e) => setObservacoes({ ...observacoes, [pagamento.id]: e.target.value })}
-                                      placeholder="Adicione observações sobre a aprovação..."
-                                    />
-                                  </div>
-                                </div>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleAprovar(pagamento.id)}>
+                        <div className="flex gap-2 flex-wrap">
+                          {pagamento.status === 'pendente' && (
+                            <>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="default">
+                                    <Check size={16} className="mr-1" />
                                     Aprovar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
-                                  <X size={16} className="mr-1" />
-                                  Rejeitar
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Rejeitar Pagamento</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Deseja rejeitar este pagamento?
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <div className="space-y-4">
-                                  <div>
-                                    <Label>Motivo da Rejeição</Label>
-                                    <Textarea
-                                      value={observacoes[pagamento.id] || ''}
-                                      onChange={(e) => setObservacoes({ ...observacoes, [pagamento.id]: e.target.value })}
-                                      placeholder="Informe o motivo da rejeição..."
-                                    />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Aprovar Pagamento</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Deseja aprovar este pagamento?
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label>Observações (opcional)</Label>
+                                      <Textarea
+                                        value={observacoes[pagamento.id] || ''}
+                                        onChange={(e) => setObservacoes({ ...observacoes, [pagamento.id]: e.target.value })}
+                                        placeholder="Adicione observações sobre a aprovação..."
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleRejeitar(pagamento.id)}>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleAprovar(pagamento.id)}>
+                                      Aprovar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="destructive">
+                                    <X size={16} className="mr-1" />
                                     Rejeitar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        )}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Rejeitar Pagamento</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Deseja rejeitar este pagamento?
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label>Motivo da Rejeição</Label>
+                                      <Textarea
+                                        value={observacoes[pagamento.id] || ''}
+                                        onChange={(e) => setObservacoes({ ...observacoes, [pagamento.id]: e.target.value })}
+                                        placeholder="Informe o motivo da rejeição..."
+                                      />
+                                    </div>
+                                  </div>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleRejeitar(pagamento.id)}>
+                                      Rejeitar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </>
+                          )}
+                          {(pagamento.status === 'atrasado' || (pagamento.status === 'pendente' && !pagamento.url_comprovante)) && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => navigate(`/upload-comprovante/${pagamento.aluno_id}`)}
+                            >
+                              <Upload size={16} className="mr-1" />
+                              {pagamento.url_comprovante ? 'Ver Comprovante' : 'Enviar Comprovante'}
+                            </Button>
+                          )}
+                          {pagamento.url_comprovante && pagamento.status !== 'atrasado' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => window.open(pagamento.url_comprovante!, '_blank')}
+                            >
+                              Ver Comprovante
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

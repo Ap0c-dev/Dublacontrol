@@ -65,13 +65,26 @@ interface Professor {
 }
 
 interface Pagamento {
-  id: number;
+  id: number | string;
   aluno_id: number;
   aluno_nome: string;
+  professor_id?: number;
+  professor_nome?: string;
+  curso?: string;
+  curso_nome?: string;
+  matricula_id?: number;
+  mes_referencia?: number;
+  ano_referencia?: number;
+  mes_nome?: string;
   valor: number;
-  data_vencimento: string;
+  valor_pago?: number;
+  data_vencimento: string | null;
   data_pagamento: string | null;
   status: string;
+  status_label?: string;
+  url_comprovante?: string | null;
+  observacoes?: string | null;
+  data_cadastro?: string | null;
 }
 
 interface Nota {

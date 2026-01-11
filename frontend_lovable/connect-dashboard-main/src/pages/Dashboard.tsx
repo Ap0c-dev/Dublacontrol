@@ -681,11 +681,11 @@ export default function Dashboard() {
                             'hsl(var(--primary))',
                             'hsl(var(--secondary))',
                             'hsl(var(--accent))',
-                            '#8884d8',
-                            '#82ca9d',
-                            '#ffc658',
-                            '#ff7300',
-                            '#8dd1e1'
+                            '#a78bfa', // Roxo claro (substitui #8884d8)
+                            '#34d399', // Verde claro
+                            '#fbbf24', // Amarelo
+                            '#fb923c', // Laranja
+                            '#22d3ee'  // Ciano
                           ];
                           return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                         })}
@@ -798,8 +798,8 @@ export default function Dashboard() {
                             'hsl(var(--primary))',
                             'hsl(var(--secondary))',
                             'hsl(var(--accent))',
-                            '#8884d8',
-                            '#82ca9d'
+                            '#a78bfa', // Roxo claro (substitui #8884d8)
+                            '#34d399'  // Verde claro
                           ];
                           return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                         })}
