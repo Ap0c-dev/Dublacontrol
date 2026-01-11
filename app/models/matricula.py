@@ -40,7 +40,7 @@ class Matricula(db.Model):
             'valor_mensalidade': float(self.valor_mensalidade) if self.valor_mensalidade else None,
             'professor_nome': self.professor.nome if self.professor else None,
             'data_matricula': self.data_matricula.isoformat() if self.data_matricula else None,
-            'data_inicio': self.data_inicio.isoformat() if self.data_inicio else None,
+            'data_inicio': self.data_inicio.strftime('%Y-%m-%d') if self.data_inicio else None,
             'data_encerramento': self.data_encerramento.isoformat() if self.data_encerramento else None,
             'dia_semana': self.dia_semana,
             'horario_aula': self.horario_aula

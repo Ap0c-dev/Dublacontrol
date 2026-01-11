@@ -82,11 +82,19 @@ export default function AlunoDetalhes() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
+    
+    // Se a data vem no formato ISO com timestamp (YYYY-MM-DDTHH:mm:ss), extrair apenas a data
+    let dateOnly = dateString;
+    if (dateString.includes('T')) {
+      dateOnly = dateString.split('T')[0];
+    }
+    
     // Se a data vem no formato ISO (YYYY-MM-DD), parsear manualmente para evitar problemas de timezone
-    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      const [year, month, day] = dateString.split('-').map(Number);
+    if (dateOnly.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateOnly.split('-').map(Number);
       return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
     }
+    
     // Para outros formatos, usar Date normalmente
     const date = new Date(dateString);
     // Verificar se a data é válida

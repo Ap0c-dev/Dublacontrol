@@ -625,7 +625,7 @@ def api_get_aluno(aluno_id):
                 'valor_mensalidade': float(mat.valor_mensalidade) if mat.valor_mensalidade else 0,
                 'dia_semana': mat.dia_semana,
                 'horario_aula': mat.horario_aula,
-                'data_inicio': mat.data_inicio.isoformat() if mat.data_inicio else None
+                'data_inicio': mat.data_inicio.strftime('%Y-%m-%d') if mat.data_inicio else None
             })
         
         return jsonify({
@@ -1836,7 +1836,7 @@ def api_dashboard_stats():
 @api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
 @api_login_required
 def api_alunos_evolucao():
-    """Retorna quantos alunos ativos foram cadastrados (data_cadastro) em cada um dos últimos 12 meses ou dia a dia de um mês específico"""
+    """Retorna quantos alunos ativos iniciaram (data_inicio da matrícula) em cada um dos últimos 12 meses ou dia a dia de um mês específico""""""
     try:
         from datetime import timedelta
         from calendar import monthrange
@@ -1875,12 +1875,19 @@ def api_alunos_evolucao():
             # Gerar todos os dias do mês
             data_atual = primeiro_dia
             while data_atual <= data_fim_mes:
-                # Contar alunos ativos cadastrados até este dia (acumulado)
-                # Usar data_cadastro e filtrar apenas alunos ativos
-                alunos_ate_hoje = db.session.query(Aluno.id).filter(
+                # Contar alunos ativos que iniciaram (data_inicio da matrícula) até este dia (acumulado)
+                # Considerar apenas alunos ativos com matrículas ativas que têm data_inicio
+                alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
+                    Matricula, Aluno.id == Matricula.aluno_id
+                ).filter(
                     Aluno.ativo == True,
-                    db.func.date(Aluno.data_cadastro) >= primeiro_dia,
-                    db.func.date(Aluno.data_cadastro) <= data_atual
+                    Matricula.data_inicio.isnot(None),
+                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    db.func.date(Matricula.data_inicio) <= data_atual,
+                    db.or_(
+                        Matricula.data_encerramento.is_(None),
+                        Matricula.data_encerramento > hoje
+                    )
                 ).count()
                 
                 resultado.append({
@@ -1912,15 +1919,23 @@ def api_alunos_evolucao():
                 ultimo_dia = monthrange(ano, mes)[1]
                 data_fim_mes = date(ano, mes, ultimo_dia)
                 
-                # Contar quantos alunos ativos foram cadastrados (data_cadastro) neste mês específico
-                alunos_cadastrados = db.session.query(Aluno.id).filter(
+                # Contar quantos alunos ativos iniciaram (data_inicio da matrícula) neste mês específico
+                # Considerar apenas alunos ativos com matrículas ativas que têm data_inicio
+                alunos_cadastrados = db.session.query(Aluno.id).distinct().join(
+                    Matricula, Aluno.id == Matricula.aluno_id
+                ).filter(
                     Aluno.ativo == True,
-                    # Data de cadastro está dentro deste mês específico
-                    db.func.date(Aluno.data_cadastro) >= primeiro_dia,
-                    db.func.date(Aluno.data_cadastro) <= data_fim_mes
+                    Matricula.data_inicio.isnot(None),
+                    # Data de início está dentro deste mês específico
+                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    db.func.date(Matricula.data_inicio) <= data_fim_mes,
+                    db.or_(
+                        Matricula.data_encerramento.is_(None),
+                        Matricula.data_encerramento > hoje
+                    )
                 ).count()
                 
-                print(f"📊 Mês {mes}/{ano}: {alunos_cadastrados} alunos ativos cadastrados")
+                print(f"📊 Mês {mes}/{ano}: {alunos_cadastrados} alunos ativos que iniciaram")
                 
                 resultado.append({
                     'mes': mes,
@@ -4321,7 +4336,7 @@ def api_listar_matriculas():
                 'professor_nome': mat.professor.nome if mat.professor else None,
                 'tipo_curso': mat.tipo_curso,
                 'valor_mensalidade': float(mat.valor_mensalidade) if mat.valor_mensalidade else None,
-                'data_inicio': mat.data_inicio.isoformat() if mat.data_inicio else None,
+                'data_inicio': mat.data_inicio.strftime('%Y-%m-%d') if mat.data_inicio else None,
                 'data_encerramento': mat.data_encerramento.isoformat() if mat.data_encerramento else None,
                 'dia_semana': mat.dia_semana,
                 'horario_aula': mat.horario_aula,

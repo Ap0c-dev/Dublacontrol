@@ -864,8 +864,8 @@ export default function Dashboard() {
             </DialogTitle>
             <DialogDescription>
               {tipoEvolucao === 'diario' 
-                ? 'Gráfico mostrando a evolução dia a dia (acumulado) de alunos ativos cadastrados'
-                : 'Gráfico mostrando quantos alunos ativos foram cadastrados (data de cadastro) em cada mês'}
+                ? 'Gráfico mostrando a evolução dia a dia (acumulado) de alunos ativos que iniciaram (data de início)'
+                : 'Gráfico mostrando quantos alunos ativos iniciaram (data de início) em cada mês'}
             </DialogDescription>
           </DialogHeader>
           
