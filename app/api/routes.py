@@ -1848,7 +1848,22 @@ def api_alunos_evolucao():
         mes_filtro = request.args.get('mes', type=int)
         ano_filtro = request.args.get('ano', type=int)
         
-        print(f"📊 Filtros recebidos: mes={mes_filtro}, ano={ano_filtro}")
+        # Debug: verificar quantos alunos ativos têm matrículas com e sem data_inicio
+        total_alunos_ativos = db.session.query(Aluno.id).filter(Aluno.ativo == True).count()
+        alunos_com_data_inicio = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            Matricula.data_inicio.isnot(None),
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).count()
+        print(f"📊 Debug evolução de alunos:")
+        print(f"   Total de alunos ativos: {total_alunos_ativos}")
+        print(f"   Alunos ativos com data_inicio: {alunos_com_data_inicio}")
+        print(f"   Filtros recebidos: mes={mes_filtro}, ano={ano_filtro}")
         
         meses_nomes = {
             1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
@@ -1875,14 +1890,14 @@ def api_alunos_evolucao():
             # Gerar todos os dias do mês
             data_atual = primeiro_dia
             while data_atual <= data_fim_mes:
-                # Contar alunos ativos que iniciaram (data_inicio da matrícula) até este dia (acumulado)
+                # Contar total acumulado de alunos ativos que iniciaram (data_inicio) até este dia
                 # Considerar apenas alunos ativos com matrículas ativas que têm data_inicio
                 alunos_ate_hoje = db.session.query(Aluno.id).distinct().join(
                     Matricula, Aluno.id == Matricula.aluno_id
                 ).filter(
                     Aluno.ativo == True,
                     Matricula.data_inicio.isnot(None),
-                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    # Acumulado: todos que iniciaram até este dia (sem limite inferior)
                     db.func.date(Matricula.data_inicio) <= data_atual,
                     db.or_(
                         Matricula.data_encerramento.is_(None),
@@ -1919,15 +1934,15 @@ def api_alunos_evolucao():
                 ultimo_dia = monthrange(ano, mes)[1]
                 data_fim_mes = date(ano, mes, ultimo_dia)
                 
-                # Contar quantos alunos ativos iniciaram (data_inicio da matrícula) neste mês específico
+                # Contar total acumulado de alunos ativos até o final deste mês
+                # Considerar alunos que iniciaram (data_inicio) até o final deste mês
                 # Considerar apenas alunos ativos com matrículas ativas que têm data_inicio
                 alunos_cadastrados = db.session.query(Aluno.id).distinct().join(
                     Matricula, Aluno.id == Matricula.aluno_id
                 ).filter(
                     Aluno.ativo == True,
                     Matricula.data_inicio.isnot(None),
-                    # Data de início está dentro deste mês específico
-                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    # Data de início até o final deste mês (acumulado)
                     db.func.date(Matricula.data_inicio) <= data_fim_mes,
                     db.or_(
                         Matricula.data_encerramento.is_(None),
@@ -1935,7 +1950,23 @@ def api_alunos_evolucao():
                     )
                 ).count()
                 
-                print(f"📊 Mês {mes}/{ano}: {alunos_cadastrados} alunos ativos que iniciaram")
+                # Debug: verificar quantos alunos têm data_inicio e quantos iniciaram neste mês
+                total_com_data_inicio = db.session.query(Matricula.id).filter(
+                    Matricula.data_inicio.isnot(None)
+                ).count()
+                alunos_que_iniciaram_neste_mes = db.session.query(Aluno.id).distinct().join(
+                    Matricula, Aluno.id == Matricula.aluno_id
+                ).filter(
+                    Aluno.ativo == True,
+                    Matricula.data_inicio.isnot(None),
+                    db.func.date(Matricula.data_inicio) >= primeiro_dia,
+                    db.func.date(Matricula.data_inicio) <= data_fim_mes,
+                    db.or_(
+                        Matricula.data_encerramento.is_(None),
+                        Matricula.data_encerramento > hoje
+                    )
+                ).count()
+                print(f"📊 Mês {mes}/{ano}: {alunos_cadastrados} alunos ativos acumulados até o final do mês (iniciaram neste mês: {alunos_que_iniciaram_neste_mes}, total com data_inicio: {total_com_data_inicio})")
                 
                 resultado.append({
                     'mes': mes,
