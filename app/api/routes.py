@@ -1836,7 +1836,7 @@ def api_dashboard_stats():
 @api_bp.route('/dashboard/alunos-evolucao', methods=['GET'])
 @api_login_required
 def api_alunos_evolucao():
-    """Retorna quantos alunos ativos iniciaram (data_inicio da matrícula) em cada um dos últimos 12 meses ou dia a dia de um mês específico""""""
+    """Retorna quantos alunos ativos iniciaram (data_inicio da matrícula) em cada um dos últimos 12 meses ou dia a dia de um mês específico"""
     try:
         from datetime import timedelta
         from calendar import monthrange
