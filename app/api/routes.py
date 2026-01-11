@@ -1131,126 +1131,126 @@ def api_listar_pagamentos():
                     aluno = pagamento.aluno
                     if not aluno or not aluno.ativo:
                         continue
-                
-                # Buscar matrículas ativas do aluno para este pagamento
-                # Se o pagamento não tem matrícula específica, buscar todas as matrículas ativas
-                matriculas_ativas = Matricula.query.options(
-                    joinedload(Matricula.professor)
-                ).filter(
-                    Matricula.aluno_id == aluno.id,
-                    db.or_(
-                        Matricula.data_encerramento.is_(None),
-                        Matricula.data_encerramento > hoje
-                    )
-                ).all()
-                
-                # Se não houver matrícula ativa, pular
-                if not matriculas_ativas:
-                    print(f"⚠️ Aluno {aluno.id} ({aluno.nome}) não tem matrículas ativas")
-                    continue
-                
-                print(f"✅ Aluno {aluno.id} ({aluno.nome}) tem {len(matriculas_ativas)} matrícula(s) ativa(s)")
-                
-                # Para cada matrícula ativa, criar uma linha no resultado
-                for matricula in matriculas_ativas:
-                    print(f"📋 Processando matrícula {matricula.id}: professor_id={matricula.professor_id}, tipo_curso={matricula.tipo_curso}")
-                    # Calcular data de vencimento baseada no aluno e mês/ano de referência
-                    data_vencimento_ref = None
-                    if aluno.data_vencimento:
-                        dia_vencimento = aluno.data_vencimento.day
-                        try:
-                            data_vencimento_ref = date(pagamento.ano_referencia, pagamento.mes_referencia, dia_vencimento)
-                        except ValueError:
-                            ultimo_dia = monthrange(pagamento.ano_referencia, pagamento.mes_referencia)[1]
-                            data_vencimento_ref = date(pagamento.ano_referencia, pagamento.mes_referencia, min(dia_vencimento, ultimo_dia))
                     
-                    # Converter status do banco para frontend
-                    if pagamento.status == 'aprovado':
-                        status_pagamento = 'pago'
-                    elif pagamento.status == 'pendente':
-                        # Verificar se está atrasado (vencimento passou)
-                        if data_vencimento_ref and data_vencimento_ref < hoje:
+                    # Buscar matrículas ativas do aluno para este pagamento
+                    # Se o pagamento não tem matrícula específica, buscar todas as matrículas ativas
+                    matriculas_ativas = Matricula.query.options(
+                        joinedload(Matricula.professor)
+                    ).filter(
+                        Matricula.aluno_id == aluno.id,
+                        db.or_(
+                            Matricula.data_encerramento.is_(None),
+                            Matricula.data_encerramento > hoje
+                        )
+                    ).all()
+                    
+                    # Se não houver matrícula ativa, pular
+                    if not matriculas_ativas:
+                        print(f"⚠️ Aluno {aluno.id} ({aluno.nome}) não tem matrículas ativas")
+                        continue
+                    
+                    print(f"✅ Aluno {aluno.id} ({aluno.nome}) tem {len(matriculas_ativas)} matrícula(s) ativa(s)")
+                    
+                    # Para cada matrícula ativa, criar uma linha no resultado
+                    for matricula in matriculas_ativas:
+                        print(f"📋 Processando matrícula {matricula.id}: professor_id={matricula.professor_id}, tipo_curso={matricula.tipo_curso}")
+                        # Calcular data de vencimento baseada no aluno e mês/ano de referência
+                        data_vencimento_ref = None
+                        if aluno.data_vencimento:
+                            dia_vencimento = aluno.data_vencimento.day
+                            try:
+                                data_vencimento_ref = date(pagamento.ano_referencia, pagamento.mes_referencia, dia_vencimento)
+                            except ValueError:
+                                ultimo_dia = monthrange(pagamento.ano_referencia, pagamento.mes_referencia)[1]
+                                data_vencimento_ref = date(pagamento.ano_referencia, pagamento.mes_referencia, min(dia_vencimento, ultimo_dia))
+                        
+                        # Converter status do banco para frontend
+                        if pagamento.status == 'aprovado':
+                            status_pagamento = 'pago'
+                        elif pagamento.status == 'pendente':
+                            # Verificar se está atrasado (vencimento passou)
+                            if data_vencimento_ref and data_vencimento_ref < hoje:
+                                status_pagamento = 'atrasado'
+                            else:
+                                status_pagamento = 'pendente'
+                        elif pagamento.status == 'rejeitado':
                             status_pagamento = 'atrasado'
                         else:
                             status_pagamento = 'pendente'
-                    elif pagamento.status == 'rejeitado':
-                        status_pagamento = 'atrasado'
-                    else:
-                        status_pagamento = 'pendente'
-                    
-                    # Aplicar filtro de status se especificado
-                    # IMPORTANTE: Filtrar DEPOIS de calcular o status real (pendente pode virar atrasado)
-                    if status_filtro:
-                        if status_filtro == 'pago':
-                            # Apenas pagos (aprovados)
-                            if status_pagamento != 'pago':
-                                continue
-                        elif status_filtro == 'pendente':
-                            # Apenas pendentes (NÃO incluir os que viraram atrasados)
-                            if status_pagamento != 'pendente':
-                                continue
-                        elif status_filtro == 'atrasado':
-                            # Apenas atrasados (rejeitados + pendentes que estão atrasados)
-                            if status_pagamento != 'atrasado':
-                                continue
-                    
-                    valor_pago = float(pagamento.valor_pago) if pagamento.valor_pago else 0
-                    valor_mensalidade = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else aluno.get_total_mensalidades()
-                    mes_nome = meses.get(pagamento.mes_referencia, f'Mês {pagamento.mes_referencia}')
-                    
-                    # Nome do curso formatado
-                    curso_nomes = {
-                        'dublagem_online': 'Dublagem Online',
-                        'dublagem_presencial': 'Dublagem Presencial',
-                        'teatro_presencial': 'Teatro Presencial',
-                        'locucao': 'Locução',
-                        'teatro_tv_cinema': 'Teatro TV/Cinema',
-                        'musical': 'Musical'
-                    }
-                    curso_nome = curso_nomes.get(matricula.tipo_curso, matricula.tipo_curso)
-                    
-                    # Obter nome do professor - sempre buscar diretamente para garantir
-                    professor_nome = None
-                    if matricula.professor_id:
-                        try:
-                            professor = Professor.query.get(matricula.professor_id)
-                            if professor:
-                                professor_nome = professor.nome
-                                print(f"✅ Professor encontrado: {professor_nome} (ID: {matricula.professor_id})")
-                            else:
-                                print(f"⚠️ Professor não encontrado para professor_id={matricula.professor_id} (matrícula {matricula.id})")
-                                # Verificar se existem professores no banco
-                                total_professores = Professor.query.count()
-                                print(f"📊 Total de professores no banco: {total_professores}")
-                        except Exception as e:
-                            print(f"⚠️ Erro ao buscar professor {matricula.professor_id} para matrícula {matricula.id}: {str(e)}")
-                            import traceback
-                            print(traceback.format_exc())
-                    else:
-                        print(f"⚠️ Matrícula {matricula.id} não tem professor_id!")
-                    
-                    resultado.append({
-                        'id': f'{pagamento.id}_mat_{matricula.id}',
-                        'aluno_id': aluno.id,
-                        'aluno_nome': aluno.nome,
-                        'professor_id': matricula.professor_id,
-                        'professor_nome': professor_nome,
-                        'curso': matricula.tipo_curso,
-                        'curso_nome': curso_nome,
-                        'matricula_id': matricula.id,
-                        'mes_referencia': pagamento.mes_referencia,
-                        'ano_referencia': pagamento.ano_referencia,
-                        'mes_nome': mes_nome,
-                        'valor': valor_pago if valor_pago > 0 else valor_mensalidade,
-                        'valor_pago': valor_pago,
-                        'data_vencimento': data_vencimento_ref.isoformat() if data_vencimento_ref else None,
-                        'data_pagamento': pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None,
-                        'status': status_pagamento,
-                        'status_label': 'Pago' if status_pagamento == 'pago' else 'Pendente' if status_pagamento == 'pendente' else 'Atrasado',
-                        'url_comprovante': pagamento.url_comprovante,
-                        'observacoes': pagamento.observacoes,
-                        'data_cadastro': pagamento.data_cadastro.isoformat() if pagamento.data_cadastro else None
-                    })
+                        
+                        # Aplicar filtro de status se especificado
+                        # IMPORTANTE: Filtrar DEPOIS de calcular o status real (pendente pode virar atrasado)
+                        if status_filtro:
+                            if status_filtro == 'pago':
+                                # Apenas pagos (aprovados)
+                                if status_pagamento != 'pago':
+                                    continue
+                            elif status_filtro == 'pendente':
+                                # Apenas pendentes (NÃO incluir os que viraram atrasados)
+                                if status_pagamento != 'pendente':
+                                    continue
+                            elif status_filtro == 'atrasado':
+                                # Apenas atrasados (rejeitados + pendentes que estão atrasados)
+                                if status_pagamento != 'atrasado':
+                                    continue
+                        
+                        valor_pago = float(pagamento.valor_pago) if pagamento.valor_pago else 0
+                        valor_mensalidade = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else aluno.get_total_mensalidades()
+                        mes_nome = meses.get(pagamento.mes_referencia, f'Mês {pagamento.mes_referencia}')
+                        
+                        # Nome do curso formatado
+                        curso_nomes = {
+                            'dublagem_online': 'Dublagem Online',
+                            'dublagem_presencial': 'Dublagem Presencial',
+                            'teatro_presencial': 'Teatro Presencial',
+                            'locucao': 'Locução',
+                            'teatro_tv_cinema': 'Teatro TV/Cinema',
+                            'musical': 'Musical'
+                        }
+                        curso_nome = curso_nomes.get(matricula.tipo_curso, matricula.tipo_curso)
+                        
+                        # Obter nome do professor - sempre buscar diretamente para garantir
+                        professor_nome = None
+                        if matricula.professor_id:
+                            try:
+                                professor = Professor.query.get(matricula.professor_id)
+                                if professor:
+                                    professor_nome = professor.nome
+                                    print(f"✅ Professor encontrado: {professor_nome} (ID: {matricula.professor_id})")
+                                else:
+                                    print(f"⚠️ Professor não encontrado para professor_id={matricula.professor_id} (matrícula {matricula.id})")
+                                    # Verificar se existem professores no banco
+                                    total_professores = Professor.query.count()
+                                    print(f"📊 Total de professores no banco: {total_professores}")
+                            except Exception as e:
+                                print(f"⚠️ Erro ao buscar professor {matricula.professor_id} para matrícula {matricula.id}: {str(e)}")
+                                import traceback
+                                print(traceback.format_exc())
+                        else:
+                            print(f"⚠️ Matrícula {matricula.id} não tem professor_id!")
+                        
+                        resultado.append({
+                            'id': f'{pagamento.id}_mat_{matricula.id}',
+                            'aluno_id': aluno.id,
+                            'aluno_nome': aluno.nome,
+                            'professor_id': matricula.professor_id,
+                            'professor_nome': professor_nome,
+                            'curso': matricula.tipo_curso,
+                            'curso_nome': curso_nome,
+                            'matricula_id': matricula.id,
+                            'mes_referencia': pagamento.mes_referencia,
+                            'ano_referencia': pagamento.ano_referencia,
+                            'mes_nome': mes_nome,
+                            'valor': valor_pago if valor_pago > 0 else valor_mensalidade,
+                            'valor_pago': valor_pago,
+                            'data_vencimento': data_vencimento_ref.isoformat() if data_vencimento_ref else None,
+                            'data_pagamento': pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None,
+                            'status': status_pagamento,
+                            'status_label': 'Pago' if status_pagamento == 'pago' else 'Pendente' if status_pagamento == 'pendente' else 'Atrasado',
+                            'url_comprovante': pagamento.url_comprovante,
+                            'observacoes': pagamento.observacoes,
+                            'data_cadastro': pagamento.data_cadastro.isoformat() if pagamento.data_cadastro else None
+                        })
             
             # Adicionar alunos atrasados sem pagamento registrado (apenas se o filtro for "atrasado")
             # Quando não há filtro, não adicionar alunos sem pagamento, apenas mostrar os pagamentos registrados
