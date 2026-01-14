@@ -5,7 +5,7 @@ import { api, Aluno, Professor } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload, Download, Clock } from 'lucide-react';
+import { Search, Loader2, Users, Mail, Phone, Eye, Plus, GraduationCap, Pencil, Upload, Download, Clock, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -356,6 +356,51 @@ export default function Alunos() {
                           >
                             <Pencil size={16} />
                           </Button>
+                          {aluno.ativo && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                if (window.confirm(`Tem certeza que deseja inativar o aluno ${aluno.nome}?`)) {
+                                  try {
+                                    const response = await api.excluirAluno(aluno.id);
+                                    if (response.success) {
+                                      toast({
+                                        title: 'Sucesso',
+                                        description: 'Aluno inativado com sucesso',
+                                      });
+                                      // Recarregar a lista
+                                      const filters: any = {};
+                                      if (search) filters.search = search;
+                                      if (filterProfessor) filters.professor_id = filterProfessor;
+                                      if (filterStatus === 'ativo') filters.ativo = true;
+                                      else if (filterStatus === 'inativo') filters.ativo = false;
+                                      const alunosResponse = await api.getAlunos(filters);
+                                      if (alunosResponse.success) {
+                                        setAlunos(alunosResponse.data);
+                                      }
+                                    } else {
+                                      toast({
+                                        title: 'Erro',
+                                        description: response.error || 'Erro ao inativar aluno',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  } catch (error) {
+                                    toast({
+                                      title: 'Erro',
+                                      description: 'Erro ao inativar aluno',
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                }
+                              }}
+                              title="Inativar"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <XCircle size={16} />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

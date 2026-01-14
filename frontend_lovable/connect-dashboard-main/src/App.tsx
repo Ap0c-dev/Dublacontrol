@@ -162,6 +162,14 @@ const App = () => (
               }
             />
             <Route
+              path="/upload-comprovante/:alunoId"
+              element={
+                <RoleProtectedRoute allowedRoles={['admin', 'aluno']} requireWrite={true}>
+                  <UploadComprovante />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/gerar-codigo-recuperacao"
               element={
                 <RoleProtectedRoute allowedRoles={['admin']}>

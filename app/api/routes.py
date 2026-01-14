@@ -4163,6 +4163,10 @@ def api_rejeitar_pagamento(pagamento_id):
 @api_login_required
 def api_upload_comprovante():
     """Upload de comprovante de pagamento"""
+    print(f"📤 Upload de comprovante - Método: {request.method}")
+    print(f"📤 Headers: {dict(request.headers)}")
+    print(f"📤 Form data: {dict(request.form)}")
+    print(f"📤 Files: {list(request.files.keys())}")
     try:
         import cloudinary
         import cloudinary.uploader
