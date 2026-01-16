@@ -90,7 +90,56 @@ def create_app():
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
             return response
     
+    # Configurar connection pooling antes de inicializar db
+    # Flask-SQLAlchemy aplica SQLALCHEMY_ENGINE_OPTIONS automaticamente se configurado
     db.init_app(app)
+    
+    # Aplicar configurações de pooling manualmente se necessário
+    if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('postgresql://'):
+        engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
+        if engine_options:
+            # Recriar engine com as opções de pooling
+            from sqlalchemy import create_engine
+            database_uri = app.config['SQLALCHEMY_DATABASE_URI']
+            
+            # Para PgBouncer, garantir configurações corretas
+            if 'pooler' in database_uri and ':6543' in database_uri:
+                # PgBouncer tem limitações - ajustar configurações
+                # Não usar prepared statements (não suportado em modo transaction)
+                from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+                
+                parsed = urlparse(database_uri)
+                query_params = parse_qs(parsed.query)
+                
+                # Remover pgbouncer se existir (não é reconhecido pelo psycopg2)
+                if 'pgbouncer' in query_params:
+                    del query_params['pgbouncer']
+                
+                # Adicionar parâmetros necessários para PgBouncer
+                if 'server_prepared_statements' not in query_params:
+                    query_params['server_prepared_statements'] = ['false']
+                
+                # Reconstruir URL
+                new_query = urlencode(query_params, doseq=True)
+                database_uri = urlunparse((
+                    parsed.scheme,
+                    parsed.netloc,
+                    parsed.path,
+                    parsed.params,
+                    new_query,
+                    parsed.fragment
+                ))
+                
+                print("✅ Configurações PgBouncer aplicadas (pgbouncer=true removido da URL)")
+            
+            new_engine = create_engine(
+                database_uri,
+                **engine_options
+            )
+            # Substituir o engine do Flask-SQLAlchemy
+            db.engine = new_engine
+            # Atualizar a URI no config também
+            app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     
     # Configurar Flask-Login
     login_manager = LoginManager()

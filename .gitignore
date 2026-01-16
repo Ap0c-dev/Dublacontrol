@@ -40,3 +40,18 @@ TOKEN_ADMIN.txt
 # Uploads locais (se houver)
 uploads/
 
+# Documentação Markdown
+*.md
+
+# Scripts SQL
+*.sql
+
+# Scripts de teste e migração
+*test*.py
+*migra*.py
+*converter*.py
+*dividir*.py
+*restaurar*.py
+*exportar*.py
+testar_conexao_supabase.py
+

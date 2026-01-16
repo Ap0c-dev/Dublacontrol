@@ -12,7 +12,7 @@ from app.models.pagamento import Pagamento
 from app.models.nota import Nota
 from app.models.senha_reset import SenhaReset
 from app.models.lista_espera import ListaEspera
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 import hashlib
 from calendar import monthrange
@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 import os
 import re
 import unicodedata
+import time
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
@@ -29,6 +30,12 @@ api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 # Armazenamento simples de tokens válidos (em produção, usar Redis ou JWT)
 # Formato: {token: user_id}
 valid_tokens = {}
+
+# Rate limiting simples para login (em produção, usar Redis ou Flask-Limiter)
+# Formato: {ip_address: {'count': int, 'reset_time': datetime}}
+login_attempts = {}
+MAX_LOGIN_ATTEMPTS = 5  # Máximo de tentativas
+LOGIN_LOCKOUT_TIME = 300  # 5 minutos em segundos
 
 # Handler global para requisições OPTIONS (CORS preflight)
 # Isso garante que requisições OPTIONS sejam tratadas antes de chegar aos endpoints
@@ -191,6 +198,32 @@ def api_login():
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         return response, 200
     
+    # Rate limiting básico
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    else:
+        client_ip = request.remote_addr or 'unknown'
+    
+    # Verificar rate limiting
+    now = datetime.now()
+    if client_ip in login_attempts:
+        attempt_data = login_attempts[client_ip]
+        if attempt_data['reset_time'] > now:
+            if attempt_data['count'] >= MAX_LOGIN_ATTEMPTS:
+                remaining = int((attempt_data['reset_time'] - now).total_seconds())
+                response = jsonify({
+                    'error': 'Muitas tentativas de login. Tente novamente em alguns minutos.',
+                    'success': False,
+                    'retry_after': remaining
+                })
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Retry-After', str(remaining))
+                return response, 429
+        else:
+            # Reset se passou o tempo
+            login_attempts[client_ip] = {'count': 0, 'reset_time': now + timedelta(seconds=LOGIN_LOCKOUT_TIME)}
+    
     try:
         # Aceitar JSON mesmo se Content-Type não estiver correto
         data = request.get_json(force=True, silent=True)
@@ -209,26 +242,56 @@ def api_login():
         
         usuario = Usuario.query.filter_by(username=username).first()
         
+        # Sempre fazer verificação de senha (mesmo se usuário não existir) para prevenir timing attacks
+        # Adicionar pequeno delay para normalizar tempo de resposta
+        time.sleep(0.1)
+        
         # Verificar se usuário existe
         if not usuario:
-            print(f"❌ Tentativa de login com usuário inexistente: {username}")
+            # Incrementar tentativas
+            if client_ip not in login_attempts:
+                login_attempts[client_ip] = {'count': 0, 'reset_time': now + timedelta(seconds=LOGIN_LOCKOUT_TIME)}
+            login_attempts[client_ip]['count'] += 1
+            print(f"❌ Tentativa de login com usuário inexistente (IP: {client_ip})")
             response = jsonify({'error': 'Credenciais inválidas', 'success': False})
             response.headers.add('Access-Control-Allow-Origin', '*')
+            # Headers de segurança
+            response.headers.add('X-Content-Type-Options', 'nosniff')
+            response.headers.add('X-Frame-Options', 'DENY')
+            response.headers.add('X-XSS-Protection', '1; mode=block')
             return response, 401
         
         # Verificar se usuário está ativo
         if not usuario.ativo:
-            print(f"❌ Tentativa de login com usuário inativo: {username}")
+            # Incrementar tentativas
+            if client_ip not in login_attempts:
+                login_attempts[client_ip] = {'count': 0, 'reset_time': now + timedelta(seconds=LOGIN_LOCKOUT_TIME)}
+            login_attempts[client_ip]['count'] += 1
+            print(f"❌ Tentativa de login com usuário inativo (IP: {client_ip})")
             response = jsonify({'error': 'Usuário inativo. Entre em contato com o administrador.', 'success': False})
             response.headers.add('Access-Control-Allow-Origin', '*')
+            response.headers.add('X-Content-Type-Options', 'nosniff')
+            response.headers.add('X-Frame-Options', 'DENY')
+            response.headers.add('X-XSS-Protection', '1; mode=block')
             return response, 403
         
         # Verificar senha
         if not usuario.check_password(password):
-            print(f"❌ Tentativa de login com senha incorreta para usuário: {username}")
+            # Incrementar tentativas
+            if client_ip not in login_attempts:
+                login_attempts[client_ip] = {'count': 0, 'reset_time': now + timedelta(seconds=LOGIN_LOCKOUT_TIME)}
+            login_attempts[client_ip]['count'] += 1
+            print(f"❌ Tentativa de login com senha incorreta (IP: {client_ip})")
             response = jsonify({'error': 'Credenciais inválidas', 'success': False})
             response.headers.add('Access-Control-Allow-Origin', '*')
+            response.headers.add('X-Content-Type-Options', 'nosniff')
+            response.headers.add('X-Frame-Options', 'DENY')
+            response.headers.add('X-XSS-Protection', '1; mode=block')
             return response, 401
+        
+        # Login bem-sucedido - resetar contador
+        if client_ip in login_attempts:
+            login_attempts[client_ip] = {'count': 0, 'reset_time': now}
         
         # Login via Flask-Login (para manter compatibilidade)
         login_user(usuario, remember=True)
@@ -266,12 +329,29 @@ def api_login():
             }
         })
         response.headers.add('Access-Control-Allow-Origin', '*')
+        # Headers de segurança
+        response.headers.add('X-Content-Type-Options', 'nosniff')
+        response.headers.add('X-Frame-Options', 'DENY')
+        response.headers.add('X-XSS-Protection', '1; mode=block')
+        # Não armazenar credenciais em cache
+        response.headers.add('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+        response.headers.add('Pragma', 'no-cache')
         return response
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Erro no login API: {error_trace}")
-        response = jsonify({'error': str(e), 'success': False})
+        print(f"❌ Erro no login API: {str(e)}")
+        print(f"   Tipo: {type(e).__name__}")
+        print(f"   Traceback completo: {error_trace}")
+        
+        # Verificar se é erro de conexão com banco
+        error_str = str(e).lower()
+        if 'connection' in error_str or 'database' in error_str or 'operationalerror' in error_str:
+            error_msg = 'Erro de conexão com o banco de dados. Verifique a configuração.'
+        else:
+            error_msg = f'Erro interno: {str(e)}'
+        
+        response = jsonify({'error': error_msg, 'success': False, 'details': str(e) if app.debug else None})
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response, 500
 

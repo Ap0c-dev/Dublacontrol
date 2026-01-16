@@ -7,18 +7,95 @@ class Config:
     ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev').lower()  # 'dev' ou 'prd'
     
     # Banco de dados
-    if os.environ.get('DATABASE_URL'):
+    # Verificar se está rodando no Render
+    is_render = os.environ.get('RENDER') is not None
+    database_url_env = os.environ.get('DATABASE_URL')
+    
+    # Verificar se deve usar DATABASE_URL ou SQLite local
+    use_database_url = False
+    if database_url_env:
+        # Se não estiver no Render e a URL apontar para o Render (hostname dpg-), ignorar e usar SQLite
+        if not is_render and 'dpg-' in database_url_env:
+            print(f"⚠️  DATABASE_URL aponta para Render, mas rodando localmente. Usando SQLite local.")
+        else:
+            # Usar DATABASE_URL (Render ou outro PostgreSQL)
+            use_database_url = True
+    
+    if use_database_url:
         # Render PostgreSQL ou outro banco via DATABASE_URL (produção)
         # Render usa postgres:// mas SQLAlchemy precisa postgresql://
-        database_url = os.environ.get('DATABASE_URL')
+        database_url = database_url_env
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        # Remover parâmetro pgbouncer=true da URL (não é reconhecido pelo psycopg2)
+        # O pooler funciona automaticamente na porta 6543, não precisa desse parâmetro
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        parsed = urlparse(database_url)
+        query_params = parse_qs(parsed.query)
+        
+        # Remover pgbouncer se existir
+        if 'pgbouncer' in query_params:
+            del query_params['pgbouncer']
+        
+        # Reconstruir URL sem pgbouncer
+        new_query = urlencode(query_params, doseq=True)
+        database_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+        
         SQLALCHEMY_DATABASE_URI = database_url
-        ENVIRONMENT = 'prd'  # Se tem DATABASE_URL, está em produção
+        ENVIRONMENT = 'prd'  # Se tem DATABASE_URL válida, está em produção
+        
+        # Configurações de connection pooling para melhor performance
+        # Especialmente importante para Supabase e outros bancos remotos
+        # Flask-SQLAlchemy aplica essas configurações via SQLALCHEMY_ENGINE_OPTIONS
+        
+        # Para PgBouncer (pooler), usar configurações mais conservadoras
+        is_pgbouncer = 'pooler' in database_url and ':6543' in database_url
+        
+        if is_pgbouncer:
+            # PgBouncer tem limitações - usar pool menor e sem prepared statements
+            SQLALCHEMY_ENGINE_OPTIONS = {
+                'pool_size': 3,  # Pool menor para PgBouncer
+                'max_overflow': 5,
+                'pool_pre_ping': True,
+                'pool_recycle': 1800,  # 30 minutos (PgBouncer recicla conexões)
+                'connect_args': {
+                    'connect_timeout': 10,
+                    # PgBouncer não suporta prepared statements em modo transaction
+                    # Usar modo session para melhor compatibilidade
+                }
+            }
+        else:
+            # Configuração padrão para conexão direta
+            SQLALCHEMY_ENGINE_OPTIONS = {
+                'pool_size': 5,
+                'max_overflow': 10,
+                'pool_pre_ping': True,
+                'pool_recycle': 3600,
+                'connect_args': {
+                    'connect_timeout': 10,
+                }
+            }
+        
+        # Para Supabase, usar pooler se disponível (melhor performance)
+        if 'supabase.co' in database_url:
+            if 'pooler' in database_url and ':6543' in database_url:
+                print("✅ Usando Supabase com connection pooling (PgBouncer) - Ótimo para performance!")
+            elif 'pooler' not in database_url:
+                print("💡 Dica: Para melhor performance no Supabase, use a URL do pooler (porta 6543)")
+                print("   No Supabase: Settings → Database → Connection string → ORM's")
+                print("   Use a porta 6543 (PgBouncer) ao invés de 5432")
     else:
         # SQLite local - separar dev e prd
         # No Render, usar diretório temporário se não houver DATABASE_URL
-        if os.environ.get('RENDER'):
+        if is_render:
             # Render sem DATABASE_URL - usar diretório temporário (dados serão perdidos ao reiniciar)
             import tempfile
             temp_dir = tempfile.gettempdir()
