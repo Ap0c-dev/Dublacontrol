@@ -90,14 +90,11 @@ def create_app():
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
             return response
     
-    # Configurar connection pooling antes de inicializar db
-    # Flask-SQLAlchemy aplica SQLALCHEMY_ENGINE_OPTIONS automaticamente se configurado
-    # Configurar pooling antes de inicializar db
-    # Flask-SQLAlchemy aplica SQLALCHEMY_ENGINE_OPTIONS automaticamente se configurado
-    db.init_app(app)
-    
+    # Flask-SQLAlchemy gerencia o engine automaticamente
     # A URL já foi processada no config.py (pgbouncer removido)
-    # As opções de pooling estão em SQLALCHEMY_ENGINE_OPTIONS e serão aplicadas automaticamente
+    # SQLALCHEMY_ENGINE_OPTIONS está configurado mas Flask-SQLAlchemy 3.x não suporta diretamente
+    # O pooling básico funcionará, mas não otimizado. A URL limpa já resolve o problema principal.
+    db.init_app(app)
     
     # Configurar Flask-Login
     login_manager = LoginManager()
