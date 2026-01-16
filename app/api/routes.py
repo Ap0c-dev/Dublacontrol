@@ -37,6 +37,40 @@ login_attempts = {}
 MAX_LOGIN_ATTEMPTS = 5  # Máximo de tentativas
 LOGIN_LOCKOUT_TIME = 300  # 5 minutos em segundos
 
+# ==================== REGRA TEMPORÁRIA DE PAGAMENTO ====================
+# Regra temporária: Alunos com vencimento <= 14/01/2026 são considerados pagos
+# apenas para janeiro de 2026. A partir de 14/01/2026, tudo volta ao normal.
+DATA_LIMITE_VENCIMENTO = date(2026, 1, 14)
+MES_APLICACAO = 1  # Janeiro
+ANO_APLICACAO = 2026
+
+def aluno_considerado_pago_automaticamente(aluno, mes_referencia, ano_referencia):
+    """
+    Verifica se um aluno deve ser considerado como pago automaticamente
+    baseado na regra temporária de janeiro/2026.
+    
+    Args:
+        aluno: Objeto Aluno
+        mes_referencia: Mês de referência do pagamento (1-12)
+        ano_referencia: Ano de referência do pagamento
+    
+    Returns:
+        bool: True se o aluno deve ser considerado como pago automaticamente
+    """
+    # Aplicar regra apenas para janeiro de 2026
+    if mes_referencia != MES_APLICACAO or ano_referencia != ANO_APLICACAO:
+        return False
+    
+    # Verificar se o aluno tem data de vencimento
+    if not aluno or not aluno.data_vencimento:
+        return False
+    
+    # Verificar se a data de vencimento é <= 14/01/2026
+    if aluno.data_vencimento <= DATA_LIMITE_VENCIMENTO:
+        return True
+    
+    return False
+
 # Handler global para requisições OPTIONS (CORS preflight)
 # Isso garante que requisições OPTIONS sejam tratadas antes de chegar aos endpoints
 @api_bp.before_request
@@ -1095,7 +1129,16 @@ def api_listar_pagamentos():
                     url_comprovante = None
                     pagamento_id = None
                     
-                    if pagamento:
+                    # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+                    considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, mes_atual, ano_atual)
+                    
+                    if considerado_pago_auto:
+                        # Aluno considerado pago automaticamente para janeiro/2026
+                        status_pagamento = 'pago'
+                        # Se não tem pagamento registrado, usar valor da mensalidade
+                        if not pagamento:
+                            valor_pago = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else aluno.get_total_mensalidades()
+                    elif pagamento:
                         pagamento_id = pagamento.id
                         valor_pago = float(pagamento.valor_pago) if pagamento.valor_pago else 0
                         data_pagamento = pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None
@@ -1244,8 +1287,14 @@ def api_listar_pagamentos():
                                 ultimo_dia = monthrange(pagamento.ano_referencia, pagamento.mes_referencia)[1]
                                 data_vencimento_ref = date(pagamento.ano_referencia, pagamento.mes_referencia, min(dia_vencimento, ultimo_dia))
                         
+                        # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+                        considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, pagamento.mes_referencia, pagamento.ano_referencia)
+                        
                         # Converter status do banco para frontend
-                        if pagamento.status == 'aprovado':
+                        if considerado_pago_auto:
+                            # Aluno considerado pago automaticamente para janeiro/2026
+                            status_pagamento = 'pago'
+                        elif pagamento.status == 'aprovado':
                             status_pagamento = 'pago'
                         elif pagamento.status == 'pendente':
                             # Verificar se está atrasado (vencimento passou)
@@ -1365,6 +1414,12 @@ def api_listar_pagamentos():
                 for matricula in matriculas:
                     aluno = matricula.aluno
                     if not aluno or not aluno.ativo or not aluno.data_vencimento:
+                        continue
+                    
+                    # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+                    considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, mes_atual, ano_atual)
+                    if considerado_pago_auto:
+                        # Aluno considerado pago automaticamente, não adicionar como atrasado
                         continue
                     
                     # Calcular data de vencimento para o mês atual
@@ -1508,13 +1563,22 @@ def api_listar_pagamentos():
                     ano_referencia=ano_referencia
                 ).first()
                 
+                # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+                considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, mes_referencia, ano_referencia)
+                
                 status_pagamento = None
                 valor_pago = 0
                 data_pagamento = None
                 url_comprovante = None
                 pagamento_id = None
                 
-                if pagamento:
+                if considerado_pago_auto:
+                    # Aluno considerado pago automaticamente para janeiro/2026
+                    status_pagamento = 'pago'
+                    # Se não tem pagamento registrado, usar valor da mensalidade
+                    if not pagamento:
+                        valor_pago = float(matricula.valor_mensalidade) if matricula.valor_mensalidade else aluno.get_total_mensalidades()
+                elif pagamento:
                     pagamento_id = pagamento.id
                     valor_pago = float(pagamento.valor_pago) if pagamento.valor_pago else 0
                     data_pagamento = pagamento.data_pagamento.isoformat() if pagamento.data_pagamento else None
@@ -1691,6 +1755,13 @@ def api_dashboard_stats():
             except ValueError:
                 ultimo_dia = monthrange(ano_atual, mes_atual)[1]
                 data_vencimento_ref = date(ano_atual, mes_atual, min(dia_vencimento, ultimo_dia))
+            
+            # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+            considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, mes_atual, ano_atual)
+            
+            # Se considerado pago automaticamente, não contar como atrasado
+            if considerado_pago_auto:
+                continue
             
             # Buscar pagamento do aluno para o mês atual
             pagamento = Pagamento.query.filter_by(
@@ -2477,6 +2548,12 @@ def api_professores_performance():
                 aluno_id = aluno_id_tuple[0]
                 aluno = Aluno.query.get(aluno_id)
                 if aluno and aluno.ativo:
+                    # Verificar se aluno deve ser considerado pago automaticamente (regra temporária)
+                    considerado_pago_auto = aluno_considerado_pago_automaticamente(aluno, hoje.month, hoje.year)
+                    if considerado_pago_auto:
+                        # Aluno considerado pago automaticamente, não contar como atrasado
+                        continue
+                    
                     # Verificar se tem pagamento atrasado
                     data_vencimento = aluno.data_vencimento
                     if data_vencimento:
@@ -2574,6 +2651,400 @@ def api_professores_performance():
     except Exception as e:
         import traceback
         print(f"❌ Erro ao buscar performance de professores: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/taxa-retencao-geral', methods=['GET'])
+@api_login_required
+def api_taxa_retencao_geral():
+    """Taxa de retenção geral - % de alunos que continuam ativos após X meses"""
+    try:
+        from datetime import timedelta
+        from calendar import monthrange
+        
+        hoje = date.today()
+        meses = request.args.get('meses', type=int, default=6)  # Padrão: 6 meses
+        
+        # Calcular data de referência: X meses atrás (sem dateutil)
+        ano = hoje.year
+        mes = hoje.month
+        for _ in range(meses):
+            if mes == 1:
+                mes = 12
+                ano -= 1
+            else:
+                mes -= 1
+        data_referencia = date(ano, mes, 1)
+        
+        # Alunos que iniciaram matrícula há X meses ou mais
+        alunos_iniciados = db.session.query(Matricula.aluno_id).distinct().filter(
+            Matricula.data_inicio.isnot(None),
+            Matricula.data_inicio <= data_referencia
+        ).all()
+        total_alunos_iniciados = len(alunos_iniciados)
+        
+        if total_alunos_iniciados == 0:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'meses': meses,
+                    'total_alunos_iniciados': 0,
+                    'alunos_ainda_ativos': 0,
+                    'taxa_retencao': 0.0,
+                    'taxa_evasao': 0.0
+                }
+            })
+        
+        alunos_ids = [a[0] for a in alunos_iniciados]
+        
+        # Alunos que ainda estão ativos (têm matrícula ativa)
+        alunos_ainda_ativos = db.session.query(Matricula.aluno_id).distinct().filter(
+            Matricula.aluno_id.in_(alunos_ids),
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).count()
+        
+        # Calcular taxas
+        taxa_retencao = (alunos_ainda_ativos / total_alunos_iniciados) * 100
+        taxa_evasao = 100 - taxa_retencao
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'meses': meses,
+                'total_alunos_iniciados': total_alunos_iniciados,
+                'alunos_ainda_ativos': alunos_ainda_ativos,
+                'alunos_que_sairam': total_alunos_iniciados - alunos_ainda_ativos,
+                'taxa_retencao': round(taxa_retencao, 1),
+                'taxa_evasao': round(taxa_evasao, 1),
+                'data_referencia': data_referencia.strftime('%Y-%m-%d')
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao calcular taxa de retenção geral: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/taxa-evasao-geral', methods=['GET'])
+@api_login_required
+def api_taxa_evasao_geral():
+    """Taxa de evasão geral - % de alunos que saíram nos últimos X meses"""
+    try:
+        from datetime import timedelta
+        
+        hoje = date.today()
+        meses = request.args.get('meses', type=int, default=3)  # Padrão: últimos 3 meses
+        
+        # Calcular data de referência: X meses atrás (sem dateutil)
+        ano = hoje.year
+        mes = hoje.month
+        for _ in range(meses):
+            if mes == 1:
+                mes = 12
+                ano -= 1
+            else:
+                mes -= 1
+        data_referencia = date(ano, mes, 1)
+        
+        # Total de alunos que tinham matrícula ativa há X meses
+        alunos_ativos_antes = db.session.query(Matricula.aluno_id).distinct().filter(
+            Matricula.data_inicio.isnot(None),
+            Matricula.data_inicio <= data_referencia,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > data_referencia
+            )
+        ).count()
+        
+        if alunos_ativos_antes == 0:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'meses': meses,
+                    'alunos_ativos_antes': 0,
+                    'alunos_ativos_agora': 0,
+                    'alunos_que_sairam': 0,
+                    'taxa_evasao': 0.0
+                }
+            })
+        
+        # Alunos que ainda estão ativos agora
+        alunos_ativos_agora = db.session.query(Matricula.aluno_id).distinct().filter(
+            Matricula.data_inicio.isnot(None),
+            Matricula.data_inicio <= data_referencia,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).count()
+        
+        # Alunos que saíram
+        alunos_que_sairam = alunos_ativos_antes - alunos_ativos_agora
+        taxa_evasao = (alunos_que_sairam / alunos_ativos_antes) * 100 if alunos_ativos_antes > 0 else 0.0
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'meses': meses,
+                'alunos_ativos_antes': alunos_ativos_antes,
+                'alunos_ativos_agora': alunos_ativos_agora,
+                'alunos_que_sairam': alunos_que_sairam,
+                'taxa_evasao': round(taxa_evasao, 1),
+                'data_referencia': data_referencia.strftime('%Y-%m-%d')
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao calcular taxa de evasão geral: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/ticket-medio', methods=['GET'])
+@api_login_required
+def api_ticket_medio():
+    """Ticket médio por aluno - valor médio por aluno (soma de todas modalidades)"""
+    try:
+        hoje = date.today()
+        
+        # Buscar todos os alunos ativos com matrícula ativa
+        alunos_ativos = db.session.query(Aluno.id).distinct().join(
+            Matricula, Aluno.id == Matricula.aluno_id
+        ).filter(
+            Aluno.ativo == True,
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        total_alunos = len(alunos_ativos)
+        
+        if total_alunos == 0:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'total_alunos': 0,
+                    'ticket_medio': 0.0,
+                    'receita_total_mensal': 0.0
+                }
+            })
+        
+        alunos_ids = [a[0] for a in alunos_ativos]
+        
+        # Para cada aluno, somar o valor de todas as suas matrículas ativas
+        receita_total_mensal = 0.0
+        tickets_por_aluno = []
+        
+        for aluno_id in alunos_ids:
+            valor_total_aluno = db.session.query(
+                db.func.sum(Matricula.valor_mensalidade)
+            ).filter(
+                Matricula.aluno_id == aluno_id,
+                db.or_(
+                    Matricula.data_encerramento.is_(None),
+                    Matricula.data_encerramento > hoje
+                )
+            ).scalar() or 0.0
+            
+            tickets_por_aluno.append(float(valor_total_aluno))
+            receita_total_mensal += float(valor_total_aluno)
+        
+        # Calcular ticket médio
+        ticket_medio = receita_total_mensal / total_alunos if total_alunos > 0 else 0.0
+        
+        # Estatísticas adicionais
+        ticket_minimo = min(tickets_por_aluno) if tickets_por_aluno else 0.0
+        ticket_maximo = max(tickets_por_aluno) if tickets_por_aluno else 0.0
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_alunos': total_alunos,
+                'receita_total_mensal': round(receita_total_mensal, 2),
+                'ticket_medio': round(ticket_medio, 2),
+                'ticket_minimo': round(ticket_minimo, 2),
+                'ticket_maximo': round(ticket_maximo, 2)
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao calcular ticket médio: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/horarios-populares', methods=['GET'])
+@api_login_required
+def api_horarios_populares():
+    """Horários mais populares - distribuição de horários de aula"""
+    try:
+        hoje = date.today()
+        
+        # Buscar todas as matrículas ativas com horário
+        matriculas = Matricula.query.filter(
+            Matricula.horario_aula.isnot(None),
+            Matricula.horario_aula != '',
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        # Agrupar por horário
+        horarios_count = {}
+        for mat in matriculas:
+            horario = mat.horario_aula.strip() if mat.horario_aula else None
+            if horario:
+                horarios_count[horario] = horarios_count.get(horario, 0) + 1
+        
+        # Ordenar por quantidade (mais popular primeiro)
+        horarios_ordenados = sorted(
+            horarios_count.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        
+        # Formatar resultado
+        resultado = [
+            {
+                'horario': horario,
+                'quantidade': quantidade,
+                'percentual': round((quantidade / len(matriculas)) * 100, 1) if len(matriculas) > 0 else 0
+            }
+            for horario, quantidade in horarios_ordenados
+        ]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_matriculas': len(matriculas),
+                'horarios': resultado
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar horários populares: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/dias-populares', methods=['GET'])
+@api_login_required
+def api_dias_populares():
+    """Dias da semana mais procurados"""
+    try:
+        hoje = date.today()
+        
+        # Buscar todas as matrículas ativas com dia da semana
+        matriculas = Matricula.query.filter(
+            Matricula.dia_semana.isnot(None),
+            Matricula.dia_semana != '',
+            db.or_(
+                Matricula.data_encerramento.is_(None),
+                Matricula.data_encerramento > hoje
+            )
+        ).all()
+        
+        # Agrupar por dia da semana
+        dias_count = {}
+        for mat in matriculas:
+            dia = mat.dia_semana.strip() if mat.dia_semana else None
+            if dia:
+                dias_count[dia] = dias_count.get(dia, 0) + 1
+        
+        # Ordenar dias da semana (Segunda a Domingo)
+        ordem_dias = {
+            'Segunda-feira': 1,
+            'Segunda': 1,
+            'Terça-feira': 2,
+            'Terça': 2,
+            'Quarta-feira': 3,
+            'Quarta': 3,
+            'Quinta-feira': 4,
+            'Quinta': 4,
+            'Sexta-feira': 5,
+            'Sexta': 5,
+            'Sábado': 6,
+            'Sabado': 6,
+            'Domingo': 7
+        }
+        
+        # Ordenar por ordem da semana
+        dias_ordenados = sorted(
+            dias_count.items(),
+            key=lambda x: ordem_dias.get(x[0], 99)
+        )
+        
+        # Formatar resultado
+        resultado = [
+            {
+                'dia_semana': dia,
+                'quantidade': quantidade,
+                'percentual': round((quantidade / len(matriculas)) * 100, 1) if len(matriculas) > 0 else 0
+            }
+            for dia, quantidade in dias_ordenados
+        ]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_matriculas': len(matriculas),
+                'dias': resultado
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao buscar dias populares: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/dashboard/sazonalidade', methods=['GET'])
+@api_login_required
+def api_sazonalidade():
+    """Padrões de matrícula ao longo do ano - distribuição mensal"""
+    try:
+        # Buscar todas as matrículas com data_inicio
+        matriculas = Matricula.query.filter(
+            Matricula.data_inicio.isnot(None)
+        ).all()
+        
+        # Agrupar por mês/ano
+        meses_count = {}
+        meses_nomes = {
+            1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+            5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+            9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+        }
+        
+        for mat in matriculas:
+            if mat.data_inicio:
+                chave = f"{mat.data_inicio.year}-{mat.data_inicio.month:02d}"
+                meses_count[chave] = meses_count.get(chave, 0) + 1
+        
+        # Ordenar por data (mais antigo primeiro)
+        meses_ordenados = sorted(meses_count.items())
+        
+        # Formatar resultado
+        resultado = []
+        for chave, quantidade in meses_ordenados:
+            ano, mes = chave.split('-')
+            resultado.append({
+                'ano': int(ano),
+                'mes': int(mes),
+                'mes_nome': meses_nomes[int(mes)],
+                'quantidade': quantidade,
+                'periodo': f"{meses_nomes[int(mes)]}/{ano}"
+            })
+        
+        # Calcular média mensal
+        media_mensal = sum(meses_count.values()) / len(meses_count) if meses_count else 0
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_matriculas': len(matriculas),
+                'media_mensal': round(media_mensal, 1),
+                'distribuicao_mensal': resultado
+            }
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro ao calcular sazonalidade: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== NOTAS ====================
