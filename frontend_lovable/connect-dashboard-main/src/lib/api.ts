@@ -765,6 +765,38 @@ class ApiClient {
     }
   }
 
+  async marcarAlunoPago(
+    id: number, 
+    mesReferencia?: number, 
+    anoReferencia?: number
+  ): Promise<ApiResponse<{ pagamento_id: number; aluno_id: number; mes_referencia: number; ano_referencia: number; valor_pago: number; status: string }>> {
+    try {
+      const body: any = {};
+      if (mesReferencia) body.mes_referencia = mesReferencia;
+      if (anoReferencia) body.ano_referencia = anoReferencia;
+
+      const response = await fetch(`${API_BASE_URL}/alunos/${id}/marcar-pago`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Erro ao marcar aluno como pago:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao marcar aluno como pago',
+        data: {} as any
+      };
+    }
+  }
+
   async criarProfessor(professor: Partial<Professor>): Promise<ApiResponse<Professor>> {
     try {
       const response = await fetch(`${API_BASE_URL}/professores`, {

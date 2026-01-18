@@ -71,6 +71,25 @@ def aluno_considerado_pago_automaticamente(aluno, mes_referencia, ano_referencia
     
     return False
 
+# Função auxiliar para adicionar headers CORS corretamente
+def add_cors_headers(response):
+    """
+    Adiciona headers CORS a uma resposta.
+    Quando supports_credentials está ativo, não podemos usar '*', 
+    então usamos a origem da requisição.
+    """
+    origin = request.headers.get('Origin')
+    if origin:
+        # Usar origem específica quando disponível (necessário com credentials)
+        response.headers.add("Access-Control-Allow-Origin", origin)
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    else:
+        # Fallback para * se não houver origem (menos seguro, mas funciona)
+        response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
+    response.headers.add('Access-Control-Allow-Methods', "GET,POST,PUT,DELETE,OPTIONS")
+    return response
+
 # Handler global para requisições OPTIONS (CORS preflight)
 # Isso garante que requisições OPTIONS sejam tratadas antes de chegar aos endpoints
 @api_bp.before_request
@@ -78,14 +97,7 @@ def handle_preflight():
     """Trata requisições OPTIONS (CORS preflight)"""
     if request.method == "OPTIONS":
         response = make_response('', 200)
-        origin = request.headers.get('Origin')
-        if origin:
-            response.headers.add("Access-Control-Allow-Origin", origin)
-        else:
-            response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
-        response.headers.add('Access-Control-Allow-Methods', "GET,POST,PUT,DELETE,OPTIONS")
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        add_cors_headers(response)
         response.headers.add('Access-Control-Max-Age', '3600')
         return response
 
@@ -224,12 +236,10 @@ def gerar_username_voxen(nome, role='aluno'):
 @api_bp.route('/auth/login', methods=['POST', 'OPTIONS'])
 def api_login():
     """Login via API - retorna token simples (pode melhorar com JWT depois)"""
-    # Tratar OPTIONS para CORS
+    # Tratar OPTIONS para CORS (já tratado pelo before_request, mas mantemos para compatibilidade)
     if request.method == 'OPTIONS':
         response = jsonify({})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        add_cors_headers(response)
         return response, 200
     
     # Rate limiting básico
@@ -251,7 +261,7 @@ def api_login():
                     'success': False,
                     'retry_after': remaining
                 })
-                response.headers.add('Access-Control-Allow-Origin', '*')
+                add_cors_headers(response)
                 response.headers.add('Retry-After', str(remaining))
                 return response, 429
         else:
@@ -271,7 +281,7 @@ def api_login():
         
         if not username or not password:
             response = jsonify({'error': 'Username e password são obrigatórios', 'success': False})
-            response.headers.add('Access-Control-Allow-Origin', '*')
+            add_cors_headers(response)
             return response, 400
         
         usuario = Usuario.query.filter_by(username=username).first()
@@ -288,7 +298,7 @@ def api_login():
             login_attempts[client_ip]['count'] += 1
             print(f"❌ Tentativa de login com usuário inexistente (IP: {client_ip})")
             response = jsonify({'error': 'Credenciais inválidas', 'success': False})
-            response.headers.add('Access-Control-Allow-Origin', '*')
+            add_cors_headers(response)
             # Headers de segurança
             response.headers.add('X-Content-Type-Options', 'nosniff')
             response.headers.add('X-Frame-Options', 'DENY')
@@ -303,7 +313,7 @@ def api_login():
             login_attempts[client_ip]['count'] += 1
             print(f"❌ Tentativa de login com usuário inativo (IP: {client_ip})")
             response = jsonify({'error': 'Usuário inativo. Entre em contato com o administrador.', 'success': False})
-            response.headers.add('Access-Control-Allow-Origin', '*')
+            add_cors_headers(response)
             response.headers.add('X-Content-Type-Options', 'nosniff')
             response.headers.add('X-Frame-Options', 'DENY')
             response.headers.add('X-XSS-Protection', '1; mode=block')
@@ -362,7 +372,7 @@ def api_login():
                 'aluno_id': usuario.aluno_id
             }
         })
-        response.headers.add('Access-Control-Allow-Origin', '*')
+        add_cors_headers(response)
         # Headers de segurança
         response.headers.add('X-Content-Type-Options', 'nosniff')
         response.headers.add('X-Frame-Options', 'DENY')
@@ -386,7 +396,7 @@ def api_login():
             error_msg = f'Erro interno: {str(e)}'
         
         response = jsonify({'error': error_msg, 'success': False, 'details': str(e) if app.debug else None})
-        response.headers.add('Access-Control-Allow-Origin', '*')
+        add_cors_headers(response)
         return response, 500
 
 @api_bp.route('/auth/me', methods=['GET'])
@@ -3750,6 +3760,145 @@ def api_excluir_aluno(aluno_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/alunos/<int:aluno_id>/marcar-pago', methods=['POST'])
+@api_write_required
+@api_admin_required
+def api_marcar_aluno_pago(aluno_id):
+    """Marcar aluno como pago (criar pagamento aprovado diretamente)"""
+    try:
+        aluno = Aluno.query.get_or_404(aluno_id)
+        
+        if not aluno.ativo:
+            response = jsonify({'error': 'Não é possível marcar aluno inativo como pago'})
+            add_cors_headers(response)
+            return response, 400
+        
+        # Obter mês e ano de referência (padrão: mês/ano atual)
+        data = request.get_json() or {}
+        mes_referencia = data.get('mes_referencia')
+        ano_referencia = data.get('ano_referencia')
+        
+        hoje = date.today()
+        if not mes_referencia:
+            mes_referencia = hoje.month
+        if not ano_referencia:
+            ano_referencia = hoje.year
+        
+        # Validar mês e ano
+        if mes_referencia < 1 or mes_referencia > 12:
+            response = jsonify({'error': 'Mês deve estar entre 1 e 12'})
+            add_cors_headers(response)
+            return response, 400
+        
+        if ano_referencia < 2020 or ano_referencia > 2100:
+            response = jsonify({'error': 'Ano inválido'})
+            add_cors_headers(response)
+            return response, 400
+        
+        # Verificar se já existe pagamento aprovado para esse mês/ano
+        pagamento_existente = Pagamento.query.filter_by(
+            aluno_id=aluno_id,
+            mes_referencia=mes_referencia,
+            ano_referencia=ano_referencia,
+            status='aprovado'
+        ).first()
+        
+        if pagamento_existente:
+            response = jsonify({
+                'error': f'Já existe um pagamento aprovado para {mes_referencia}/{ano_referencia}',
+                'pagamento_id': pagamento_existente.id
+            })
+            add_cors_headers(response)
+            return response, 400
+        
+        # Calcular valor da mensalidade (soma de todas as matrículas ativas)
+        valor_mensalidade = aluno.get_total_mensalidades()
+        
+        if valor_mensalidade <= 0:
+            response = jsonify({'error': 'Aluno não possui mensalidade cadastrada'})
+            add_cors_headers(response)
+            return response, 400
+        
+        # Verificar se já existe pagamento pendente para esse mês/ano
+        pagamento_pendente = Pagamento.query.filter_by(
+            aluno_id=aluno_id,
+            mes_referencia=mes_referencia,
+            ano_referencia=ano_referencia
+        ).first()
+        
+        if pagamento_pendente:
+            # Se existe pagamento pendente, aprovar ele
+            pagamento_pendente.status = 'aprovado'
+            pagamento_pendente.aprovado_por = current_user.id
+            pagamento_pendente.data_aprovacao = datetime.now()
+            pagamento = pagamento_pendente
+        else:
+            # Criar novo pagamento aprovado
+            pagamento = Pagamento(
+                aluno_id=aluno_id,
+                mes_referencia=mes_referencia,
+                ano_referencia=ano_referencia,
+                valor_pago=valor_mensalidade,
+                data_pagamento=hoje,
+                status='aprovado',
+                aprovado_por=current_user.id,
+                data_aprovacao=datetime.now(),
+                observacoes_admin='Marcado como pago diretamente pelo administrador'
+            )
+            db.session.add(pagamento)
+        
+        # Atualizar data de vencimento do aluno se o pagamento for do mês corrente
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        if mes_referencia == mes_atual and ano_referencia == ano_atual:
+            # Calcular próxima data de vencimento (próximo mês, mantendo o dia)
+            if mes_atual == 12:
+                proximo_mes = 1
+                proximo_ano = ano_atual + 1
+            else:
+                proximo_mes = mes_atual + 1
+                proximo_ano = ano_atual
+            
+            # Manter o dia da data de vencimento atual
+            dia_vencimento = aluno.data_vencimento.day if aluno.data_vencimento else hoje.day
+            
+            # Ajustar o dia se o próximo mês não tiver esse dia
+            try:
+                nova_data_vencimento = date(proximo_ano, proximo_mes, dia_vencimento)
+            except ValueError:
+                ultimo_dia = monthrange(proximo_ano, proximo_mes)[1]
+                nova_data_vencimento = date(proximo_ano, proximo_mes, ultimo_dia)
+            
+            aluno.data_vencimento = nova_data_vencimento
+            if hasattr(aluno, 'dia_vencimento'):
+                aluno.dia_vencimento = nova_data_vencimento.day
+        
+        db.session.commit()
+        
+        response = jsonify({
+            'success': True,
+            'message': f'Aluno {aluno.nome} marcado como pago para {mes_referencia}/{ano_referencia}',
+            'data': {
+                'pagamento_id': pagamento.id,
+                'aluno_id': aluno_id,
+                'mes_referencia': mes_referencia,
+                'ano_referencia': ano_referencia,
+                'valor_pago': float(valor_mensalidade),
+                'status': 'aprovado'
+            }
+        })
+        add_cors_headers(response)
+        return response, 200
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"❌ Erro ao marcar aluno como pago: {traceback.format_exc()}")
+        response = jsonify({'error': f'Erro ao marcar aluno como pago: {str(e)}'})
+        add_cors_headers(response)
+        return response, 500
 
 @api_bp.route('/alunos/importar', methods=['POST'])
 @api_write_required

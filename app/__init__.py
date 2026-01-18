@@ -61,18 +61,25 @@ def create_app():
     # Configurar CORS para API (permitir frontend externo)
     # Em produção, permitir apenas domínios específicos via variável de ambiente
     allowed_origins = os.environ.get('CORS_ORIGINS', '*')
+    use_credentials = False  # Por padrão, não usar credentials quando origins é '*'
+    
     if allowed_origins != '*':
         # Se CORS_ORIGINS for uma string com múltiplos domínios separados por vírgula
         allowed_origins = [origin.strip() for origin in allowed_origins.split(',')]
+        use_credentials = True  # Permitir credentials quando origins são específicos
     
     if CORS_AVAILABLE:
+        cors_config = {
+            "origins": allowed_origins,  # Domínios permitidos (ou '*' para todos)
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+        }
+        # Só adicionar supports_credentials se não estivermos usando '*' (navegador não permite)
+        if use_credentials:
+            cors_config["supports_credentials"] = True
+        
         CORS(app, resources={
-            r"/api/*": {
-                "origins": allowed_origins,  # Domínios permitidos (ou '*' para todos)
-                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"],
-                "supports_credentials": True
-            }
+            r"/api/*": cors_config
         })
     else:
         # CORS não disponível - adicionar headers manualmente para API
