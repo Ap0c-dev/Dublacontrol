@@ -70,39 +70,46 @@ def create_app():
     
     # Função auxiliar para adicionar headers CORS
     def add_cors_headers_to_response(response):
-        """Adiciona headers CORS a uma resposta"""
+        """Adiciona headers CORS a uma resposta (apenas se não existirem)"""
         if request.path.startswith('/api/'):
             origin = request.headers.get('Origin')
             
-            # Sempre adicionar headers básicos
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-            response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+            # Verificar se os headers já foram adicionados pelo Flask-CORS
+            # Se já existirem, não adicionar novamente para evitar duplicação
+            if 'Access-Control-Allow-Origin' in response.headers:
+                return response
+            
+            # Adicionar headers básicos apenas se não existirem
+            if 'Access-Control-Allow-Headers' not in response.headers:
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            if 'Access-Control-Allow-Methods' not in response.headers:
+                response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
             
             # Determinar origem permitida
             if allowed_origins == '*':
                 # Permitir qualquer origem quando configurado como '*'
                 if origin:
-                    response.headers.add('Access-Control-Allow-Origin', origin)
+                    response.headers['Access-Control-Allow-Origin'] = origin
                 else:
-                    response.headers.add('Access-Control-Allow-Origin', '*')
+                    response.headers['Access-Control-Allow-Origin'] = '*'
             elif isinstance(allowed_origins, list):
                 # Verificar se a origem está na lista permitida
                 if origin and origin in allowed_origins:
-                    response.headers.add('Access-Control-Allow-Origin', origin)
+                    response.headers['Access-Control-Allow-Origin'] = origin
                     if use_credentials:
-                        response.headers.add('Access-Control-Allow-Credentials', 'true')
+                        response.headers['Access-Control-Allow-Credentials'] = 'true'
                 elif origin:
                     # Se a origem não está na lista, ainda permitir (para desenvolvimento)
-                    response.headers.add('Access-Control-Allow-Origin', origin)
+                    response.headers['Access-Control-Allow-Origin'] = origin
                 else:
                     # Se não há origem, permitir qualquer
-                    response.headers.add('Access-Control-Allow-Origin', '*')
+                    response.headers['Access-Control-Allow-Origin'] = '*'
             else:
                 # Fallback: usar origem se disponível, senão permitir qualquer
                 if origin:
-                    response.headers.add('Access-Control-Allow-Origin', origin)
+                    response.headers['Access-Control-Allow-Origin'] = origin
                 else:
-                    response.headers.add('Access-Control-Allow-Origin', '*')
+                    response.headers['Access-Control-Allow-Origin'] = '*'
         return response
     
     if CORS_AVAILABLE:
@@ -119,8 +126,9 @@ def create_app():
             r"/api/*": cors_config
         })
     
-    # Sempre adicionar headers CORS manualmente também (backup caso Flask-CORS falhe)
+    # Adicionar headers CORS manualmente apenas se Flask-CORS não adicionou (backup)
     # Isso garante que os headers sejam adicionados mesmo se Flask-CORS não funcionar
+    # Mas evita duplicação verificando se os headers já existem
     @app.after_request
     def after_request(response):
         return add_cors_headers_to_response(response)
