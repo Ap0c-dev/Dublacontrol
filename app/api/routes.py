@@ -710,13 +710,20 @@ def api_listar_alunos():
                 }
             })
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'count': len(resultado),
             'data': resultado
         })
+        add_cors_headers(response)
+        return response
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        print(f"❌ Erro ao listar alunos: {str(e)}")
+        print(traceback.format_exc())
+        response = jsonify({'error': str(e), 'success': False})
+        add_cors_headers(response)
+        return response, 500
 
 @api_bp.route('/alunos/<int:aluno_id>', methods=['GET'])
 @api_login_required

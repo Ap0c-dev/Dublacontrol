@@ -133,6 +133,46 @@ def create_app():
     def after_request(response):
         return add_cors_headers_to_response(response)
     
+    # Handlers de erro para garantir que headers CORS sejam sempre adicionados, mesmo em erros
+    @app.errorhandler(500)
+    @app.errorhandler(404)
+    @app.errorhandler(403)
+    @app.errorhandler(401)
+    @app.errorhandler(400)
+    def handle_error(e):
+        """Handler de erros HTTP - garante headers CORS mesmo em erros"""
+        from flask import jsonify
+        status_code = 500
+        if hasattr(e, 'code'):
+            status_code = e.code
+        
+        response = jsonify({
+            'error': str(e) if hasattr(e, 'description') and e.description else 'Erro interno do servidor',
+            'success': False
+        })
+        response = add_cors_headers_to_response(response)
+        return response, status_code
+    
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(e):
+        """Handler global de exceções não tratadas - garante headers CORS"""
+        from flask import jsonify
+        import traceback
+        
+        # Log do erro
+        print(f"❌ Erro não tratado: {str(e)}")
+        if app.debug:
+            print(traceback.format_exc())
+        
+        # Criar resposta de erro com headers CORS
+        response = jsonify({
+            'error': 'Erro interno do servidor',
+            'success': False,
+            'details': str(e) if app.debug else None
+        })
+        response = add_cors_headers_to_response(response)
+        return response, 500
+    
     # Flask-SQLAlchemy gerencia o engine automaticamente
     # A URL já foi processada no config.py (pgbouncer removido)
     # SQLALCHEMY_ENGINE_OPTIONS está configurado mas Flask-SQLAlchemy 3.x não suporta diretamente
