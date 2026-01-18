@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { api, Pagamento, Professor } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, CreditCard, Calendar, User, Check, X, Upload } from 'lucide-react';
+import { Loader2, CreditCard, Calendar, User, Check, X, Upload, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -188,6 +188,47 @@ export default function Pagamentos() {
         description: 'Erro ao rejeitar pagamento',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleMarcarComoPago = async (alunoId: number, mesReferencia?: number, anoReferencia?: number) => {
+    try {
+      setIsLoading(true);
+      const hoje = new Date();
+      const mes = mesReferencia || (hoje.getMonth() + 1);
+      const ano = anoReferencia || hoje.getFullYear();
+      
+      if (window.confirm(
+        `Deseja marcar o aluno como pago para ${mes}/${ano}?\n\n` +
+        `Isso criará um pagamento aprovado automaticamente.`
+      )) {
+        const response = await api.marcarAlunoPago(alunoId, mes, ano);
+        if (response.success) {
+          toast({
+            title: 'Sucesso',
+            description: response.message || 'Aluno marcado como pago com sucesso',
+          });
+          // Recarregar pagamentos
+          const res = await api.getPagamentos({ status: filter || undefined });
+          if (res.success) {
+            setPagamentos(res.data);
+          }
+        } else {
+          toast({
+            title: 'Erro',
+            description: response.error || 'Erro ao marcar aluno como pago',
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao marcar aluno como pago',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -408,6 +449,22 @@ export default function Pagamentos() {
                                 </AlertDialogContent>
                               </AlertDialog>
                             </>
+                          )}
+                          {(pagamento.status === 'atrasado' || pagamento.status === 'pendente') && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-green-600 hover:text-green-700 border-green-200 hover:bg-green-50"
+                              onClick={() => handleMarcarComoPago(
+                                pagamento.aluno_id,
+                                pagamento.mes_referencia,
+                                pagamento.ano_referencia
+                              )}
+                              disabled={isLoading}
+                            >
+                              <CheckCircle size={16} className="mr-1" />
+                              Marcar como Pago
+                            </Button>
                           )}
                           {(pagamento.status === 'atrasado' || (pagamento.status === 'pendente' && !pagamento.url_comprovante)) && (
                             <Button 
