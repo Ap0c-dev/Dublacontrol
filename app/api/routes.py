@@ -395,7 +395,7 @@ def api_login():
         else:
             error_msg = f'Erro interno: {str(e)}'
         
-        response = jsonify({'error': error_msg, 'success': False, 'details': str(e) if app.debug else None})
+        response = jsonify({'error': error_msg, 'success': False, 'details': str(e) if current_app.debug else None})
         add_cors_headers(response)
         return response, 500
 
