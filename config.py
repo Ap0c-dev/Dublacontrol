@@ -30,7 +30,7 @@ class Config:
         
         # Remover parâmetro pgbouncer=true da URL (não é reconhecido pelo psycopg2)
         # O pooler funciona automaticamente na porta 6543, não precisa desse parâmetro
-        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote_plus
         parsed = urlparse(database_url)
         query_params = parse_qs(parsed.query)
         
@@ -40,6 +40,28 @@ class Config:
         
         # Reconstruir URL sem pgbouncer
         new_query = urlencode(query_params, doseq=True)
+        
+        # Garantir que a senha está corretamente codificada na URL
+        # Se a senha contém caracteres especiais, ela precisa ser URL-encoded
+        # Reconstruir a URL garantindo que username e password estão corretos
+        if parsed.username and parsed.password:
+            # Se a senha não está codificada, codificar agora
+            # Mas não codificar se já estiver codificada (evitar dupla codificação)
+            try:
+                from urllib.parse import unquote
+                # Tentar decodificar para verificar se está codificada
+                decoded_password = unquote(parsed.password)
+                # Se decodificar mudou algo, significa que estava codificada
+                # Se não mudou, pode precisar codificar se tiver caracteres especiais
+                if decoded_password == parsed.password:
+                    # Verificar se tem caracteres que precisam ser codificados
+                    if any(c in parsed.password for c in ['@', ':', '/', '?', '#', '[', ']', '%']):
+                        # A senha pode ter caracteres especiais, mas não está codificada
+                        # Não vamos codificar aqui porque pode quebrar se já estiver correta
+                        pass
+            except:
+                pass
+        
         database_url = urlunparse((
             parsed.scheme,
             parsed.netloc,
@@ -48,6 +70,34 @@ class Config:
             new_query,
             parsed.fragment
         ))
+        
+        # Log da URL (sem senha) para debug
+        if 'supabase' in database_url.lower():
+            # Mascarar senha no log
+            safe_url = database_url
+            if '@' in safe_url:
+                parts = safe_url.split('@')
+                if len(parts) == 2:
+                    user_pass = parts[0].split('://')[-1] if '://' in parts[0] else parts[0]
+                    if ':' in user_pass:
+                        user = user_pass.split(':')[0]
+                        safe_url = safe_url.replace(user_pass, f"{user}:***")
+                print(f"🔗 Conectando ao Supabase: {safe_url}")
+            
+            # Validar formato do usuário Supabase
+            parsed_check = urlparse(database_url)
+            if parsed_check.username:
+                # No Supabase, o usuário deve ter o formato: postgres.PROJECT_REF
+                # Se não começar com "postgres.", pode estar incorreto
+                if not parsed_check.username.startswith('postgres.'):
+                    print(f"⚠️  AVISO: Usuário Supabase pode estar incorreto: {parsed_check.username}")
+                    print("   Formato esperado: postgres.PROJECT_REF (ex: postgres.tfgfklzhewesggrusupm)")
+            
+            # Verificar se a senha está presente
+            if not parsed_check.password or parsed_check.password == '[YOUR-PASSWORD]':
+                print("❌ ERRO: Senha não configurada na DATABASE_URL!")
+                print("   Verifique se a senha foi substituída na variável de ambiente DATABASE_URL no Render")
+                print("   A senha deve ser a senha do banco de dados do Supabase")
         
         SQLALCHEMY_DATABASE_URI = database_url
         ENVIRONMENT = 'prd'  # Se tem DATABASE_URL válida, está em produção
