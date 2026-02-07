@@ -1876,8 +1876,6 @@ def api_dashboard_stats():
         
         # Calcular crescimento de alunos comparando mês anterior completo com mês atual até hoje
         # Exemplo: se hoje é 10/01, comparar todos os alunos de dezembro com alunos de janeiro até hoje
-        from datetime import timedelta
-        from calendar import monthrange
         
         # Calcular mês anterior
         if mes_atual == 1:
