@@ -44,9 +44,6 @@ class Aluno(db.Model):
     motivo_exclusao = db.Column(db.String(200), nullable=True)
     observacao = db.Column(db.Text, nullable=True)  # Observações gerais sobre o aluno (especialmente para inativos)
     
-    # Notificações WhatsApp (preenchido ao enviar aviso; usado para evitar duplicatas e histórico)
-    ultimo_aviso_whatsapp_em = db.Column(db.DateTime, nullable=True)
-    
     # Aprovação de cadastro
     aprovado = db.Column(db.Boolean, default=True, nullable=False)  # True = aprovado, False = pendente
     
@@ -202,10 +199,7 @@ class Aluno(db.Model):
             'ativo': self.ativo,
             'data_exclusao': self.data_exclusao.isoformat() if self.data_exclusao else None,
             'motivo_exclusao': self.motivo_exclusao,
-            'observacao': self.observacao,
-            'ultimo_aviso_whatsapp_em': self.ultimo_aviso_whatsapp_em.isoformat()
-            if self.ultimo_aviso_whatsapp_em
-            else None,
+            'observacao': self.observacao
         }
 
 # Evento para preencher dia_vencimento automaticamente (compatibilidade com banco antigo)

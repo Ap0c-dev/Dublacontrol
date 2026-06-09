@@ -37,7 +37,39 @@ login_attempts = {}
 MAX_LOGIN_ATTEMPTS = 5  # Máximo de tentativas
 LOGIN_LOCKOUT_TIME = 300  # 5 minutos em segundos
 
-from app.pagamento_regras import aluno_considerado_pago_automaticamente
+# ==================== REGRA TEMPORÁRIA DE PAGAMENTO ====================
+# Regra temporária: Alunos com vencimento <= 14/01/2026 são considerados pagos
+# apenas para janeiro de 2026. A partir de 14/01/2026, tudo volta ao normal.
+DATA_LIMITE_VENCIMENTO = date(2026, 1, 14)
+MES_APLICACAO = 1  # Janeiro
+ANO_APLICACAO = 2026
+
+def aluno_considerado_pago_automaticamente(aluno, mes_referencia, ano_referencia):
+    """
+    Verifica se um aluno deve ser considerado como pago automaticamente
+    baseado na regra temporária de janeiro/2026.
+    
+    Args:
+        aluno: Objeto Aluno
+        mes_referencia: Mês de referência do pagamento (1-12)
+        ano_referencia: Ano de referência do pagamento
+    
+    Returns:
+        bool: True se o aluno deve ser considerado como pago automaticamente
+    """
+    # Aplicar regra apenas para janeiro de 2026
+    if mes_referencia != MES_APLICACAO or ano_referencia != ANO_APLICACAO:
+        return False
+    
+    # Verificar se o aluno tem data de vencimento
+    if not aluno or not aluno.data_vencimento:
+        return False
+    
+    # Verificar se a data de vencimento é <= 14/01/2026
+    if aluno.data_vencimento <= DATA_LIMITE_VENCIMENTO:
+        return True
+    
+    return False
 
 # Função auxiliar para adicionar headers CORS corretamente
 def add_cors_headers(response):
@@ -667,9 +699,6 @@ def api_listar_alunos():
                 'created_at': primeira_data_inicio.isoformat() if primeira_data_inicio else (aluno.data_cadastro.isoformat() if aluno.data_cadastro else None),  # Usar data_inicio se disponível, senão data_cadastro
                 'motivo_exclusao': aluno.motivo_exclusao,
                 'observacao': aluno.observacao,
-                'ultimo_aviso_whatsapp_em': aluno.ultimo_aviso_whatsapp_em.isoformat()
-                if aluno.ultimo_aviso_whatsapp_em
-                else None,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -751,9 +780,6 @@ def api_get_aluno(aluno_id):
                 'status_vencimento': aluno.get_status_vencimento(),
                 'motivo_exclusao': aluno.motivo_exclusao,
                 'observacao': aluno.observacao,
-                'ultimo_aviso_whatsapp_em': aluno.ultimo_aviso_whatsapp_em.isoformat()
-                if aluno.ultimo_aviso_whatsapp_em
-                else None,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -3644,23 +3670,6 @@ def api_editar_aluno(aluno_id):
             aluno.experimental = data['experimental']
         if 'observacao' in data:
             aluno.observacao = (data['observacao'] or '').strip() or None
-        if 'ultimo_aviso_whatsapp_em' in data:
-            raw = data.get('ultimo_aviso_whatsapp_em')
-            if raw is None or raw == '':
-                aluno.ultimo_aviso_whatsapp_em = None
-            else:
-                try:
-                    s = str(raw).strip()
-                    if s.endswith('Z'):
-                        s = s[:-1] + '+00:00'
-                    try:
-                        aluno.ultimo_aviso_whatsapp_em = datetime.fromisoformat(s)
-                    except ValueError:
-                        from app.datetime_sqlite_fix import parse_datetime_result
-
-                        aluno.ultimo_aviso_whatsapp_em = parse_datetime_result(s)
-                except (ValueError, TypeError):
-                    return jsonify({'error': 'ultimo_aviso_whatsapp_em inválido (use ISO 8601 ou null)'}), 400
         
         # Atualizar matrículas se fornecidas
         if 'matriculas' in data:
@@ -4465,8 +4474,7 @@ def api_exportar_alunos():
             'Nome', 'Telefone', 'Telefone Responsável', 'Nome Responsável',
             'Cidade', 'Estado', 'Data Nascimento', 'Data Vencimento',
             'Forma Pagamento', 'Status', 'Ativo', 'Aprovado',
-            'Data Cadastro', 'Observação', 'Motivo Exclusão',
-            'Último aviso WhatsApp',
+            'Data Cadastro', 'Observação', 'Motivo Exclusão'
         ]
         ws.append(headers)
         
@@ -4504,10 +4512,7 @@ def api_exportar_alunos():
                 'Sim' if aluno.aprovado else 'Não',
                 aluno.data_cadastro.strftime('%d/%m/%Y %H:%M') if aluno.data_cadastro else '',
                 aluno.observacao or '',
-                aluno.motivo_exclusao or '',
-                aluno.ultimo_aviso_whatsapp_em.strftime('%d/%m/%Y %H:%M')
-                if aluno.ultimo_aviso_whatsapp_em
-                else '',
+                aluno.motivo_exclusao or ''
             ]
             ws.append(row)
         
@@ -4527,8 +4532,7 @@ def api_exportar_alunos():
             'L': 8,   # Aprovado
             'M': 18,  # Data Cadastro
             'N': 40,  # Observação
-            'O': 40,  # Motivo Exclusão
-            'P': 22,  # Último aviso WhatsApp
+            'O': 40   # Motivo Exclusão
         }
         for col, width in column_widths.items():
             ws.column_dimensions[col].width = width
