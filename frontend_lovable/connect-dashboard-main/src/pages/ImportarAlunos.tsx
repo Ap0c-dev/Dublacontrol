@@ -304,7 +304,7 @@ export default function ImportarAlunos() {
             <div className="space-y-2 text-sm">
               <p className="font-semibold">Colunas obrigatórias:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                <li>nome</li>
+                <li>aluno ou nome</li>
                 <li>telefone</li>
                 <li>cidade</li>
                 <li>estado</li>

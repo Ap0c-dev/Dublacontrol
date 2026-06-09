@@ -751,10 +751,15 @@ class ApiClient {
         method: 'DELETE',
         headers: this.getHeaders(),
       });
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        return {
+          success: false,
+          error: data.error || `Erro ao excluir aluno (${response.status})`,
+          data: undefined
+        };
       }
-      return response.json();
+      return data;
     } catch (error) {
       console.error('Erro ao excluir aluno:', error);
       return {

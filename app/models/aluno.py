@@ -1,6 +1,6 @@
 from app.models.professor import db
 from datetime import datetime, date
-from sqlalchemy import event
+from sqlalchemy import event, update
 from sqlalchemy import text
 
 class Aluno(db.Model):
@@ -44,6 +44,9 @@ class Aluno(db.Model):
     motivo_exclusao = db.Column(db.String(200), nullable=True)
     observacao = db.Column(db.Text, nullable=True)  # Observações gerais sobre o aluno (especialmente para inativos)
     
+    # Notificações WhatsApp (preenchido ao enviar aviso; usado para evitar duplicatas e histórico)
+    ultimo_aviso_whatsapp_em = db.Column(db.DateTime, nullable=True)
+    
     # Aprovação de cadastro
     aprovado = db.Column(db.Boolean, default=True, nullable=False)  # True = aprovado, False = pendente
     
@@ -74,6 +77,44 @@ class Aluno(db.Model):
     
     def __repr__(self):
         return f'<Aluno {self.nome}>'
+
+    @classmethod
+    def excluir_logicamente(cls, aluno_id, motivo_exclusao=None, data_encerramento=None):
+        """
+        Exclusão lógica via UPDATE direto (evita StaleDataError quando há
+        linhas duplicadas com o mesmo id na tabela).
+        Retorna o nome do aluno ou None se não existir.
+        """
+        aluno = db.session.get(cls, aluno_id)
+        if not aluno:
+            return None
+
+        nome = aluno.nome
+        db.session.expunge(aluno)
+
+        values = {
+            'ativo': False,
+            'data_exclusao': date.today(),
+        }
+        if motivo_exclusao:
+            values['motivo_exclusao'] = motivo_exclusao
+
+        db.session.execute(
+            update(cls).where(cls.id == aluno_id).values(**values)
+        )
+
+        if data_encerramento is not None:
+            from app.models.matricula import Matricula
+            db.session.execute(
+                update(Matricula)
+                .where(
+                    Matricula.aluno_id == aluno_id,
+                    Matricula.data_encerramento.is_(None),
+                )
+                .values(data_encerramento=data_encerramento)
+            )
+
+        return nome
     
     def get_total_mensalidades(self):
         """Retorna a soma de todas as mensalidades do aluno"""
@@ -161,7 +202,10 @@ class Aluno(db.Model):
             'ativo': self.ativo,
             'data_exclusao': self.data_exclusao.isoformat() if self.data_exclusao else None,
             'motivo_exclusao': self.motivo_exclusao,
-            'observacao': self.observacao
+            'observacao': self.observacao,
+            'ultimo_aviso_whatsapp_em': self.ultimo_aviso_whatsapp_em.isoformat()
+            if self.ultimo_aviso_whatsapp_em
+            else None,
         }
 
 # Evento para preencher dia_vencimento automaticamente (compatibilidade com banco antigo)

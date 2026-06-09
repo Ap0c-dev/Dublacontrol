@@ -37,39 +37,7 @@ login_attempts = {}
 MAX_LOGIN_ATTEMPTS = 5  # Máximo de tentativas
 LOGIN_LOCKOUT_TIME = 300  # 5 minutos em segundos
 
-# ==================== REGRA TEMPORÁRIA DE PAGAMENTO ====================
-# Regra temporária: Alunos com vencimento <= 14/01/2026 são considerados pagos
-# apenas para janeiro de 2026. A partir de 14/01/2026, tudo volta ao normal.
-DATA_LIMITE_VENCIMENTO = date(2026, 1, 14)
-MES_APLICACAO = 1  # Janeiro
-ANO_APLICACAO = 2026
-
-def aluno_considerado_pago_automaticamente(aluno, mes_referencia, ano_referencia):
-    """
-    Verifica se um aluno deve ser considerado como pago automaticamente
-    baseado na regra temporária de janeiro/2026.
-    
-    Args:
-        aluno: Objeto Aluno
-        mes_referencia: Mês de referência do pagamento (1-12)
-        ano_referencia: Ano de referência do pagamento
-    
-    Returns:
-        bool: True se o aluno deve ser considerado como pago automaticamente
-    """
-    # Aplicar regra apenas para janeiro de 2026
-    if mes_referencia != MES_APLICACAO or ano_referencia != ANO_APLICACAO:
-        return False
-    
-    # Verificar se o aluno tem data de vencimento
-    if not aluno or not aluno.data_vencimento:
-        return False
-    
-    # Verificar se a data de vencimento é <= 14/01/2026
-    if aluno.data_vencimento <= DATA_LIMITE_VENCIMENTO:
-        return True
-    
-    return False
+from app.pagamento_regras import aluno_considerado_pago_automaticamente
 
 # Função auxiliar para adicionar headers CORS corretamente
 def add_cors_headers(response):
@@ -699,6 +667,9 @@ def api_listar_alunos():
                 'created_at': primeira_data_inicio.isoformat() if primeira_data_inicio else (aluno.data_cadastro.isoformat() if aluno.data_cadastro else None),  # Usar data_inicio se disponível, senão data_cadastro
                 'motivo_exclusao': aluno.motivo_exclusao,
                 'observacao': aluno.observacao,
+                'ultimo_aviso_whatsapp_em': aluno.ultimo_aviso_whatsapp_em.isoformat()
+                if aluno.ultimo_aviso_whatsapp_em
+                else None,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -780,6 +751,9 @@ def api_get_aluno(aluno_id):
                 'status_vencimento': aluno.get_status_vencimento(),
                 'motivo_exclusao': aluno.motivo_exclusao,
                 'observacao': aluno.observacao,
+                'ultimo_aviso_whatsapp_em': aluno.ultimo_aviso_whatsapp_em.isoformat()
+                if aluno.ultimo_aviso_whatsapp_em
+                else None,
                 'modalidades': {
                     'dublagem_online': aluno.dublagem_online,
                     'dublagem_presencial': aluno.dublagem_presencial,
@@ -3670,6 +3644,23 @@ def api_editar_aluno(aluno_id):
             aluno.experimental = data['experimental']
         if 'observacao' in data:
             aluno.observacao = (data['observacao'] or '').strip() or None
+        if 'ultimo_aviso_whatsapp_em' in data:
+            raw = data.get('ultimo_aviso_whatsapp_em')
+            if raw is None or raw == '':
+                aluno.ultimo_aviso_whatsapp_em = None
+            else:
+                try:
+                    s = str(raw).strip()
+                    if s.endswith('Z'):
+                        s = s[:-1] + '+00:00'
+                    try:
+                        aluno.ultimo_aviso_whatsapp_em = datetime.fromisoformat(s)
+                    except ValueError:
+                        from app.datetime_sqlite_fix import parse_datetime_result
+
+                        aluno.ultimo_aviso_whatsapp_em = parse_datetime_result(s)
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'ultimo_aviso_whatsapp_em inválido (use ISO 8601 ou null)'}), 400
         
         # Atualizar matrículas se fornecidas
         if 'matriculas' in data:
@@ -3753,9 +3744,10 @@ def api_editar_aluno(aluno_id):
 def api_excluir_aluno(aluno_id):
     """Excluir aluno (exclusão lógica)"""
     try:
-        aluno = Aluno.query.get_or_404(aluno_id)
-        aluno.ativo = False
-        aluno.data_exclusao = date.today()
+        nome = Aluno.excluir_logicamente(aluno_id)
+        if not nome:
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+
         db.session.commit()
         
         return jsonify({
@@ -3942,22 +3934,40 @@ def api_importar_alunos():
         print(f"📋 Cabeçalhos encontrados: {headers}")
         
         # Mapear nomes de colunas (case-insensitive, com variações)
-        def encontrar_coluna(nomes_possiveis):
+        def normalizar_header(header):
+            if not header:
+                return ''
+            return str(header).lower().strip().replace(' ', '_')
+
+        def encontrar_coluna(nomes_possiveis, excluir_se_contem=None):
+            excluir_se_contem = excluir_se_contem or []
             for nome in nomes_possiveis:
+                nome_norm = normalizar_header(nome)
                 for idx, header in enumerate(headers):
-                    if nome.lower() in header.lower():
+                    header_norm = normalizar_header(header)
+                    if any(ex in header_norm for ex in excluir_se_contem):
+                        continue
+                    if header_norm == nome_norm:
+                        return idx
+            for nome in nomes_possiveis:
+                nome_norm = normalizar_header(nome)
+                for idx, header in enumerate(headers):
+                    header_norm = normalizar_header(header)
+                    if any(ex in header_norm for ex in excluir_se_contem):
+                        continue
+                    if nome_norm in header_norm:
                         return idx
             return None
         
-        # Índices das colunas
-        idx_nome = encontrar_coluna(['nome', 'name'])
-        idx_telefone = encontrar_coluna(['telefone', 'phone', 'tel'])
+        # Índices das colunas (específicos primeiro para evitar confundir nome/telefone com responsável)
+        idx_nome_responsavel = encontrar_coluna(['nome_responsavel', 'nome responsavel', 'responsible'])
+        idx_telefone_responsavel = encontrar_coluna(['telefone_responsavel', 'telefone responsavel', 'tel responsavel'])
+        idx_nome = encontrar_coluna(['aluno', 'nome', 'name'], excluir_se_contem=['responsavel', 'professor'])
+        idx_telefone = encontrar_coluna(['telefone', 'phone', 'tel'], excluir_se_contem=['responsavel'])
         idx_cidade = encontrar_coluna(['cidade', 'city'])
         idx_estado = encontrar_coluna(['estado', 'state', 'uf'])
         idx_forma_pagamento = encontrar_coluna(['forma_pagamento', 'forma pagamento', 'pagamento', 'payment'])
         idx_data_vencimento = encontrar_coluna(['data_vencimento', 'data vencimento', 'vencimento', 'due_date'])
-        idx_nome_responsavel = encontrar_coluna(['nome_responsavel', 'nome responsavel', 'responsavel', 'responsible'])
-        idx_telefone_responsavel = encontrar_coluna(['telefone_responsavel', 'telefone responsavel', 'tel responsavel'])
         idx_data_nascimento = encontrar_coluna(['data_nascimento', 'data nascimento', 'nascimento', 'birth', 'birthday'])
         
         # Modalidades (opcionais)
@@ -3985,7 +3995,7 @@ def api_importar_alunos():
         # Validar colunas obrigatórias
         erros_validacao = []
         if idx_nome is None:
-            erros_validacao.append('Coluna "nome" não encontrada')
+            erros_validacao.append('Coluna "aluno" ou "nome" não encontrada')
         if idx_telefone is None:
             erros_validacao.append('Coluna "telefone" não encontrada')
         if idx_cidade is None:
@@ -4455,7 +4465,8 @@ def api_exportar_alunos():
             'Nome', 'Telefone', 'Telefone Responsável', 'Nome Responsável',
             'Cidade', 'Estado', 'Data Nascimento', 'Data Vencimento',
             'Forma Pagamento', 'Status', 'Ativo', 'Aprovado',
-            'Data Cadastro', 'Observação', 'Motivo Exclusão'
+            'Data Cadastro', 'Observação', 'Motivo Exclusão',
+            'Último aviso WhatsApp',
         ]
         ws.append(headers)
         
@@ -4493,7 +4504,10 @@ def api_exportar_alunos():
                 'Sim' if aluno.aprovado else 'Não',
                 aluno.data_cadastro.strftime('%d/%m/%Y %H:%M') if aluno.data_cadastro else '',
                 aluno.observacao or '',
-                aluno.motivo_exclusao or ''
+                aluno.motivo_exclusao or '',
+                aluno.ultimo_aviso_whatsapp_em.strftime('%d/%m/%Y %H:%M')
+                if aluno.ultimo_aviso_whatsapp_em
+                else '',
             ]
             ws.append(row)
         
@@ -4513,7 +4527,8 @@ def api_exportar_alunos():
             'L': 8,   # Aprovado
             'M': 18,  # Data Cadastro
             'N': 40,  # Observação
-            'O': 40   # Motivo Exclusão
+            'O': 40,  # Motivo Exclusão
+            'P': 22,  # Último aviso WhatsApp
         }
         for col, width in column_widths.items():
             ws.column_dimensions[col].width = width

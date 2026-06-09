@@ -42,22 +42,40 @@ def importar_alunos(arquivo_excel):
         print(f"📋 Cabeçalhos encontrados: {len(headers)} colunas")
         
         # Mapear nomes de colunas
-        def encontrar_coluna(nomes_possiveis):
+        def normalizar_header(header):
+            if not header:
+                return ''
+            return str(header).lower().strip().replace(' ', '_')
+
+        def encontrar_coluna(nomes_possiveis, excluir_se_contem=None):
+            excluir_se_contem = excluir_se_contem or []
             for nome in nomes_possiveis:
+                nome_norm = normalizar_header(nome)
                 for idx, header in enumerate(headers):
-                    if nome.lower() in header.lower():
+                    header_norm = normalizar_header(header)
+                    if any(ex in header_norm for ex in excluir_se_contem):
+                        continue
+                    if header_norm == nome_norm:
+                        return idx
+            for nome in nomes_possiveis:
+                nome_norm = normalizar_header(nome)
+                for idx, header in enumerate(headers):
+                    header_norm = normalizar_header(header)
+                    if any(ex in header_norm for ex in excluir_se_contem):
+                        continue
+                    if nome_norm in header_norm:
                         return idx
             return None
         
-        # Índices das colunas
-        idx_nome = encontrar_coluna(['nome', 'name'])
-        idx_telefone = encontrar_coluna(['telefone', 'phone', 'tel'])
+        # Índices das colunas (específicos primeiro para evitar confundir nome/telefone com responsável)
+        idx_nome_responsavel = encontrar_coluna(['nome_responsavel', 'nome responsavel', 'responsible'])
+        idx_telefone_responsavel = encontrar_coluna(['telefone_responsavel', 'telefone responsavel', 'tel responsavel'])
+        idx_nome = encontrar_coluna(['aluno', 'nome', 'name'], excluir_se_contem=['responsavel', 'professor'])
+        idx_telefone = encontrar_coluna(['telefone', 'phone', 'tel'], excluir_se_contem=['responsavel'])
         idx_cidade = encontrar_coluna(['cidade', 'city'])
         idx_estado = encontrar_coluna(['estado', 'state', 'uf'])
         idx_forma_pagamento = encontrar_coluna(['forma_pagamento', 'forma pagamento', 'pagamento', 'payment'])
         idx_data_vencimento = encontrar_coluna(['data_vencimento', 'data vencimento', 'vencimento', 'due_date'])
-        idx_nome_responsavel = encontrar_coluna(['nome_responsavel', 'nome responsavel', 'responsavel', 'responsible'])
-        idx_telefone_responsavel = encontrar_coluna(['telefone_responsavel', 'telefone responsavel', 'tel responsavel'])
         idx_data_nascimento = encontrar_coluna(['data_nascimento', 'data nascimento', 'nascimento', 'birth', 'birthday'])
         
         # Modalidades
@@ -85,7 +103,7 @@ def importar_alunos(arquivo_excel):
         # Validar colunas obrigatórias
         erros = []
         if idx_nome is None:
-            erros.append('Coluna "nome" não encontrada')
+            erros.append('Coluna "aluno" ou "nome" não encontrada')
         if idx_telefone is None:
             erros.append('Coluna "telefone" não encontrada')
         if idx_cidade is None:

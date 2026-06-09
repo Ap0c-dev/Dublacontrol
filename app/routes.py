@@ -175,10 +175,16 @@ def criar_admin_inicial():
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Página de login"""
+    """Página de login (HTML legado) ou redirecionamento para o app React (mesma UI de produção)."""
     try:
         if current_user.is_authenticated:
             return redirect(url_for('main.index'))
+
+        # Mesma interface Voxen de produção: app Vite (ex.: http://localhost:8080/login)
+        if request.method == 'GET':
+            base = (current_app.config.get('FRONTEND_APP_URL') or '').strip().rstrip('/')
+            if current_app.config.get('USE_FRONTEND_LOGIN_REDIRECT') and base:
+                return redirect(f'{base}/login')
     
         if request.method == 'POST':
             username = request.form.get('username', '').strip()
@@ -1520,8 +1526,6 @@ def listar_alunos():
 @admin_required
 def excluir_aluno(aluno_id):
     """Exclusão lógica de aluno"""
-    aluno = Aluno.query.get_or_404(aluno_id)
-    
     motivo = request.form.get('motivo_exclusao', '').strip()
     data_encerramento_str = request.form.get('data_encerramento', '').strip()
     
@@ -1539,18 +1543,18 @@ def excluir_aluno(aluno_id):
         flash('Data de encerramento inválida.', 'error')
         return redirect(url_for('main.listar_alunos'))
     
-    aluno.ativo = False
-    aluno.data_exclusao = date.today()
-    aluno.motivo_exclusao = motivo
-    
-    # Preencher data de encerramento em todas as matrículas ativas do aluno
-    for matricula in aluno.matriculas:
-        if not matricula.data_encerramento:  # Só preencher se ainda não tiver data de encerramento
-            matricula.data_encerramento = data_encerramento
-    
     try:
+        nome = Aluno.excluir_logicamente(
+            aluno_id,
+            motivo_exclusao=motivo,
+            data_encerramento=data_encerramento,
+        )
+        if not nome:
+            flash('Aluno não encontrado.', 'error')
+            return redirect(url_for('main.listar_alunos'))
+
         db.session.commit()
-        flash(f'Aluno {aluno.nome} excluído com sucesso.', 'success')
+        flash(f'Aluno {nome} excluído com sucesso.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir aluno: {str(e)}', 'error')
@@ -2825,113 +2829,50 @@ def deletar_pagamento(pagamento_id):
 @bp.route('/notificacoes/enviar-vencimentos', methods=['POST'])
 @admin_required
 def enviar_notificacoes_vencimentos():
-    """Envia notificações WhatsApp para alunos com vencimento hoje"""
+    """
+    Disparo manual de notificações WhatsApp para vencimentos do dia via Evolution API.
+
+    1) Enfileira itens elegíveis em mensalidades_cobranca (CobrancaEnqueueService);
+    2) Processa um lote da fila imediatamente (WhatsappQueueProcessor).
+
+    Em produção o ideal é o cron/scheduler fazer isso — esta rota é um disparo manual.
+    Para testes ad-hoc de mensagem use POST /api/v1/internal/whatsapp/test-send.
+    """
     import logging
     logger = logging.getLogger(__name__)
-    
-    from app.services.whatsapp_service import WhatsAppService
-    
-    try:
-        # Verificar se WhatsApp está habilitado
-        if not current_app.config.get('WHATSAPP_ENABLED', False):
-            flash('WhatsApp não está habilitado. Configure as variáveis de ambiente.', 'error')
-            return redirect(url_for('main.listar_alunos'))
-        
-        # Inicializar serviço WhatsApp
-        whatsapp = WhatsAppService(
-            account_sid=current_app.config.get('TWILIO_ACCOUNT_SID'),
-            auth_token=current_app.config.get('TWILIO_AUTH_TOKEN'),
-            from_number=current_app.config.get('TWILIO_WHATSAPP_FROM')
-        )
-        
-        # Enviar notificações
-        resultados = whatsapp.notificar_vencimentos_hoje()
-        
-        # Exibir resultados
-        if resultados['enviadas'] > 0:
-            flash(f'✅ {resultados["enviadas"]} notificação(ões) enviada(s) com sucesso!', 'success')
-        
-        if resultados['erros'] > 0:
-            flash(f'⚠️ {resultados["erros"]} erro(s) ao enviar notificação(ões).', 'error')
-        
-        if resultados['enviadas'] == 0 and resultados['erros'] == 0:
-            flash('Nenhum aluno com vencimento hoje encontrado.', 'info')
-        
-        # Log detalhado
-        if resultados['detalhes']:
-            for detalhe in resultados['detalhes']:
-                if detalhe['status'] == 'erro':
-                    logger.warning(f"Erro ao notificar {detalhe['aluno']}: {detalhe.get('mensagem', 'Erro desconhecido')}")
-        
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Erro ao enviar notificações: {e}")
-        flash(f'Erro ao enviar notificações: {str(e)}', 'error')
-    
-    return redirect(url_for('main.listar_alunos'))
 
-@bp.route('/notificacoes/testar', methods=['GET', 'POST'])
-@admin_required
-def testar_notificacao_whatsapp():
-    """Página para testar envio de notificação WhatsApp"""
-    import traceback
-    
+    if not current_app.config.get('WHATSAPP_EVOLUTION_ENABLED'):
+        flash('Evolution API desabilitada (defina WHATSAPP_EVOLUTION_ENABLED=true).', 'error')
+        return redirect(url_for('main.listar_alunos'))
+
     try:
-        from app.services.whatsapp_service import WhatsAppService
-    except ImportError as e:
-        flash(f'Erro ao importar serviço WhatsApp: {str(e)}. Verifique se o twilio está instalado (pip install twilio).', 'error')
-        import traceback
-        traceback.print_exc()
-        # Preparar informações básicas para o template mesmo com erro
-        config_info = {
-            'whatsapp_from': 'Erro na configuração',
-            'whatsapp_enabled': False
-        }
-        return render_template('testar_notificacao.html', config_info=config_info)
-    
-    # Preparar informações para o template
-    config_info = {
-        'whatsapp_from': current_app.config.get('TWILIO_WHATSAPP_FROM', 'Não configurado'),
-        'whatsapp_enabled': current_app.config.get('WHATSAPP_ENABLED', False)
-    }
-    
-    if request.method == 'POST':
-        telefone = request.form.get('telefone', '').strip()
-        mensagem = request.form.get('mensagem', '').strip()
-        
-        if not telefone or not mensagem:
-            flash('Telefone e mensagem são obrigatórios.', 'error')
-            return render_template('testar_notificacao.html', config_info=config_info)
-        
-        try:
-            whatsapp = WhatsAppService(
-                account_sid=current_app.config.get('TWILIO_ACCOUNT_SID'),
-                auth_token=current_app.config.get('TWILIO_AUTH_TOKEN'),
-                from_number=current_app.config.get('TWILIO_WHATSAPP_FROM')
-            )
-            
-            sucesso, resultado = whatsapp.enviar_mensagem(telefone, mensagem)
-            
-            if sucesso:
-                status_info = f", Status: {resultado.get('status', 'N/A')}" if isinstance(resultado, dict) else ""
-                flash(f'✅ Mensagem enviada! ID: {resultado.get("sid", resultado) if isinstance(resultado, dict) else resultado}{status_info}', 'success')
-            else:
-                if isinstance(resultado, dict):
-                    erro_msg = resultado.get('erro', 'Erro desconhecido')
-                    status_info = f" (Status: {resultado.get('status', 'N/A')})" if resultado.get('status') else ""
-                    flash(f'❌ Erro: {erro_msg}{status_info}', 'error')
-                else:
-                    flash(f'❌ Erro ao enviar mensagem: {resultado}', 'error')
-                
-        except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            flash(f'Erro: {str(e)}', 'error')
-            # Log do erro completo para debug
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Erro ao enviar mensagem de teste: {error_trace}")
-    
-    return render_template('testar_notificacao.html', config_info=config_info)
+        from app.services.cobranca_enqueue_service import CobrancaEnqueueService
+        from app.services.whatsapp_queue_processor import WhatsappQueueProcessor
+
+        enqueue_stats = CobrancaEnqueueService(current_app).run()
+        process_stats = WhatsappQueueProcessor(current_app).process_batch()
+
+        novos = (
+            enqueue_stats.get('enfileirados_no_dia', 0)
+            + enqueue_stats.get('enfileirados_atraso', 0)
+        )
+        enviados = process_stats.get('enviados', 0)
+        falhas = process_stats.get('falhas', 0)
+
+        if novos:
+            flash(f'✅ {novos} cobrança(s) enfileirada(s) para envio.', 'success')
+        if enviados:
+            flash(f'📤 {enviados} mensagem(ns) WhatsApp enviada(s) agora.', 'success')
+        if falhas:
+            flash(f'⚠️ {falhas} falha(s) registrada(s) (verifique a fila).', 'error')
+        if not (novos or enviados or falhas):
+            flash('Nenhum vencimento elegível e fila vazia no momento.', 'info')
+
+        logger.info('Disparo manual Evolution: %s / processo: %s', enqueue_stats, process_stats)
+    except Exception as e:
+        logger.exception('Erro ao enviar notificações WhatsApp')
+        flash(f'Erro ao enviar notificações: {str(e)}', 'error')
+
+    return redirect(url_for('main.listar_alunos'))
 
 

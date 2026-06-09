@@ -41,6 +41,11 @@ from config import Config
 from app.models.professor import db
 
 def create_app():
+    # Antes de qualquer query: datas vindas do SQLite com fração != 3/6 dígitos quebram fromisoformat (Py 3.10)
+    from app.datetime_sqlite_fix import apply_sqlalchemy_datetime_fix
+
+    apply_sqlalchemy_datetime_fix()
+
     # Obter o diretório raiz do projeto
     base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     template_dir = os.path.join(base_dir, 'templates')
@@ -57,6 +62,15 @@ def create_app():
                 static_folder=static_dir,
                 instance_relative_config=True)
     app.config.from_object(Config)
+
+    # Produção no PC com SQLite: sem DEBUG (como Render), salvo FLASK_DEBUG=true
+    if app.config.get('USE_LOCAL_SQLITE') or app.config.get('PRODUCTION_LIKE_LOCAL'):
+        explicit_debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+        app.config['DEBUG'] = explicit_debug
+
+    fe = (app.config.get('FRONTEND_APP_URL') or '').strip()
+    if app.config.get('USE_FRONTEND_LOGIN_REDIRECT') and fe:
+        print(f'✓ Login Flask (/login) redireciona para a UI React (Voxen): {fe}/login')
     
     # Configurar CORS para API (permitir frontend externo)
     # Em produção, permitir apenas domínios específicos via variável de ambiente
@@ -230,7 +244,7 @@ def create_app():
         return dict(range=range_func)
     
     # Importar modelos para garantir que as tabelas sejam criadas
-    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento, senha_reset, lista_espera
+    from app.models import professor, aluno, matricula, usuario, horario_professor, nota, pagamento, senha_reset, lista_espera, mensalidade_cobranca  # noqa: F401
     
     # Configurar Cloudinary
     import cloudinary
@@ -339,6 +353,43 @@ def create_app():
                 error_str = str(e).lower()
                 if 'does not exist' not in error_str and 'no such table' not in error_str:
                     print(f"⚠️  Aviso na migração de observacao: {e}")
+            
+            # Migração: coluna ultimo_aviso_whatsapp_em em alunos (último aviso WhatsApp enviado)
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                table_names = inspector.get_table_names()
+                if 'alunos' in table_names:
+                    columns = [col['name'] for col in inspector.get_columns('alunos')]
+                    if 'ultimo_aviso_whatsapp_em' not in columns:
+                        print("🔄 Migração: Adicionando coluna 'ultimo_aviso_whatsapp_em' na tabela 'alunos'...")
+                        db_uri = str(db.engine.url)
+                        is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                        try:
+                            if is_postgres:
+                                db.session.execute(text("""
+                                    ALTER TABLE alunos
+                                    ADD COLUMN IF NOT EXISTS ultimo_aviso_whatsapp_em TIMESTAMP
+                                """))
+                            else:
+                                db.session.execute(text("""
+                                    ALTER TABLE alunos
+                                    ADD COLUMN ultimo_aviso_whatsapp_em DATETIME
+                                """))
+                            db.session.commit()
+                            print("✅ Migração concluída: coluna 'ultimo_aviso_whatsapp_em' na tabela 'alunos'")
+                        except Exception as alter_error:
+                            db.session.rollback()
+                            error_str = str(alter_error).lower()
+                            if 'already exists' in error_str or 'duplicate column' in error_str:
+                                print("✅ Coluna 'ultimo_aviso_whatsapp_em' já existe na tabela 'alunos'")
+                            else:
+                                raise
+            except Exception as e:
+                db.session.rollback()
+                error_str = str(e).lower()
+                if 'does not exist' not in error_str and 'no such table' not in error_str:
+                    print(f"⚠️  Aviso na migração de ultimo_aviso_whatsapp_em: {e}")
             
             # Migração: Criar tabela lista_espera se não existir
             try:
@@ -465,6 +516,44 @@ def create_app():
                     print(f"⚠️  Aviso na migração de lista_espera (colunas): {e}")
             
             db.create_all()
+
+            # Remover linhas duplicadas em alunos (mesmo id) — causa erro ao excluir via ORM
+            try:
+                from sqlalchemy import inspect, text
+                inspector = inspect(db.engine)
+                if 'alunos' in inspector.get_table_names():
+                    db_uri = str(db.engine.url)
+                    is_postgres = 'postgresql' in db_uri or 'postgres' in db_uri
+                    if is_postgres:
+                        dup = db.session.execute(text(
+                            "SELECT id FROM alunos GROUP BY id HAVING COUNT(*) > 1"
+                        )).fetchall()
+                        if dup:
+                            print(f"🔄 Removendo {len(dup)} id(s) duplicado(s) na tabela alunos...")
+                            db.session.execute(text("""
+                                DELETE FROM alunos a
+                                USING alunos b
+                                WHERE a.id = b.id AND a.ctid > b.ctid
+                            """))
+                            db.session.commit()
+                            print("✅ Duplicatas de alunos removidas")
+                    else:
+                        dup = db.session.execute(text(
+                            "SELECT id FROM alunos GROUP BY id HAVING COUNT(*) > 1"
+                        )).fetchall()
+                        if dup:
+                            print(f"🔄 Removendo {len(dup)} id(s) duplicado(s) na tabela alunos...")
+                            db.session.execute(text("""
+                                DELETE FROM alunos
+                                WHERE rowid NOT IN (
+                                    SELECT MIN(rowid) FROM alunos GROUP BY id
+                                )
+                            """))
+                            db.session.commit()
+                            print("✅ Duplicatas de alunos removidas")
+            except Exception as e:
+                db.session.rollback()
+                print(f"⚠️  Aviso na limpeza de duplicatas em alunos: {e}")
             
             # Verificar e criar usuário admin se não existir (apenas em produção)
             env = app.config.get('ENVIRONMENT', 'dev')
@@ -510,6 +599,18 @@ def create_app():
     # Registrar API blueprint (para frontend moderno)
     from app.api.routes import api_bp
     app.register_blueprint(api_bp)
+
+    # Jobs HTTP (cron externo): enqueue + processamento da fila Evolution
+    from app.api.internal_jobs import internal_jobs_bp
+    app.register_blueprint(internal_jobs_bp)
+
+    # CLI Flask (flask whatsapp-enqueue / whatsapp-process)
+    _register_whatsapp_cli(app)
+
+    # APScheduler opcional (um único worker — ver WHATSAPP_EVOLUTION.md)
+    from app.jobs.scheduler import start_scheduler
+
+    start_scheduler(app)
     
     # Rota de health check para o Render
     @app.route('/health')
@@ -517,4 +618,47 @@ def create_app():
         return {'status': 'ok'}, 200
     
     return app
+
+
+def _register_whatsapp_cli(app):
+    """Comandos: flask whatsapp-enqueue | whatsapp-process | whatsapp-status | whatsapp-gen-token"""
+
+    @app.cli.command('whatsapp-enqueue')
+    def cli_whatsapp_enqueue():
+        """Enfileira cobranças conforme vencimento (execução manual)."""
+        from app.services.cobranca_enqueue_service import CobrancaEnqueueService
+
+        print(CobrancaEnqueueService(app).run())
+
+    @app.cli.command('whatsapp-process')
+    def cli_whatsapp_process():
+        """Processa um lote da fila Evolution."""
+        from app.services.whatsapp_queue_processor import WhatsappQueueProcessor
+
+        print(WhatsappQueueProcessor(app).process_batch())
+
+    @app.cli.command('whatsapp-status')
+    def cli_whatsapp_status():
+        """Exibe contadores da fila e config (sem segredos)."""
+        from app.api.internal_jobs import _queue_counters
+
+        cfg = app.config
+        with app.app_context():
+            data = {
+                'evolution_enabled': bool(cfg.get('WHATSAPP_EVOLUTION_ENABLED')),
+                'has_base_url': bool(cfg.get('EVOLUTION_API_BASE_URL')),
+                'has_api_key': bool(cfg.get('EVOLUTION_API_KEY')),
+                'instance': cfg.get('EVOLUTION_INSTANCE_NAME') or None,
+                'timezone': cfg.get('APP_TIMEZONE'),
+                'lookback_days': cfg.get('WHATSAPP_ENQUEUE_LOOKBACK_DAYS'),
+                'fila': _queue_counters(),
+            }
+        import json
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+
+    @app.cli.command('whatsapp-gen-token')
+    def cli_whatsapp_gen_token():
+        """Gera um INTERNAL_JOB_TOKEN aleatório (para colar no .env)."""
+        import secrets
+        print(secrets.token_hex(32))
 
